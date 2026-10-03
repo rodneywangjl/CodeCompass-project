@@ -55,7 +55,11 @@ def _node_text(node, content: bytes) -> str:
 
 
 def _unwrap(node, spec):
-    """Return (range_node, named_node) peeling export/decorator wrappers."""
+    """Return (range_node, named_node, intermediates) peeling wrappers.
+
+    Intermediates (e.g. variable_declarator) are kept so the symbol can be
+    resolved when the inner function node itself is anonymous.
+    """
     current = node
     while True:
         named = None
@@ -66,31 +70,33 @@ def _unwrap(node, spec):
         if named is None or current.type not in spec["wrapper"]:
             break
         current = named
-    # Find the named node for the symbol (direct or one level down).
     if current.type in spec["function"] or current.type in spec["class"]:
-        return node, current
-    for child in current.children:
-        if child.type in spec["function"] or child.type in spec["class"]:
-            return node, child
-        for grand in child.children:
-            if grand.type in spec["function"] or grand.type in spec["class"]:
-                return node, grand
-    return node, None
+        return node, current, []
+    # Nearest function/class descendant (e.g. export > lexical > declarator
+    # > arrow); intermediates resolve anonymous names like `const f = ...`.
+    from collections import deque
+    queue = deque((child, [child]) for child in current.children)
+    while queue:
+        descendant, trail = queue.popleft()
+        if descendant.type in spec["function"] or descendant.type in spec["class"]:
+            return node, descendant, trail[:-1]
+        if len(trail) < 3:
+            queue.extend((c, [*trail, c]) for c in descendant.children)
+    return node, None, []
 
 
-def _symbol(named, content: bytes, parent: str | None) -> str | None:
-    if named is None:
-        return parent
-    name_node = named.child_by_field_name("name")
-    if name_node is None:
-        for child in named.children:
-            if child.type == "identifier":
-                name_node = child
-                break
-    if name_node is None:
-        return parent
-    name = _node_text(name_node, content)
-    return f"{parent}.{name}" if parent else name
+def _symbol(named, intermediates, content: bytes, parent: str | None) -> str | None:
+    for candidate in [named, *intermediates] if named is not None else intermediates:
+        name_node = candidate.child_by_field_name("name")
+        if name_node is None:
+            for child in candidate.children:
+                if child.type == "identifier":
+                    name_node = child
+                    break
+        if name_node is not None:
+            name = _node_text(name_node, content)
+            return f"{parent}.{name}" if parent else name
+    return parent
 
 
 def _methods_of(class_node, spec):
@@ -112,7 +118,7 @@ def _split_children(node, spec, emitter: _Emitter, symbol: str | None):
     """Split an oversize unit at its top-level blocks (greedy groups)."""
     container = node
     for child in node.children:
-        if child.type == "block":
+        if child.type in ("block", "statement_block"):
             container = child
             break
     stmts = [c for c in container.children
@@ -181,10 +187,10 @@ def _windows(emitter: _Emitter, start: int, end: int, symbol: str | None):
 
 
 def _emit_unit(node, spec, content: bytes, emitter: _Emitter, parent: str | None):
-    range_node, named = _unwrap(node, spec)
+    range_node, named, intermediates = _unwrap(node, spec)
     start = range_node.start_point[0] + 1
     end = range_node.end_point[0] + 1
-    symbol = _symbol(named, content, parent)
+    symbol = _symbol(named, intermediates, content, parent)
     state = classify_size(emitter.tokens(start, end), emitter.policy)
     if state == "fits":
         emitter.take(start, end, symbol)
