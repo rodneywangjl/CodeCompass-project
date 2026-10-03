@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-import hashlib
-
-
-def text_hash(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+from codecompass.offline.chunking.ids import text_hash
 
 
 class FakeVectorStore:
