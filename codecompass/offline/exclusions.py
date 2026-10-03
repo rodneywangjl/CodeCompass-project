@@ -33,4 +33,8 @@ def decide(path: str, cfg, get_size=None, get_head=None) -> Decision:
     for part in normpath.split("/"):
         if part in cfg.exclude_dirs:
             return Decision(False, f"excluded:dir:{part}")
+    if get_size is not None and get_size() > cfg.max_file_bytes:
+        return Decision(False, "too-large")
+    if get_head is not None and b"\x00" in get_head():
+        return Decision(False, "binary")
     return Decision(True, "include")
