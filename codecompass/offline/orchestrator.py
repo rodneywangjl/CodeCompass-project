@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+from time import perf_counter
 
 from .chunking import chunk_file
 from .chunking.ids import text_hash
@@ -109,11 +110,13 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
         decisions: dict[str, object] = {}
         blobs: dict[str, bytes] = {}
         deleted = set(changeset.deleted)
+        t_classify = perf_counter()
         for path in sorted(set(touched) - deleted):
             decision, blob = classify(path)
             decisions[path] = decision
             if blob is not None:
                 blobs[path] = blob
+        timings["classify"] = perf_counter() - t_classify
         for path in sorted(set(touched)):
             decisions.setdefault(path, Decision(True, "include"))
         included = sorted(blobs)
@@ -134,25 +137,30 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
         from .models import ChunkMode
         new_chunks = []
         files_fallback = 0
+        t_chunk = perf_counter()
         for path in included:
             text = blobs[path].decode("utf-8", "replace")
             chunks, m = chunk_file(path, text, head, policy=policy)
             if m is ChunkMode.FALLBACK:
                 files_fallback += 1
             new_chunks.extend(chunks)
+        timings["chunk"] = perf_counter() - t_chunk
         # Phase B (pure compute): embed everything new. Still no mutations,
         # so an embedding failure returns with the existing index untouched.
         # Vectors for the whole run are held in memory; bounded-memory
         # batching (O9) is revisited with measurements per C6.
         pending = [c for c in new_chunks if text_hash(c.text) not in reuse]
+        t_embed = perf_counter()
         if pending:
             from .embedding import embed_in_batches
             for chunk, vector in zip(pending, embed_in_batches(
                     embedder, [c.text for c in pending],
                     config.embedder.batch_size)):
                 reuse.setdefault(text_hash(chunk.text), vector)
+        timings["embed"] = perf_counter() - t_embed
         vectors = [reuse[text_hash(c.text)] for c in new_chunks]
         chunks_added = len(new_chunks)
+        t_store = perf_counter()
         # Phase C (mutation): remove stale chunks first. The keyword delete is
         # committed before any insert because delete tombstones would
         # otherwise also remove documents added later in the same run.
@@ -172,6 +180,7 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
         # metadata-only (no re-embed, no keyword churn), which is why T7.7
         # scopes "no store write" to content writes.
         vector_store.restamp_commit_sha(head)
+        timings["store"] = perf_counter() - t_store
 
         finished = datetime.now(timezone.utc)
         meta = meta.__class__(**{**meta.__dict__, "indexed_commit": head,
@@ -180,12 +189,16 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
                                  "in_progress": None})
         write_meta(idx, meta)
         elapsed = (finished - started).total_seconds()
-        return RunReport(
+        from collections import Counter
+        skipped_by_rule = Counter(
+            d.reason for d in decisions.values() if not d.included)
+        report = RunReport(
             mode=mode, from_commit=base_commit, to_commit=head, note=note,
             files_added=len(changeset.added), files_modified=len(changeset.modified),
             files_deleted=len(changeset.deleted),
             files_skipped=sum(1 for p, d in decisions.items()
                               if not d.included and d.reason != "non-code"),
+            skipped_by_rule=dict(skipped_by_rule),
             files_non_code=sum(1 for d in decisions.values() if d.reason == "non-code"),
             files_fallback=files_fallback,
             chunks_added=chunks_added, chunks_removed=chunks_removed,
@@ -193,3 +206,7 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
             embedder_revision=embedder.identity.revision,
             elapsed_seconds=elapsed, timings=timings,
         )
+        from .report import write_json
+        stamp = finished.isoformat(timespec="seconds").replace(":", "").replace("+", "")
+        write_json(report, idx / "runs" / f"{stamp}.json")
+        return report

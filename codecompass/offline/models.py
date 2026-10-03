@@ -72,6 +72,7 @@ class RunReport:
     files_deleted: int = 0
     files_renamed: int = 0
     files_skipped: int = 0
+    skipped_by_rule: dict = field(default_factory=dict)
     files_fallback: int = 0
     files_non_code: int = 0
     chunks_added: int = 0
