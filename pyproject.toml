@@ -1,0 +1,10 @@
+[project]
+name = "codecompass"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+markers = [
+    "model: tests requiring a real local model (excluded from the required suite)",
+]
+strict_markers = true
