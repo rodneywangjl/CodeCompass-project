@@ -52,6 +52,17 @@ class GitSource:
                 deleted.append(path)
         return ChangeSet(added=sorted(added), modified=sorted(modified), deleted=sorted(deleted))
 
+    def is_ancestor(self, old: str, new: str) -> bool:
+        """True if *old* is reachable from *new*; False on any unresolvable sha."""
+        try:
+            r = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", old, new],
+                cwd=self.path, capture_output=True,
+            )
+            return r.returncode == 0
+        except Exception:
+            return False
+
     def entry_kind(self, sha: str, path: str) -> str:
         """One of blob|symlink|submodule|missing, from the commit's tree."""
         out = self._repo.git.ls_tree(sha, "--", path).strip()
