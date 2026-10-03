@@ -87,8 +87,31 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
             "target_commit": head, "touched_paths": touched}})
         write_meta(idx, meta)
 
-        decisions = {p: decide_for_source(p, config.files, src, head) for p in touched}
-        included = sorted(p for p, d in decisions.items() if d.included)
+        from .exclusions import Decision, decide
+
+        def classify(path: str):
+            """Path rules + size gate without reading content; one read after."""
+            quick = decide(path, config.files)
+            if not quick.included:
+                return quick, None
+            if src.blob_size(head, path) > config.files.max_file_bytes:
+                return Decision(False, "too-large"), None
+            blob = src.read_blob(head, path)
+            if b"\x00" in blob[:8192]:
+                return Decision(False, "binary"), None
+            return Decision(True, "include"), blob
+
+        decisions: dict[str, object] = {}
+        blobs: dict[str, bytes] = {}
+        for path in sorted(set(changeset.added) | set(changeset.modified)):
+            decision, blob = classify(path)
+            decisions[path] = decision
+            if blob is not None:
+                blobs[path] = blob
+        for path in sorted(set(changeset.deleted) | set(changeset.added) |
+                           set(changeset.modified)):
+            decisions.setdefault(path, Decision(True, "include"))
+        included = sorted(blobs)
 
         vector_store = VectorStore(idx / "vector", dimension=embedder.identity.dimension)
         keyword_index = KeywordIndex(idx / "keyword")
@@ -101,14 +124,19 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
         files_fallback = 0
         batch_size = config.chunking.batch_files or len(included) or 1
         reuse = vector_store.vectors_for_paths(touched)
+        # Phase 1: remove stale chunks first. The keyword delete is committed
+        # before any insert because delete tombstones would otherwise also
+        # remove documents added later in the same run.
+        delete_paths = sorted(set(included) | {before[c] for c in stale})
+        if delete_paths:
+            vector_store.delete_paths(delete_paths)
+            keyword_index.delete_paths(delete_paths)
+            keyword_index.commit()
         for i in range(0, len(included), batch_size):
             batch = included[i:i + batch_size]
-            vector_store.delete_paths(batch)
-            keyword_index.delete_paths(batch)
             new_chunks = []
             for path in batch:
-                blob = src.read_blob(head, path)
-                text = blob.decode("utf-8", "replace")
+                text = blobs[path].decode("utf-8", "replace")
                 chunks, m = chunk_file(path, text, head)
                 from .models import ChunkMode
                 if m is ChunkMode.FALLBACK:
@@ -126,13 +154,9 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
                 vector_store.add(new_chunks, vectors)
                 keyword_index.add(new_chunks)
                 chunks_added += len(new_chunks)
-        if stale:
-            vector_store.delete_paths(sorted({before[c] for c in stale}))
-            keyword_index.delete_paths(sorted({before[c] for c in stale}))
-        dirty = bool(chunks_added or chunks_removed or included)
-        if dirty:
+        if chunks_added:
             keyword_index.commit()
-        else:
+        elif not delete_paths:
             keyword_index.close()
 
         finished = datetime.now(timezone.utc)
