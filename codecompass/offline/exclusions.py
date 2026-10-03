@@ -41,3 +41,25 @@ def decide(path: str, cfg, get_size=None, get_head=None) -> Decision:
     if ext not in {e.lower() for e in cfg.source_extensions}:
         return Decision(False, "non-code")
     return Decision(True, "include")
+
+
+def decide_for_source(path: str, cfg, source, sha: str) -> Decision:
+    """Wire :func:`decide` to a git source with lazy size/content reads (O6)."""
+    return decide(
+        path, cfg,
+        get_size=lambda: source.blob_size(sha, path),
+        get_head=lambda: source.read_blob(sha, path)[:8192],
+    )
+
+
+def classify_all(paths, cfg, source=None, sha=None) -> tuple:
+    """Decide many paths; returns (decisions, counts-by-reason)."""
+    from collections import Counter
+    decisions = []
+    counts: Counter = Counter()
+    for path in paths:
+        d = decide_for_source(path, cfg, source, sha) if source is not None \
+            else decide(path, cfg)
+        decisions.append(d)
+        counts[d.reason] += 1
+    return decisions, counts
