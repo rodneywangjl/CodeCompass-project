@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import tempfile
@@ -28,8 +29,29 @@ class EmbedderMismatchError(MetaError):
     """Embedder identity differs from the one that built the index."""
 
 
-def default_meta(identity: EmbedderIdentity, fingerprint: str = "") -> IndexMeta:
-    return IndexMeta(
+def repo_id(repo_path) -> str:
+    """Stable repository identifier for the index directory (spec C4)."""
+    return hashlib.sha1(str(Path(repo_path).resolve()).encode()).hexdigest()[:16]
+
+
+def index_path_for(repo_path, base_dir) -> Path:
+    """Per-repository index directory: base / stable repo id."""
+    return Path(base_dir) / repo_id(repo_path)
+
+
+def config_fingerprint(config) -> str:
+    """Short hash of the content-affecting configuration (T7.6)."""
+    material = json.dumps({
+        "chunking": [config.chunking.target_tokens, config.chunking.hard_max_tokens],
+        "files": [config.files.max_file_bytes, list(config.files.source_extensions),
+                  list(config.files.exclude_patterns), list(config.files.exclude_dirs)],
+        "embedder": [config.embedder.model, config.embedder.revision,
+                     config.embedder.dimension],
+    }, sort_keys=True)
+    return hashlib.sha256(material.encode()).hexdigest()[:16]
+
+
+def default_meta(identity: EmbedderIdentity, fingerprint: str = "") -> IndexMeta:    return IndexMeta(
         schema_version=SCHEMA_VERSION,
         embedder=identity,
         indexed_commit=None,

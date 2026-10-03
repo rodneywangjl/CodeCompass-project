@@ -6,40 +6,29 @@ construction. The recorded commit advances only after both stores are done.
 
 from __future__ import annotations
 
-import hashlib
-import json
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .chunking import chunk_file
 from .chunking.ids import text_hash
-from .exclusions import decide_for_source
 from .git_source import GitSource
 from .lock import acquire_lock
-from .meta import check_compatible, default_meta, read_meta, write_meta
+from .meta import (
+    check_compatible,
+    config_fingerprint,
+    default_meta,
+    index_path_for,
+    read_meta,
+    repo_id,  # noqa: F401  (re-exported for existing callers)
+    write_meta,
+)
 from .models import RunReport
 from .stores.keyword import KeywordIndex
 from .stores.vector import VectorStore
 
-
-def repo_id(repo_path) -> str:
-    """Stable repository identifier (spec C4)."""
-    return hashlib.sha1(str(Path(repo_path).resolve()).encode()).hexdigest()[:16]
-
-
-def index_path_for(repo_path, base_dir) -> Path:
-    return Path(base_dir) / repo_id(repo_path)
-
-
-def config_fingerprint(config) -> str:
-    material = json.dumps({
-        "chunking": [config.chunking.target_tokens, config.chunking.hard_max_tokens],
-        "files": [config.files.max_file_bytes, list(config.files.source_extensions),
-                  list(config.files.exclude_patterns), list(config.files.exclude_dirs)],
-        "embedder": [config.embedder.model, config.embedder.revision,
-                     config.embedder.dimension],
-    }, sort_keys=True)
-    return hashlib.sha256(material.encode()).hexdigest()[:16]
+# index_path_for / config_fingerprint are defined in .meta and re-exported
+# here so existing callers keep working.
+__all__ = ["run", "index_path_for", "repo_id", "config_fingerprint"]
 
 
 def run(repo_path, *, config, index_dir=None, embedder=None,

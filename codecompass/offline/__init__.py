@@ -10,10 +10,18 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .git_source import GitSource
-from .meta import read_meta
-from .orchestrator import index_path_for
+from .meta import config_fingerprint, index_path_for, read_meta
+from .lock import LockTimeout
 
 __all__ = ["ensure_current", "status", "open_index", "check_consistency"]
+
+
+@dataclass(frozen=True)
+class EnsureResult:
+    ok: bool
+    status: str  # current | failed | locked
+    report: object = None
+    message: str = ""
 
 
 @dataclass(frozen=True)
@@ -50,3 +58,35 @@ def status(repo_path, *, config, index_dir=None) -> IndexStatus:
         last_run_at=meta.last_run_at,
         config_fingerprint=meta.config_fingerprint,
     )
+
+
+def ensure_current(repo_path, *, config, index_dir=None, embedder=None,
+                   embedder_factory=None) -> EnsureResult:
+    """Online pipeline's single write-capable entry (AC-5.6, Article II.2).
+
+    Fast path (O1): when the index is already current, compare commits only:
+    no lock, no source reads, no store/model imports, no writes. Otherwise run
+    an incremental update. Never blocks indefinitely: lock waits time out.
+    """
+    from .models import RunReport
+    src = GitSource(repo_path)
+    head = src.head_sha()
+    idx = index_path_for(repo_path, _base_dir(config, index_dir))
+    meta_path = idx / "meta.json"
+    if meta_path.exists():
+        meta = read_meta(idx)
+        if (meta.indexed_commit == head and meta.in_progress is None
+                and meta.config_fingerprint == config_fingerprint(config)):
+            return EnsureResult(
+                ok=True, status="current",
+                report=RunReport(mode="up-to-date", from_commit=head,
+                                 to_commit=head))
+    from .orchestrator import run  # heavy imports only on the stale path
+    try:
+        report = run(repo_path, config=config, index_dir=index_dir,
+                     embedder=embedder, embedder_factory=embedder_factory)
+    except LockTimeout as e:
+        return EnsureResult(ok=False, status="locked", message=str(e))
+    except Exception as e:  # noqa: BLE001 (AC-5.8: fail safe, index stays usable)
+        return EnsureResult(ok=False, status="failed", message=str(e))
+    return EnsureResult(ok=True, status="current", report=report)
