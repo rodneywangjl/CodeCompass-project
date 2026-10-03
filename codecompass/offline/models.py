@@ -66,6 +66,7 @@ class RunReport:
     mode: str  # full | incremental | up-to-date | rebuild
     to_commit: str | None = None
     from_commit: str | None = None
+    note: str = ""  # why this mode (e.g. rebuild reason)
     files_added: int = 0
     files_modified: int = 0
     files_deleted: int = 0

@@ -73,9 +73,15 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
         if meta.indexed_commit and src.is_ancestor(meta.indexed_commit, head):
             base_commit: str | None = meta.indexed_commit
             mode = "incremental"
+            note = ""
         else:
             base_commit = None
-            mode = "full" if meta.indexed_commit is None else "rebuild"
+            if meta.indexed_commit is None:
+                mode, note = "full", ""
+            else:
+                mode = "rebuild"
+                note = ("recorded commit is not reachable from HEAD "
+                        "(history rewritten or unresolvable); full rebuild")
 
         changeset = src.diff(base_commit, head)
         touched = set(changeset.added) | set(changeset.modified) | set(changeset.deleted)
@@ -167,7 +173,7 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
         write_meta(idx, meta)
         elapsed = (finished - started).total_seconds()
         return RunReport(
-            mode=mode, from_commit=base_commit, to_commit=head,
+            mode=mode, from_commit=base_commit, to_commit=head, note=note,
             files_added=len(changeset.added), files_modified=len(changeset.modified),
             files_deleted=len(changeset.deleted),
             files_skipped=sum(1 for p, d in decisions.items()
