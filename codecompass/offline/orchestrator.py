@@ -177,6 +177,10 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
             keyword_index.commit()
         elif not delete_paths:
             keyword_index.close()
+        # Stamp confirmation for AC-2.6/T7.3 (see restamp_commit_sha): even a
+        # metadata-only advance confirms every chunk present at HEAD. This is
+        # metadata-only (no re-embed, no keyword churn), which is why T7.7
+        # scopes "no store write" to content writes.
         vector_store.restamp_commit_sha(head)
 
         finished = datetime.now(timezone.utc)
