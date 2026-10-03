@@ -71,6 +71,18 @@ def write_meta(index_dir, meta: IndexMeta) -> None:
         raise
 
 
+def check_compatible(meta: IndexMeta, configured: EmbedderIdentity) -> None:
+    """Refuse an index built with a different embedder (Article II.4, AC-5.3)."""
+    found = meta.embedder
+    if (found.model, found.revision, found.dimension) != (
+            configured.model, configured.revision, configured.dimension):
+        raise EmbedderMismatchError(
+            f"embedder mismatch: index built with "
+            f"{found.model}@{found.revision} dim {found.dimension}, "
+            f"configured {configured.model}@{configured.revision} "
+            f"dim {configured.dimension}")
+
+
 def read_meta(index_dir) -> IndexMeta:
     """Read meta.json, refusing unknown schema versions (AC-5.4)."""
     raw = json.loads((Path(index_dir) / FILENAME).read_text(encoding="utf-8"))
