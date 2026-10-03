@@ -11,6 +11,11 @@ import pathlib
 import tomllib
 from dataclasses import dataclass, field
 
+from codecompass.offline.exclusions import (
+    DEFAULT_EXCLUDE_DIRS,
+    DEFAULT_EXCLUDE_PATTERNS,
+)
+
 DEFAULT_EMBEDDER_MODEL = "jinaai/jina-embeddings-v2-base-code"
 # Pinned model revision is fixed in T10.1 (real embedder); empty until then.
 DEFAULT_EMBEDDER_REVISION = ""
@@ -50,14 +55,8 @@ class FilesConfig:
         ".c", ".h", ".cpp", ".hpp", ".go", ".rs", ".rb",
         ".php", ".swift", ".kt", ".cs", ".scala", ".sh",
     )
-    exclude_patterns: tuple = (
-        ".env*", "*.pem", "*.key", "*.crt", "*.cert",
-        "*.min.js", "*.min.css", "package-lock.json",
-    )
-    exclude_dirs: tuple = (
-        "node_modules", "build", "dist", "target", "venv",
-        ".venv", "__pycache__", ".git",
-    )
+    exclude_patterns: tuple = DEFAULT_EXCLUDE_PATTERNS
+    exclude_dirs: tuple = DEFAULT_EXCLUDE_DIRS
 
 
 @dataclass(frozen=True)
