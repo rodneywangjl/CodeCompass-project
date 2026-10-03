@@ -103,13 +103,13 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
 
         decisions: dict[str, object] = {}
         blobs: dict[str, bytes] = {}
-        for path in sorted(set(changeset.added) | set(changeset.modified)):
+        deleted = set(changeset.deleted)
+        for path in sorted(set(touched) - deleted):
             decision, blob = classify(path)
             decisions[path] = decision
             if blob is not None:
                 blobs[path] = blob
-        for path in sorted(set(changeset.deleted) | set(changeset.added) |
-                           set(changeset.modified)):
+        for path in sorted(set(touched)):
             decisions.setdefault(path, Decision(True, "include"))
         included = sorted(blobs)
 
