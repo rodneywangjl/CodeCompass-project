@@ -116,16 +116,11 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
                 new_chunks.extend(chunks)
             pending = [c for c in new_chunks if text_hash(c.text) not in reuse]
             if pending:
-                order = sorted(range(len(pending)), key=lambda k: len(pending[k].text))
-                got: dict[int, list[float]] = {}
-                step = config.embedder.batch_size or len(pending)
-                for j in range(0, len(order), step):
-                    slot = order[j:j + step]
-                    vecs = embedder.embed([pending[k].text for k in slot])
-                    for k, v in zip(slot, vecs):
-                        got[k] = v
-                for k, c in enumerate(pending):
-                    reuse.setdefault(text_hash(c.text), got[k])
+                from .embedding import embed_in_batches
+                for chunk, vector in zip(pending, embed_in_batches(
+                        embedder, [c.text for c in pending],
+                        config.embedder.batch_size)):
+                    reuse.setdefault(text_hash(chunk.text), vector)
             vectors = [reuse[text_hash(c.text)] for c in new_chunks]
             if new_chunks:
                 vector_store.add(new_chunks, vectors)
