@@ -37,4 +37,7 @@ def decide(path: str, cfg, get_size=None, get_head=None) -> Decision:
         return Decision(False, "too-large")
     if get_head is not None and b"\x00" in get_head():
         return Decision(False, "binary")
+    ext = "." + normpath.rsplit(".", 1)[-1].lower() if "." in name else ""
+    if ext not in {e.lower() for e in cfg.source_extensions}:
+        return Decision(False, "non-code")
     return Decision(True, "include")
