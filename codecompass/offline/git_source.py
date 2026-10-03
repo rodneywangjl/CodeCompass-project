@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 from git import InvalidGitRepositoryError, Repo
@@ -50,3 +51,32 @@ class GitSource:
             elif status == "D":
                 deleted.append(path)
         return ChangeSet(added=sorted(added), modified=sorted(modified), deleted=sorted(deleted))
+
+    def entry_kind(self, sha: str, path: str) -> str:
+        """One of blob|symlink|submodule|missing, from the commit's tree."""
+        out = self._repo.git.ls_tree(sha, "--", path).strip()
+        if not out:
+            return "missing"
+        mode = out.split()[0]
+        if mode == "120000":
+            return "symlink"
+        if mode == "160000":
+            return "submodule"
+        return "blob"
+
+    def read_blob(self, sha: str, path: str) -> bytes:
+        """Committed bytes for *path*; never the working tree, never follows links."""
+        kind = self.entry_kind(sha, path)
+        if kind != "blob":
+            raise GitSourceError(f"not a readable file ({kind}): {path}")
+        r = subprocess.run(
+            ["git", "cat-file", "-p", f"{sha}:{path}"],
+            cwd=self.path, capture_output=True, check=True,
+        )
+        return r.stdout
+
+    def blob_size(self, sha: str, path: str) -> int:
+        """Size from the object database without reading content."""
+        if self.entry_kind(sha, path) != "blob":
+            raise GitSourceError(f"not a readable file: {path}")
+        return int(self._repo.git.cat_file("-s", f"{sha}:{path}"))
