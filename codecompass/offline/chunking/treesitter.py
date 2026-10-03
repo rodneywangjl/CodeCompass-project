@@ -171,12 +171,12 @@ def _windows(emitter: _Emitter, start: int, end: int, symbol: str | None):
             if state == "fits":
                 nxt += 1
             elif state == "over_target":
-                break_at = nxt
+                break_at = max(nxt - 1, cur)
                 for back in range(nxt - 1, cur - 1, -1):
                     if emitter.lines[back - 1].strip() == "":
                         break_at = back
                         break
-                nxt = max(break_at, cur)
+                nxt = break_at
                 break
             else:  # over_hard_max: force a cut
                 break
