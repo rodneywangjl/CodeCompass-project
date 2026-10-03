@@ -54,12 +54,17 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
 
     meta_path = idx / "meta.json"
     meta = read_meta(idx) if meta_path.exists() else None
-    if meta is not None and meta.indexed_commit == head and meta.in_progress is None:
+    current_fp_early = config_fingerprint(config)
+    if (meta is not None and meta.indexed_commit == head
+            and meta.in_progress is None
+            and meta.config_fingerprint == current_fp_early):
         return RunReport(mode="up-to-date", from_commit=head, to_commit=head)
 
     with acquire_lock(idx / "index.lock", config.lock.timeout_seconds):
         meta = read_meta(idx) if meta_path.exists() else None
-        if meta is not None and meta.indexed_commit == head and meta.in_progress is None:
+        if (meta is not None and meta.indexed_commit == head
+                and meta.in_progress is None
+                and meta.config_fingerprint == config_fingerprint(config)):
             return RunReport(mode="up-to-date", from_commit=head, to_commit=head)
 
         if embedder is None:
@@ -69,8 +74,10 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
         if meta is None:
             meta = default_meta(embedder.identity, config_fingerprint(config))
         check_compatible(meta, embedder.identity)
+        current_fp = config_fingerprint(config)
 
-        if meta.indexed_commit and src.is_ancestor(meta.indexed_commit, head):
+        if (meta.indexed_commit and src.is_ancestor(meta.indexed_commit, head)
+                and meta.config_fingerprint == current_fp):
             base_commit: str | None = meta.indexed_commit
             mode = "incremental"
             note = ""
@@ -78,6 +85,9 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
             base_commit = None
             if meta.indexed_commit is None:
                 mode, note = "full", ""
+            elif meta.config_fingerprint != current_fp:
+                mode = "rebuild"
+                note = "indexing configuration changed; full rebuild"
             else:
                 mode = "rebuild"
                 note = ("recorded commit is not reachable from HEAD "
@@ -141,9 +151,12 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
         for i in range(0, len(included), batch_size):
             batch = included[i:i + batch_size]
             new_chunks = []
+            from .chunking.sizing import SizePolicy
+            policy = SizePolicy(target_tokens=config.chunking.target_tokens,
+                                hard_max_tokens=config.chunking.hard_max_tokens)
             for path in batch:
                 text = blobs[path].decode("utf-8", "replace")
-                chunks, m = chunk_file(path, text, head)
+                chunks, m = chunk_file(path, text, head, policy=policy)
                 from .models import ChunkMode
                 if m is ChunkMode.FALLBACK:
                     files_fallback += 1
@@ -169,6 +182,7 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
         finished = datetime.now(timezone.utc)
         meta = meta.__class__(**{**meta.__dict__, "indexed_commit": head,
                                  "last_run_at": finished.isoformat(),
+                                 "config_fingerprint": current_fp,
                                  "in_progress": None})
         write_meta(idx, meta)
         elapsed = (finished - started).total_seconds()
