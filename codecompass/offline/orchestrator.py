@@ -125,44 +125,45 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
         stale = sorted({c for c, p in before.items() if p in touched})
         chunks_removed = len(stale)
 
-        chunks_added = 0
-        files_fallback = 0
-        batch_size = config.chunking.batch_files or len(included) or 1
         reuse = vector_store.vectors_for_paths(touched)
-        # Phase 1: remove stale chunks first. The keyword delete is committed
-        # before any insert because delete tombstones would otherwise also
-        # remove documents added later in the same run.
+        # Phase A (pure compute): chunk every included file. No store has been
+        # touched yet, so a failure here leaves the index unchanged (T8.3).
+        from .chunking.sizing import SizePolicy
+        policy = SizePolicy(target_tokens=config.chunking.target_tokens,
+                            hard_max_tokens=config.chunking.hard_max_tokens)
+        from .models import ChunkMode
+        new_chunks = []
+        files_fallback = 0
+        for path in included:
+            text = blobs[path].decode("utf-8", "replace")
+            chunks, m = chunk_file(path, text, head, policy=policy)
+            if m is ChunkMode.FALLBACK:
+                files_fallback += 1
+            new_chunks.extend(chunks)
+        # Phase B (pure compute): embed everything new. Still no mutations,
+        # so an embedding failure returns with the existing index untouched.
+        # Vectors for the whole run are held in memory; bounded-memory
+        # batching (O9) is revisited with measurements per C6.
+        pending = [c for c in new_chunks if text_hash(c.text) not in reuse]
+        if pending:
+            from .embedding import embed_in_batches
+            for chunk, vector in zip(pending, embed_in_batches(
+                    embedder, [c.text for c in pending],
+                    config.embedder.batch_size)):
+                reuse.setdefault(text_hash(chunk.text), vector)
+        vectors = [reuse[text_hash(c.text)] for c in new_chunks]
+        chunks_added = len(new_chunks)
+        # Phase C (mutation): remove stale chunks first. The keyword delete is
+        # committed before any insert because delete tombstones would
+        # otherwise also remove documents added later in the same run.
         delete_paths = sorted(set(included) | {before[c] for c in stale})
         if delete_paths:
             vector_store.delete_paths(delete_paths)
             keyword_index.delete_paths(delete_paths)
             keyword_index.commit()
-        for i in range(0, len(included), batch_size):
-            batch = included[i:i + batch_size]
-            new_chunks = []
-            from .chunking.sizing import SizePolicy
-            policy = SizePolicy(target_tokens=config.chunking.target_tokens,
-                                hard_max_tokens=config.chunking.hard_max_tokens)
-            for path in batch:
-                text = blobs[path].decode("utf-8", "replace")
-                chunks, m = chunk_file(path, text, head, policy=policy)
-                from .models import ChunkMode
-                if m is ChunkMode.FALLBACK:
-                    files_fallback += 1
-                new_chunks.extend(chunks)
-            pending = [c for c in new_chunks if text_hash(c.text) not in reuse]
-            if pending:
-                from .embedding import embed_in_batches
-                for chunk, vector in zip(pending, embed_in_batches(
-                        embedder, [c.text for c in pending],
-                        config.embedder.batch_size)):
-                    reuse.setdefault(text_hash(chunk.text), vector)
-            vectors = [reuse[text_hash(c.text)] for c in new_chunks]
-            if new_chunks:
-                vector_store.add(new_chunks, vectors)
-                keyword_index.add(new_chunks)
-                chunks_added += len(new_chunks)
-        if chunks_added:
+        if new_chunks:
+            vector_store.add(new_chunks, vectors)
+            keyword_index.add(new_chunks)
             keyword_index.commit()
         elif not delete_paths:
             keyword_index.close()
