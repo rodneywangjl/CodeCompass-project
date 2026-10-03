@@ -49,7 +49,9 @@ class VectorStore:
         )
 
     def delete_paths(self, paths) -> None:
-        self._collection.delete(where={"file_path": {"$in": list(paths)}})
+        paths = list(paths)
+        if paths:
+            self._collection.delete(where={"file_path": {"$in": paths}})
 
     def ids(self) -> set[str]:
         return set(self._collection.get(limit=10_000_000)["ids"])
@@ -59,6 +61,9 @@ class VectorStore:
 
     def vectors_for_paths(self, paths) -> dict[str, list[float]]:
         """text_hash -> vector for chunks under *paths* (vector reuse, O3)."""
+        paths = list(paths)
+        if not paths:
+            return {}
         got = self._collection.get(
             where={"file_path": {"$in": list(paths)}},
             limit=10_000_000, include=["embeddings", "metadatas"])
@@ -75,3 +80,33 @@ class VectorStore:
         got = self._collection.get(ids=ids, limit=10_000_000, include=["metadatas"])
         return {cid: meta["file_path"]
                 for cid, meta in zip(got["ids"], got["metadatas"])}
+
+    def records_for_ids(self, ids) -> dict[str, dict]:
+        """chunk id -> {text, metadata, vector} (read path and equivalence)."""
+        ids = list(ids)
+        if not ids:
+            return {}
+        got = self._collection.get(
+            ids=ids, limit=10_000_000,
+            include=["documents", "metadatas", "embeddings"])
+        return {cid: {"text": doc, "metadata": meta, "vector": list(vec)}
+                for cid, doc, meta, vec
+                in zip(got["ids"], got["documents"], got["metadatas"],
+                       got["embeddings"])}
+
+    def restamp_commit_sha(self, commit_sha: str) -> int:
+        """Set commit_sha on every record still carrying an older one.
+
+        AC-2.6/T7.3 require an incremental run to equal a fresh build, so each
+        advancing run confirms every chunk present at HEAD. Metadata-only: no
+        re-embedding, no text changes.
+        """
+        got = self._collection.get(limit=10_000_000, include=["metadatas"])
+        stale_ids, stale_metas = [], []
+        for cid, meta in zip(got["ids"], got["metadatas"]):
+            if meta.get("commit_sha") != commit_sha:
+                stale_ids.append(cid)
+                stale_metas.append({**meta, "commit_sha": commit_sha})
+        if stale_ids:
+            self._collection.update(ids=stale_ids, metadatas=stale_metas)
+        return len(stale_ids)

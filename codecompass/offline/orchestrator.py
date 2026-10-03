@@ -158,6 +158,7 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
             keyword_index.commit()
         elif not delete_paths:
             keyword_index.close()
+        vector_store.restamp_commit_sha(head)
 
         finished = datetime.now(timezone.utc)
         meta = meta.__class__(**{**meta.__dict__, "indexed_commit": head,
