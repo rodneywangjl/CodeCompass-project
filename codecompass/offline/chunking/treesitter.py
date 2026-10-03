@@ -1,0 +1,230 @@
+"""Structure-aware chunker over tree-sitter parse trees (plan D4)."""
+
+from __future__ import annotations
+
+from .ids import chunk_id
+from .registry import language_for_path, spec_for_language
+from .sizing import SizePolicy, classify_size, count_tokens
+from codecompass.offline.models import Chunk, ChunkMode
+
+_parsers: dict[str, object] = {}
+
+
+def _parser(language: str):
+    if language not in _parsers:
+        from tree_sitter_language_pack import get_parser
+        _parsers[language] = get_parser(language)
+    return _parsers[language]
+
+
+def _word_split(text: str) -> list[str]:
+    return text.split()
+
+
+class _Emitter:
+    def __init__(self, path, lines, language, commit_sha, policy, tokenizer):
+        self.path = path
+        self.lines = lines
+        self.language = language
+        self.commit_sha = commit_sha
+        self.policy = policy
+        self.tokenizer = tokenizer
+        self.occurrence: dict[str, int] = {}
+        self.chunks: list[Chunk] = []
+
+    def take(self, start: int, end: int, symbol: str | None) -> None:
+        """Take 1-based inclusive [start, end] as one chunk."""
+        text = "\n".join(self.lines[start - 1:end])
+        key = symbol or ""
+        index = self.occurrence.get(key, 0)
+        self.occurrence[key] = index + 1
+        self.chunks.append(Chunk(
+            id=chunk_id(self.path, symbol, index, text),
+            text=text, path=self.path,
+            start_line=start, end_line=end,
+            language=self.language, symbol=symbol,
+            commit_sha=self.commit_sha,
+        ))
+
+    def tokens(self, start: int, end: int) -> int:
+        return count_tokens("\n".join(self.lines[start - 1:end]), self.tokenizer)
+
+
+def _node_text(node, content: bytes) -> str:
+    return content[node.start_byte:node.end_byte].decode("utf-8", "replace")
+
+
+def _unwrap(node, spec):
+    """Return (range_node, named_node) peeling export/decorator wrappers."""
+    current = node
+    while True:
+        named = None
+        for child in current.children:
+            if child.type in spec["function"] or child.type in spec["class"]:
+                named = child
+                break
+        if named is None or current.type not in spec["wrapper"]:
+            break
+        current = named
+    # Find the named node for the symbol (direct or one level down).
+    if current.type in spec["function"] or current.type in spec["class"]:
+        return node, current
+    for child in current.children:
+        if child.type in spec["function"] or child.type in spec["class"]:
+            return node, child
+        for grand in child.children:
+            if grand.type in spec["function"] or grand.type in spec["class"]:
+                return node, grand
+    return node, None
+
+
+def _symbol(named, content: bytes, parent: str | None) -> str | None:
+    if named is None:
+        return parent
+    name_node = named.child_by_field_name("name")
+    if name_node is None:
+        for child in named.children:
+            if child.type == "identifier":
+                name_node = child
+                break
+    if name_node is None:
+        return parent
+    name = _node_text(name_node, content)
+    return f"{parent}.{name}" if parent else name
+
+
+def _methods_of(class_node, spec):
+    """Direct method-like children of a class node."""
+    methods = []
+
+    def visit(node, depth):
+        for child in node.children:
+            if child.type in spec["method"]:
+                methods.append(child)
+            elif depth < 2 and child.is_named and child.type not in spec["function"]:
+                visit(child, depth + 1)
+
+    visit(class_node, 0)
+    return methods
+
+
+def _split_children(node, spec, emitter: _Emitter, symbol: str | None):
+    """Split an oversize unit at its top-level child blocks (greedy groups)."""
+    blocks = [c for c in node.children if c.is_named and c.type not in ("comment",)]
+    if not blocks:
+        _windows(emitter, node.start_point[0] + 1, node.end_point[0] + 1, symbol)
+        return
+    group_start = blocks[0].start_point[0] + 1
+    acc_end = group_start
+    for i, block in enumerate(blocks):
+        block_end = block.end_point[0] + 1
+        trial = emitter.tokens(group_start, block_end)
+        if classify_size(trial, emitter.policy) == "fits" or acc_end == group_start:
+            acc_end = block_end
+        else:
+            emitter.take(group_start, acc_end, symbol)
+            group_start = blocks[i].start_point[0] + 1
+            acc_end = block_end
+    emitter.take(group_start, acc_end, symbol)
+
+
+def _windows(emitter: _Emitter, start: int, end: int, symbol: str | None):
+    """Line windows near the target size, preferring blank-line breaks."""
+    cur = start
+    while cur <= end:
+        nxt = cur
+        while nxt <= end:
+            trial = emitter.tokens(cur, nxt)
+            state = classify_size(trial, emitter.policy)
+            if state == "fits":
+                nxt += 1
+            elif state == "over_target":
+                break_at = nxt
+                for back in range(nxt - 1, cur - 1, -1):
+                    if emitter.lines[back - 1].strip() == "":
+                        break_at = back
+                        break
+                nxt = max(break_at, cur)
+                break
+            else:  # over_hard_max: force a cut
+                break
+        if nxt == cur:
+            nxt = cur  # single line over hard max: emit alone rather than loop
+        emitter.take(cur, nxt, symbol)
+        cur = nxt + 1
+
+
+def _emit_unit(node, spec, content: bytes, emitter: _Emitter, parent: str | None):
+    range_node, named = _unwrap(node, spec)
+    start = range_node.start_point[0] + 1
+    end = range_node.end_point[0] + 1
+    symbol = _symbol(named, content, parent)
+    state = classify_size(emitter.tokens(start, end), emitter.policy)
+    if state == "fits":
+        emitter.take(start, end, symbol)
+        return
+    target = named if named is not None else node
+    if target.type in spec["class"]:
+        methods = _methods_of(target, spec)
+        if methods:
+            first = methods[0].start_point[0] + 1
+            if first > start:
+                if classify_size(emitter.tokens(start, first - 1), emitter.policy) != "over_hard_max":
+                    emitter.take(start, first - 1, symbol)
+                else:
+                    _windows(emitter, start, first - 1, symbol)
+            for method in methods:
+                _emit_unit(method, spec, content, emitter, symbol)
+            return
+    _split_children(target, spec, emitter, symbol)
+
+
+def chunk(path: str, content: str, commit_sha: str, *,
+          policy: SizePolicy | None = None,
+          tokenizer=None) -> tuple[list[Chunk], ChunkMode]:
+    """Chunk one file along structural boundaries (AC-3.1, AC-3.6)."""
+    language = language_for_path(path)
+    if language is None:
+        raise ValueError(f"no tree-sitter language for: {path}")
+    policy = policy or SizePolicy()
+    tokenizer = tokenizer or _word_split
+    spec = spec_for_language(language)
+    tree = _parser(language).parse(content.encode("utf-8"))
+    lines = content.split("\n")
+    emitter = _Emitter(path, lines, language, commit_sha, policy, tokenizer)
+    residue: list = []
+    units = 0
+    for child in tree.root_node.children:
+        if child.type in spec["unit"]:
+            if residue:
+                _flush_residue(residue, emitter)
+                residue = []
+            _emit_unit(child, spec, content.encode("utf-8"), emitter, None)
+            units += 1
+        elif child.type not in ("comment",) and child.is_named:
+            residue.append(child)
+    if residue:
+        _flush_residue(residue, emitter)
+    if tree.root_node.has_error and units == 0 and not emitter.chunks:
+        return [], ChunkMode.FALLBACK
+    return emitter.chunks, ChunkMode.STRUCTURED
+
+
+def _flush_residue(nodes, emitter: _Emitter) -> None:
+    start = nodes[0].start_point[0] + 1
+    end = nodes[-1].end_point[0] + 1
+    if classify_size(emitter.tokens(start, end), emitter.policy) == "fits":
+        emitter.take(start, end, None)
+        return
+    cur = start
+    for node in nodes:
+        node_end = node.end_point[0] + 1
+        if (classify_size(emitter.tokens(cur, node_end), emitter.policy) != "fits"
+                and cur < node.start_point[0] + 1):
+            emitter.take(cur, node.start_point[0], None)
+            cur = node.start_point[0] + 1
+    if cur <= end:
+        if classify_size(emitter.tokens(cur, end), emitter.policy) == "fits":
+            emitter.take(cur, end, None)
+        else:
+            _windows(emitter, cur, end, None)
