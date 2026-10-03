@@ -109,23 +109,49 @@ def _methods_of(class_node, spec):
 
 
 def _split_children(node, spec, emitter: _Emitter, symbol: str | None):
-    """Split an oversize unit at its top-level child blocks (greedy groups)."""
-    blocks = [c for c in node.children if c.is_named and c.type not in ("comment",)]
-    if not blocks:
+    """Split an oversize unit at its top-level blocks (greedy groups)."""
+    container = node
+    for child in node.children:
+        if child.type == "block":
+            container = child
+            break
+    stmts = [c for c in container.children
+             if c.is_named and c.type not in ("comment",)]
+    if not stmts:
         _windows(emitter, node.start_point[0] + 1, node.end_point[0] + 1, symbol)
         return
-    group_start = blocks[0].start_point[0] + 1
-    acc_end = group_start
-    for i, block in enumerate(blocks):
-        block_end = block.end_point[0] + 1
-        trial = emitter.tokens(group_start, block_end)
-        if classify_size(trial, emitter.policy) == "fits" or acc_end == group_start:
-            acc_end = block_end
+    group_start = node.start_point[0] + 1
+    acc_end: int | None = None
+    for stmt in stmts:
+        stmt_end = stmt.end_point[0] + 1
+        if acc_end is None:
+            acc_end = stmt_end
+            if classify_size(emitter.tokens(group_start, acc_end), emitter.policy) == "fits":
+                continue
+            _emit_group(emitter, group_start, acc_end, symbol)
+            group_start, acc_end = acc_end + 1, None
+            continue
+        if classify_size(emitter.tokens(group_start, stmt_end), emitter.policy) == "fits":
+            acc_end = stmt_end
         else:
-            emitter.take(group_start, acc_end, symbol)
-            group_start = blocks[i].start_point[0] + 1
-            acc_end = block_end
-    emitter.take(group_start, acc_end, symbol)
+            _emit_group(emitter, group_start, acc_end, symbol)
+            group_start, acc_end = acc_end + 1, stmt_end
+            if classify_size(emitter.tokens(group_start, acc_end), emitter.policy) != "fits":
+                _emit_group(emitter, group_start, acc_end, symbol)
+                group_start, acc_end = acc_end + 1, None
+    if acc_end is not None:
+        _emit_group(emitter, group_start, acc_end, symbol)
+    elif group_start <= node.end_point[0] + 1:
+        _emit_group(emitter, group_start, node.end_point[0] + 1, symbol)
+
+
+def _emit_group(emitter: _Emitter, start: int, end: int, symbol: str | None):
+    if start > end:
+        return
+    if classify_size(emitter.tokens(start, end), emitter.policy) == "over_hard_max":
+        _windows(emitter, start, end, symbol)
+    else:
+        emitter.take(start, end, symbol)
 
 
 def _windows(emitter: _Emitter, start: int, end: int, symbol: str | None):
