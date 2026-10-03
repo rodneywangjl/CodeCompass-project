@@ -34,6 +34,10 @@ class FakeVectorStore:
                 out.setdefault(text_hash(chunk.text), vector)
         return out
 
+    def paths_for_ids(self, ids) -> dict:
+        ids = set(ids)
+        return {cid: self._by_id[cid][0].path for cid in ids if cid in self._by_id}
+
 
 class FakeKeywordIndex:
     def __init__(self) -> None:
@@ -56,6 +60,10 @@ class FakeKeywordIndex:
     def search(self, text: str, limit: int) -> list:
         hits = [cid for cid, c in self._by_id.items() if text in c.text]
         return hits[:limit]
+
+    def paths_for_ids(self, ids) -> dict:
+        ids = set(ids)
+        return {cid: c.path for cid, c in self._by_id.items() if cid in ids}
 
     def ids(self) -> set:
         return set(self._by_id)

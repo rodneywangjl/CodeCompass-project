@@ -66,3 +66,12 @@ class VectorStore:
         for meta, emb in zip(got["metadatas"], got["embeddings"]):
             out.setdefault(meta["text_hash"], list(emb))
         return out
+
+    def paths_for_ids(self, ids) -> dict[str, str]:
+        """chunk id -> file path (for the consistency check)."""
+        ids = list(ids)
+        if not ids:
+            return {}
+        got = self._collection.get(ids=ids, limit=10_000_000, include=["metadatas"])
+        return {cid: meta["file_path"]
+                for cid, meta in zip(got["ids"], got["metadatas"])}

@@ -58,6 +58,23 @@ class KeywordIndex:
         hits = searcher.search(tantivy.Query.all_query(), searcher.num_docs).hits
         return {self._cid_of(addr) for _, addr in hits}
 
+    def paths_for_ids(self, ids) -> dict[str, str]:
+        """chunk id -> file path (for the consistency check)."""
+        wanted = set(ids)
+        if not wanted:
+            return {}
+        searcher = self._index.searcher()
+        if searcher.num_docs == 0:
+            return {}
+        out = {}
+        hits = searcher.search(tantivy.Query.all_query(), searcher.num_docs).hits
+        for _, addr in hits:
+            doc = searcher.doc(addr)
+            cid = doc.get_first("cid")
+            if cid in wanted:
+                out[str(cid)] = str(doc.get_first("path"))
+        return out
+
     def _cid_of(self, address) -> str:
         doc = self._index.searcher().doc(address)
         value = doc.get_first("cid")
