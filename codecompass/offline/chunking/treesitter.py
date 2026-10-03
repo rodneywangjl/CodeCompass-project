@@ -94,7 +94,7 @@ def _symbol(named, intermediates, content: bytes, parent: str | None) -> str | N
                     name_node = child
                     break
         if name_node is not None:
-            name = _node_text(name_node, content)
+            name = _node_text(name_node, content).strip()
             return f"{parent}.{name}" if parent else name
     return parent
 
@@ -118,7 +118,7 @@ def _split_children(node, spec, emitter: _Emitter, symbol: str | None):
     """Split an oversize unit at its top-level blocks (greedy groups)."""
     container = node
     for child in node.children:
-        if child.type in ("block", "statement_block"):
+        if child.type in ("block", "statement_block") or child.type.endswith("_body"):
             container = child
             break
     stmts = [c for c in container.children
@@ -197,18 +197,34 @@ def _emit_unit(node, spec, content: bytes, emitter: _Emitter, parent: str | None
         return
     target = named if named is not None else node
     if target.type in spec["class"]:
-        methods = _methods_of(target, spec)
-        if methods:
-            first = methods[0].start_point[0] + 1
+        body = target
+        for child in target.children:
+            if child.type in ("block", "statement_block") or child.type.endswith("_body"):
+                body = child
+                break
+        methods = [c for c in body.children if c.type in spec["method"]]
+        nested = [c for c in body.children if c.type in spec["class"]]
+        if methods or nested:
+            members = sorted(methods + nested,
+                             key=lambda n: n.start_point[0])
+            first = members[0].start_point[0] + 1
             if first > start:
-                if classify_size(emitter.tokens(start, first - 1), emitter.policy) != "over_hard_max":
-                    emitter.take(start, first - 1, symbol)
-                else:
-                    _windows(emitter, start, first - 1, symbol)
+                _emit_sized(emitter, start, first - 1, symbol)
             for method in methods:
                 _emit_unit(method, spec, content, emitter, symbol)
+            for sub in nested:
+                _emit_unit(sub, spec, content, emitter, symbol)
             return
     _split_children(target, spec, emitter, symbol)
+
+
+def _emit_sized(emitter: _Emitter, start: int, end: int, symbol: str | None):
+    if start > end:
+        return
+    if classify_size(emitter.tokens(start, end), emitter.policy) == "fits":
+        emitter.take(start, end, symbol)
+    else:
+        _windows(emitter, start, end, symbol)
 
 
 def chunk(path: str, content: str, commit_sha: str, *,
