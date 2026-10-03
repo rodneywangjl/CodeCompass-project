@@ -10,10 +10,23 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .git_source import GitSource
-from .meta import config_fingerprint, index_path_for, read_meta
 from .lock import LockTimeout
-
+from .meta import (
+    EmbedderIdentity,
+    check_compatible,
+    config_fingerprint,
+    index_path_for,
+    read_meta,
+)
 __all__ = ["ensure_current", "status", "open_index", "check_consistency"]
+
+
+def __getattr__(name: str):
+    """Lazily re-export the consistency check without importing stores (O1)."""
+    if name == "check_consistency":
+        from .stores.consistency import check_consistency
+        return check_consistency
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 @dataclass(frozen=True)
@@ -90,3 +103,80 @@ def ensure_current(repo_path, *, config, index_dir=None, embedder=None,
     except Exception as e:  # noqa: BLE001 (AC-5.8: fail safe, index stays usable)
         return EnsureResult(ok=False, status="failed", message=str(e))
     return EnsureResult(ok=True, status="current", report=report)
+
+
+class ReadOnlyVectorStore:
+    """Read-only facade over the vector store (Article II.2, AC-5.5)."""
+
+    def __init__(self, store) -> None:
+        self._store = store
+
+    def ids(self) -> set:
+        return self._store.ids()
+
+    def count(self) -> int:
+        return self._store.count()
+
+    def records_for_ids(self, ids) -> dict:
+        return self._store.records_for_ids(ids)
+
+    def paths_for_ids(self, ids) -> dict:
+        return self._store.paths_for_ids(ids)
+
+    def vectors_for_paths(self, paths) -> dict:
+        return self._store.vectors_for_paths(paths)
+
+    def close(self) -> None:
+        self._store = None  # type: ignore[assignment]
+
+
+class ReadOnlyKeywordIndex:
+    """Read-only facade over the keyword index (Article II.2, AC-5.5)."""
+
+    def __init__(self, store) -> None:
+        self._store = store
+
+    def ids(self) -> set:
+        return self._store.ids()
+
+    def search(self, text: str, limit: int) -> list:
+        return self._store.search(text, limit)
+
+    def paths_for_ids(self, ids) -> dict:
+        return self._store.paths_for_ids(ids)
+
+    def close(self) -> None:
+        if self._store is not None:
+            self._store.close()
+            self._store = None  # type: ignore[assignment]
+
+
+@dataclass(frozen=True)
+class IndexHandles:
+    vector: ReadOnlyVectorStore
+    keyword: ReadOnlyKeywordIndex
+    meta: object = None
+
+    def close(self) -> None:
+        self.keyword.close()
+        self.vector.close()
+
+
+def open_index(repo_path, *, config, index_dir=None) -> IndexHandles:
+    """Read-only handles to both indexes with compatibility checks (AC-5.5).
+
+    Refuses mismatched embedder identity (AC-5.3) and unknown schema (AC-5.4).
+    """
+    from .stores.keyword import KeywordIndex
+    from .stores.vector import VectorStore
+    idx = index_path_for(repo_path, _base_dir(config, index_dir))
+    meta = read_meta(idx)  # raises SchemaMismatchError / FileNotFoundError
+    check_compatible(meta, EmbedderIdentity(
+        model=config.embedder.model, revision=config.embedder.revision,
+        dimension=config.embedder.dimension))
+    return IndexHandles(
+        vector=ReadOnlyVectorStore(VectorStore(
+            idx / "vector", dimension=meta.embedder.dimension)),
+        keyword=ReadOnlyKeywordIndex(KeywordIndex(idx / "keyword")),
+        meta=meta,
+    )
