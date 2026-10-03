@@ -32,6 +32,32 @@ from .stores.vector import VectorStore
 __all__ = ["run", "index_path_for", "repo_id", "config_fingerprint"]
 
 
+def _compute_plan(src, meta, head, current_fp):
+    """Shared read-only planning: base commit, mode label, touched paths."""
+    if (meta is not None and meta.indexed_commit
+            and src.is_ancestor(meta.indexed_commit, head)
+            and meta.config_fingerprint == current_fp):
+        base_commit: str | None = meta.indexed_commit
+        mode = "incremental"
+        note = ""
+    else:
+        base_commit = None
+        if meta is None or meta.indexed_commit is None:
+            mode, note = "full", ""
+        elif meta.config_fingerprint != current_fp:
+            mode = "rebuild"
+            note = "indexing configuration changed; full rebuild"
+        else:
+            mode = "rebuild"
+            note = ("recorded commit is not reachable from HEAD "
+                    "(history rewritten or unresolvable); full rebuild")
+    changeset = src.diff(base_commit, head)
+    touched = set(changeset.added) | set(changeset.modified) | set(changeset.deleted)
+    if meta is not None and meta.in_progress:
+        touched |= set(meta.in_progress.get("touched_paths", []))
+    return base_commit, mode, note, changeset, sorted(touched)
+
+
 def run(repo_path, *, config, index_dir=None, embedder=None,
         embedder_factory=None) -> RunReport:
     """Bring the index to HEAD; return a run report. Raises on failure."""
@@ -65,29 +91,8 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
             meta = default_meta(embedder.identity, config_fingerprint(config))
         check_compatible(meta, embedder.identity)
         current_fp = config_fingerprint(config)
-
-        if (meta.indexed_commit and src.is_ancestor(meta.indexed_commit, head)
-                and meta.config_fingerprint == current_fp):
-            base_commit: str | None = meta.indexed_commit
-            mode = "incremental"
-            note = ""
-        else:
-            base_commit = None
-            if meta.indexed_commit is None:
-                mode, note = "full", ""
-            elif meta.config_fingerprint != current_fp:
-                mode = "rebuild"
-                note = "indexing configuration changed; full rebuild"
-            else:
-                mode = "rebuild"
-                note = ("recorded commit is not reachable from HEAD "
-                        "(history rewritten or unresolvable); full rebuild")
-
-        changeset = src.diff(base_commit, head)
-        touched = set(changeset.added) | set(changeset.modified) | set(changeset.deleted)
-        if meta.in_progress:
-            touched |= set(meta.in_progress.get("touched_paths", []))
-        touched = sorted(touched)
+        base_commit, mode, note, changeset, touched = _compute_plan(
+            src, meta, head, current_fp)
 
         meta = meta.__class__(**{**meta.__dict__, "in_progress": {
             "target_commit": head, "touched_paths": touched}})
@@ -210,3 +215,73 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
         stamp = finished.isoformat(timespec="seconds").replace(":", "").replace("+", "")
         write_json(report, idx / "runs" / f"{stamp}.json")
         return report
+
+
+def dry_run(repo_path, *, config, index_dir=None) -> RunReport:
+    """List what a run would change without writing anything (AC-7.3).
+
+    No lock file, no metadata change, no store opens, no embedding: only git
+    reads, exclusion checks, and chunk counting.
+    """
+    from collections import Counter
+
+    from .chunking.sizing import SizePolicy
+    from .exclusions import Decision, decide
+    from .models import ChunkMode
+
+    started = perf_counter()
+    src = GitSource(repo_path)
+    head = src.head_sha()
+    idx = index_path_for(repo_path, Path(index_dir) if index_dir is not None
+                         else Path(config.index.dir))
+    meta_path = idx / "meta.json"
+    meta = read_meta(idx) if meta_path.exists() else None
+    if (meta is not None and meta.indexed_commit == head
+            and meta.in_progress is None
+            and meta.config_fingerprint == config_fingerprint(config)):
+        return RunReport(mode="up-to-date", from_commit=head, to_commit=head)
+    current_fp = config_fingerprint(config)
+    base_commit, mode, note, changeset, touched = _compute_plan(
+        src, meta, head, current_fp)
+    policy = SizePolicy(target_tokens=config.chunking.target_tokens,
+                        hard_max_tokens=config.chunking.hard_max_tokens)
+    decisions: dict[str, object] = {}
+    chunks_added = 0
+    files_fallback = 0
+    for path in sorted(set(touched) - set(changeset.deleted)):
+        quick = decide(path, config.files)
+        if not quick.included:
+            decisions[path] = quick
+            continue
+        if src.blob_size(head, path) > config.files.max_file_bytes:
+            decisions[path] = Decision(False, "too-large")
+            continue
+        blob = src.read_blob(head, path)
+        if b"\x00" in blob[:8192]:
+            decisions[path] = Decision(False, "binary")
+            continue
+        decisions[path] = Decision(True, "include")
+        chunks, m = chunk_file(path, blob.decode("utf-8", "replace"), head,
+                               policy=policy)
+        if m is ChunkMode.FALLBACK:
+            files_fallback += 1
+        chunks_added += len(chunks)
+    for path in sorted(set(touched)):
+        decisions.setdefault(path, Decision(True, "include"))
+    skipped_by_rule = Counter(
+        d.reason for d in decisions.values() if not d.included)
+    label = {"full": "dry-run-full", "rebuild": "dry-run-rebuild"}.get(
+        mode, "dry-run")
+    return RunReport(
+        mode=label, from_commit=base_commit, to_commit=head, note=note,
+        files_added=len(changeset.added), files_modified=len(changeset.modified),
+        files_deleted=len(changeset.deleted),
+        files_skipped=sum(1 for d in decisions.values()
+                          if not d.included and d.reason != "non-code"),
+        skipped_by_rule=dict(skipped_by_rule),
+        files_non_code=sum(1 for d in decisions.values()
+                           if d.reason == "non-code"),
+        files_fallback=files_fallback,
+        chunks_added=chunks_added, chunks_removed=0,
+        elapsed_seconds=perf_counter() - started, timings={},
+    )
