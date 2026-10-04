@@ -17,8 +17,9 @@ from codecompass.offline.exclusions import (
 )
 
 DEFAULT_EMBEDDER_MODEL = "jinaai/jina-embeddings-v2-base-code"
-# Pinned model revision is fixed in T10.1 (real embedder); empty until then.
-DEFAULT_EMBEDDER_REVISION = ""
+# Pinned upstream revision (resolved 2026-10-04); trust_remote_code loads code
+# from the repo, so the revision must stay pinned (Article VIII.1).
+DEFAULT_EMBEDDER_REVISION = "516f4baf13dec4ddddda8631e019b5737c8bc250"
 DEFAULT_EMBEDDER_DIMENSION = 768
 DEFAULT_TARGET_TOKENS = 512
 DEFAULT_HARD_MAX_TOKENS = 8192  # embedder input limit (constitution VIII.1)
