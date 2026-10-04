@@ -1,0 +1,96 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+wheels/
+
+# Installers / wheels built locally
+*.whl
+
+# pytest / testing
+.pytest_cache/
+.hypothesis/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+junit.xml
+test-results/
+
+# Type checkers and linters
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+.pyright/
+pyrightconfig.json
+
+# CodeCompass index data (default lives outside the repo in the OS
+# app-data dir, but --index-dir / index.dir can point inside the repo)
+.codecompass-index/
+.codecompass/
+*.codecompass/
+**/runs/
+chroma.sqlite3
+chroma-*.parquet
+*.tantivy/
+
+# Models and ML caches (embedder ~600MB downloads once; generator .gguf
+# models for the future online pipeline via llama-server)
+models/
+*.gguf
+*.gguf.*
+*.bin
+*.safetensors
+.transformers_cache/
+.huggingface/
+sentence_transformers/
+
+# Local config overrides and secrets (sample codecompass.toml is committed
+# intentionally; untracked local copies and env files are not)
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+codecompass.local.toml
+config.local.toml
+
+# OS artifacts
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editors and IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+*.code-workspace
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.log
