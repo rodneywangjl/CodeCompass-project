@@ -7,8 +7,9 @@ test-then-implementation pairs (92 commits total).
 
 - Required suite: **134 passed** via `pytest -m "not model"` — deterministic,
   network-blocked (socket guard in `tests/conftest.py`), CPU-only, stub embedder.
-- Model suite (local, `pytest -m model`): **4 passed** (T10.1 dimension /
-  determinism / batch-parity / NL retrieval, T10.2 end-to-end smoke).
+- Model suite (local, `pytest -m model`): **5 passed** (T10.1 dimension /
+  determinism / batch-parity / NL retrieval, T10.2 end-to-end smoke, plus the
+  T06 guard test asserting that model-marked tests may use the network).
 - Consistency check (`check_consistency`) asserted green in every integration test.
 - No skipped/xfail tests. `mlx-lm` absent. All dependencies pinned in
   `requirements.txt`.

@@ -316,7 +316,7 @@ Specs and plans: [`docs/specs/001-offline-indexing/spec.md`](docs/specs/001-offl
 .venv/bin/python -m pytest -m model
 ```
 
-Sprint 1 verification: **134 passed** in the required suite, **4 passed** in the model suite, no skipped/xfail tests.
+Sprint 1 verification: **134 passed** in the required suite, **5 passed** in the model suite, no skipped/xfail tests.
 
 ---
 
