@@ -89,6 +89,30 @@ For a fast, model-free trial (uses a deterministic stub embedder, no download):
 .venv/bin/python -m codecompass.offline.cli check /path/to/repo --embedder stub
 ```
 
+### Clone-to-running with `quickstart.py`
+
+`quickstart.py` runs all of the above for you in order: create `.venv` → install `requirements.txt` → `index` → `status` → `check` → `pytest -m "not model"`. It contains no indexing logic itself; it just calls the backend in `codecompass/offline/`.
+
+```bash
+# From the project root. <repo> is any git repo you want to search
+# (not necessarily this repo). HEAD is indexed; uncommitted edits are ignored.
+python quickstart.py /path/to/repo --embedder stub   # fast trial, no download (default)
+python quickstart.py /path/to/repo --embedder code    # real search, downloads ~600MB model once
+
+# Options:
+#   --skip-install   skip `pip install -r requirements.txt`
+#   --skip-tests     skip `pytest -m "not model"`
+```
+
+What each step does:
+
+1. `index <repo>` — first run indexes everything at HEAD; later runs only process added/modified/deleted files. Each chunk is saved twice: as a vector in Chroma (`idx/vector`) and as BM25 text in tantivy (`idx/keyword`).
+2. `status <repo>` — shows if the index is `current`/`stale`/`empty` and which commit was indexed.
+3. `check <repo>` — verifies both stores hold the same chunk ids (`consistent: True (N chunks agree)`), catching partial writes.
+4. `pytest -m "not model"` — fast test suite using the stub embedder; skips `model` tests that need the real download.
+
+`stub` = fake 8-number vectors for testing (instant). `code` = real `jina-embeddings-v2-base-code` vectors (768 numbers) for real meaning search.
+
 ---
 
 ## User guide
