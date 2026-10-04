@@ -1,0 +1,336 @@
+# CodeCompass
+
+CodeCompass is a RAG-based Q&A assistant that helps developers understand an unfamiliar git repository. It retrieves real code and commit history, verifies claims with git tooling, and answers with citations that are checked before they are shown.
+
+This repository currently implements **Sprint 1: the offline indexing pipeline**. It turns a git repository into two searchable, mutually consistent indexes — a semantic vector index (Chroma/HNSW) and a keyword index (tantivy BM25) — that the online query pipeline will read. The online pipeline (hybrid retrieval, re-ranking, generation, verifier, citation checker) is not yet built.
+
+> Grounding over fluency: if the evidence is insufficient, CodeCompass says what it could not determine rather than guessing. See [`Constitution.md`](Constitution.md).
+
+---
+
+## Table of contents
+
+- [Architecture](#architecture)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Quickstart](#quickstart)
+- [User guide](#user-guide)
+  - [1. Build or update the index](#1-build-or-update-the-index)
+  - [2. Check index status](#2-check-index-status)
+  - [3. Verify index consistency](#3-verify-index-consistency)
+  - [4. Use the Python API](#4-use-the-python-api)
+  - [5. Configure CodeCompass](#5-configure-codecompass)
+- [How indexing works](#how-indexing-works)
+- [Project structure](#project-structure)
+- [Testing](#testing)
+- [Development process](#development-process)
+- [Known limitations](#known-limitations)
+- [Roadmap](#roadmap)
+- [Reference](#reference)
+
+---
+
+## Architecture
+
+```
+Git repository
+  → Repo scanner (tree-sitter + GitPython, changed files only)
+    → Code-aware embedder (jina-embeddings-v2-base-code, local)
+      → Vector store (Chroma/HNSW)
+    → Keyword index (BM25, tantivy)
+```
+
+One pipeline, one code path: **a full build is an incremental run from an empty index**. Before answering each question, the online pipeline will call the single public `ensure_current` entry point, which compares repo HEAD against the last indexed commit and runs an incremental re-index only if they differ.
+
+Module boundaries are strict: only `codecompass.offline`'s `ensure_current` (write-capable), `status`, `open_index`, and `check_consistency` (read-only) are visible to the online pipeline.
+
+---
+
+## Requirements
+
+- Python 3.11+
+- Git
+- macOS, Linux, or Windows
+- No GPU, paid service, or network access required for the core path (indexing and the required test suite run fully locally)
+
+---
+
+## Installation
+
+```bash
+python -m venv .venv
+.venv/bin/pip install -r requirements.txt
+```
+
+All dependencies are pinned in [`requirements.txt`](requirements.txt). The embedder model revision is pinned (`jinaai/jina-embeddings-v2-base-code @ 516f4baf…`, see `codecompass/offline/config.py`). Do not add `mlx-lm` or MLX — generator inference uses llama.cpp only (online pipeline).
+
+---
+
+## Quickstart
+
+```bash
+# 1. Build the index for a repository (first run; downloads ~600MB model once)
+.venv/bin/python -m codecompass.offline.cli index /path/to/repo
+
+# 2. Check whether the index is current
+.venv/bin/python -m codecompass.offline.cli status /path/to/repo
+
+# 3. Verify both indexes agree
+.venv/bin/python -m codecompass.offline.cli check /path/to/repo
+
+# 4. After new commits, just re-run index (only changed files are processed)
+.venv/bin/python -m codecompass.offline.cli index /path/to/repo
+```
+
+For a fast, model-free trial (uses a deterministic stub embedder, no download):
+
+```bash
+.venv/bin/python -m codecompass.offline.cli index /path/to/repo --embedder stub
+.venv/bin/python -m codecompass.offline.cli check /path/to/repo --embedder stub
+```
+
+---
+
+## User guide
+
+All commands share the form:
+
+```
+python -m codecompass.offline.cli <command> <repo> [--index-dir DIR] [--config FILE]
+```
+
+- `<repo>` — path to the git repository to index (HEAD commit content is indexed; uncommitted edits are ignored).
+- `--index-dir` — override where index data is stored. Default is the OS application-data directory (`~/Library/Application Support/codecompass` on macOS, `$XDG_DATA_HOME/codecompass` on Linux, `%LOCALAPPDATA%\codecompass` on Windows), in a subfolder keyed by repository. The index is never stored inside the repo itself.
+- `--config` — path to a `codecompass.toml` file (see [Configure](#5-configure-codecompass)).
+
+Exit codes: `0` on success, `1` on failure or inconsistency (error printed to stderr).
+
+### 1. Build or update the index
+
+```bash
+# Incremental run (normal use): builds if empty, otherwise processes only changed files
+python -m codecompass.offline.cli index /path/to/repo
+
+# Force a full rebuild from scratch
+python -m codecompass.offline.cli index /path/to/repo --full
+
+# Preview what would change without writing anything
+python -m codecompass.offline.cli index /path/to/repo --dry-run
+
+# Use the stub embedder (no model download; for tests and smoke checks)
+python -m codecompass.offline.cli index /path/to/repo --embedder stub
+```
+
+Each run prints a human-readable report and saves a machine-readable copy under `<index_dir>/runs/<timestamp>.json`. The report includes: mode (`full`, `incremental`, `up-to-date`, `rebuild`), from/to commits, files added/modified/deleted/renamed/skipped/fallback-chunked, chunks added and removed, embedder and schema versions, and per-stage timings.
+
+What gets indexed:
+
+- **Indexed:** source files at HEAD in configured extensions (Python, JavaScript/TypeScript/TSX/JSX, Java get structure-aware chunking; other configured source languages use a line-window fallback).
+- **Skipped and counted:** secrets (`.env*`, private keys, certificates), lockfiles, build/dependency directories, minified bundles, binaries (detected by content), files over the size limit, git-ignored files, and non-code files (markdown, text, JSON/YAML config).
+- **Never read from disk:** file content comes from the git object database, so untracked files and uncommitted edits can never leak in.
+
+### 2. Check index status
+
+```bash
+python -m codecompass.offline.cli status /path/to/repo
+```
+
+Output:
+
+```
+state: current | stale | empty
+head: <HEAD sha>
+indexed: <last indexed sha>
+embedder: <model>@<revision> dim <N> (schema <V>)
+```
+
+- `empty` — never built. `current` — indexed commit equals HEAD. `stale` — new commits exist; re-run `index`.
+- Read-only: makes no writes.
+
+### 3. Verify index consistency
+
+```bash
+python -m codecompass.offline.cli check /path/to/repo
+# with stub-built indexes:
+python -m codecompass.offline.cli check /path/to/repo --embedder stub
+```
+
+Compares the vector store and keyword index chunk-id sets (including per-path agreement). Prints `consistent: True (N chunks agree)` and exits `0`, or lists `vector-only` / `keyword-only` ids and exits `1`.
+
+### 4. Use the Python API
+
+Only four names are public to the online pipeline (`codecompass/offline/__init__.py`). `ensure_current` is the single write-capable entry; the rest are read-only.
+
+```python
+from codecompass.offline import ensure_current, status, open_index, check_consistency
+from codecompass.offline.config import load_config
+
+config = load_config("codecompass.toml")  # or load_config(None) for defaults
+
+# Before answering a question: cheap no-op when already current
+result = ensure_current("/path/to/repo", config=config)
+if result.ok:
+    print(result.status)   # "current"
+    print(result.report)   # RunReport (mode, commits, counts, timings)
+else:
+    # result.status is "failed" or "locked"; existing index is still usable
+    # Online pipeline answers from it and flags the answer as stale.
+    print(result.status, result.message)
+
+# Read-only status
+st = status("/path/to/repo", config=config)
+print(st.state)  # "empty" | "current" | "stale"
+
+# Read-only index handles (refuses mismatched embedder or schema with a typed error)
+handles = open_index("/path/to/repo", config=config)
+try:
+    ids = handles.vector.ids()
+    hits = handles.keyword.search("get_user_by_id", limit=10)
+    result = check_consistency(handles.vector, handles.keyword)
+    assert result.ok
+finally:
+    handles.close()
+```
+
+By default `ensure_current` lazily loads the real code embedder from config. Tests pass an explicit stub or factory instead:
+
+```python
+from tests.support.stub_embedder import StubEmbedder
+result = ensure_current("/path/to/repo", config=config, embedder=StubEmbedder())
+```
+
+### 5. Configure CodeCompass
+
+All model names, thresholds, sizes, and paths come from configuration, never hard-coded. Create a `codecompass.toml` (all sections optional; missing keys use defaults):
+
+```toml
+[index]
+dir = "./.codecompass-index"      # default: OS app-data dir
+
+[chunking]
+target_tokens = 512               # target chunk size (embedder tokenizer)
+hard_max_tokens = 8192            # never exceed embedder input limit
+batch_files = 50
+
+[files]
+max_file_bytes = 1048576
+source_extensions = [".py", ".js", ".jsx", ".ts", ".tsx", ".java"]
+exclude_patterns = [".env*", "*.pem", "*.min.js"]
+exclude_dirs = ["node_modules", "__pycache__", ".venv", "build", "dist"]
+
+[languages]
+treesitter = ["python", "javascript", "typescript", "tsx", "java"]
+
+[embedder]
+model = "jinaai/jina-embeddings-v2-base-code"
+revision = "516f4baf13dec4ddddda8631e019b5737c8bc250"
+dimension = 768
+device = "cpu"
+batch_size = 32
+
+[lock]
+timeout_seconds = 120
+```
+
+Notes:
+
+- Unknown sections or keys are rejected. `target_tokens > hard_max_tokens` is rejected.
+- Relative `index.dir` resolves against the config file's directory.
+- Changing exclusion rules takes effect on the next run; newly excluded paths have their chunks removed from both indexes. Changing chunking settings triggers re-chunking (vectors reused where chunk text is unchanged).
+- The embedder identity (model, revision, dimension) is recorded in index metadata; opening or writing with a different one fails with a clear error. The schema version is gated the same way.
+
+---
+
+## How indexing works
+
+1. **Fast path:** read HEAD and `meta.json`; if equal (and config unchanged), return `up-to-date` with no lock, no file reads, no writes.
+2. **Change detection:** `git diff --no-renames <indexed>..<HEAD>` (paths only, from the object DB). Rename detection is off, so a rename is one delete plus one add. An empty index diffs against the empty tree, unifying full and incremental builds.
+3. **Filtering (cheap first):** path/dir rules → blob size → binary sniff → non-code gate. Skips are counted by rule in the report.
+4. **Journal:** target commit + touched paths recorded in `meta.json` before any write, so a crash or revert between runs still converges on re-run.
+5. **Per path:** fetch reusable vectors for unchanged chunk text → delete the path's old chunks from **both** stores → chunk the HEAD blob (tree-sitter, or line-window fallback) → embed only new chunk texts (batched, length-sorted) → insert into both stores.
+6. **Commit:** single keyword-index commit, advance `indexed_commit`, clear the journal, write the run report. A failed run never advances the commit.
+7. **Locking:** one exclusive file lock guards all writes; a second caller waits up to the timeout, then re-checks (usually nothing left to do) or returns an `index is locked` status.
+
+Chunk identity is `sha256(path | symbol | occurrence | text_hash)` — deterministic and line-number-free, so edits elsewhere in a file don't invalidate unchanged chunks.
+
+---
+
+## Project structure
+
+```
+codecompass/offline/
+  __init__.py        public API: ensure_current, status, open_index, check_consistency
+  config.py          codecompass.toml loader (all tunables live here)
+  models.py          Chunk, ChangeSet, IndexMeta, RunReport
+  git_source.py      HEAD, diff, blob reads, ancestry (object DB only)
+  exclusions.py      include/skip decision pipeline
+  chunking/          tree-sitter chunker, line-window fallback, token sizing, ids
+  embedding.py       Embedder protocol + real CodeEmbedder (lazy load)
+  stores/vector.py   Chroma wrapper       stores/keyword.py  tantivy wrapper
+  stores/consistency.py  two-index agreement check
+  meta.py            atomic meta.json + compatibility gate
+  lock.py            single-writer file lock
+  orchestrator.py    full/incremental run, journal, vector reuse
+  report.py          human + JSON run reports
+  cli.py             index / status / check commands
+tests/
+  support/           fixture-repo builder, StubEmbedder, in-memory fakes
+  offline/           unit + integration tests mirroring the modules
+```
+
+Specs and plans: [`spec-offline-indexing.md`](spec-offline-indexing.md), [`plan-offline-indexing.md`](plan-offline-indexing.md), [`tasks-offline-indexing.md`](tasks-offline-indexing.md), [`SPRINT1-SUMMARY.md`](SPRINT1-SUMMARY.md).
+
+---
+
+## Testing
+
+```bash
+# Required suite: deterministic, network-blocked, CPU-only, stub embedder
+.venv/bin/python -m pytest -m "not model"
+
+# Real-model tests (local only; downloads the pinned model once)
+.venv/bin/python -m pytest -m model
+```
+
+Sprint 1 verification: **134 passed** in the required suite, **4 passed** in the model suite, no skipped/xfail tests.
+
+---
+
+## Development process
+
+This repo is built **spec-driven and test-first** (see [`AGENTS.md`](AGENTS.md)):
+
+1. Read the constitution, then the task in `tasks-offline-indexing.md` plus the spec/plan sections it references.
+2. Do one task at a time. Write the listed tests first, run them, confirm they fail for the expected reason — then stop and wait for approval.
+3. After approval, write the minimum code to pass; iterate on the code until green; refactor with tests green.
+4. Run `pytest -m "not model"` before finishing. Commit tests first, then implementation, as separate commits.
+
+Hard rules: never edit, weaken, skip, or xfail an approved test to pass; stay inside the task's `Touches`; no new/unpinned dependencies without asking; if the spec is ambiguous, mark `[NEEDS CLARIFICATION]` and ask.
+
+---
+
+## Known limitations
+
+- The verifier is only as useful as the repository's commit history; uninformative messages are reported as-is, never invented.
+- Only the branch/HEAD passed in is indexed; there is no branch selection.
+- Submodules are skipped and reported. Symlinks are flagged, never followed.
+- No numeric performance target yet; run reports record timings so one can be set from measurements.
+
+---
+
+## Roadmap
+
+- [x] Sprint 1: offline indexing pipeline (this repo state)
+- [ ] Online pipeline: hybrid retriever (RRF-50/50→50), cross-encoder re-ranker (top 8), generator (Qwen2.5-Coder-Instruct via llama-server), verifier tool loop (`git blame`/`git log`, max 3 rounds), deterministic citation checker
+- [ ] Evaluation question set with reference answers/citations; three-way comparison (no-retrieval vs RAG vs RAG+verification); required before any retrieval/prompt/model tuning
+- [ ] Performance target from measured run-report timings
+
+---
+
+## Reference
+
+- `Constitution.md` — non-negotiable principles (grounding, two pipelines, index correctness, hybrid retrieval, bounded agent loop, citation integrity, evaluation-first, models/environment, TDD, responsible AI, scope)
+- `spec-offline-indexing.md` — what the pipeline must do (user stories, acceptance criteria)
+- `plan-offline-indexing.md` — how it is built (interfaces, design decisions D1–D10, optimisations O1–O9)
+- `tasks-offline-indexing.md` — ordered task list with per-task tests
+- `SPRINT1-SUMMARY.md` — what was built, verification results, and design deviations
