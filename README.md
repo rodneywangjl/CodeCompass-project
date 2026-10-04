@@ -4,7 +4,7 @@ CodeCompass is a RAG-based Q&A assistant that helps developers understand an unf
 
 This repository currently implements **Sprint 1: the offline indexing pipeline**. It turns a git repository into two searchable, mutually consistent indexes — a semantic vector index (Chroma/HNSW) and a keyword index (tantivy BM25) — that the online query pipeline will read. The online pipeline (hybrid retrieval, re-ranking, generation, verifier, citation checker) is not yet built.
 
-> Grounding over fluency: if the evidence is insufficient, CodeCompass says what it could not determine rather than guessing. See [`Constitution.md`](Constitution.md).
+> Grounding over fluency: if the evidence is insufficient, CodeCompass says what it could not determine rather than guessing. See [`docs/constitution.md`](docs/constitution.md).
 
 ---
 
@@ -302,7 +302,7 @@ tests/
   offline/           unit + integration tests mirroring the modules
 ```
 
-Specs and plans: [`spec-offline-indexing.md`](spec-offline-indexing.md), [`plan-offline-indexing.md`](plan-offline-indexing.md), [`tasks-offline-indexing.md`](tasks-offline-indexing.md), [`SPRINT1-SUMMARY.md`](SPRINT1-SUMMARY.md).
+Specs and plans: [`docs/specs/001-offline-indexing/spec.md`](docs/specs/001-offline-indexing/spec.md), [`plan.md`](docs/specs/001-offline-indexing/plan.md), [`tasks.md`](docs/specs/001-offline-indexing/tasks.md), [`docs/summary/SPRINT1-SUMMARY.md`](docs/summary/SPRINT1-SUMMARY.md).
 
 ---
 
@@ -324,7 +324,7 @@ Sprint 1 verification: **134 passed** in the required suite, **4 passed** in the
 
 This repo is built **spec-driven and test-first** (see [`AGENTS.md`](AGENTS.md)):
 
-1. Read the constitution, then the task in `tasks-offline-indexing.md` plus the spec/plan sections it references.
+1. Read the constitution, then the task in `docs/specs/001-offline-indexing/tasks.md` plus the spec/plan sections it references.
 2. Do one task at a time. Write the listed tests first, run them, confirm they fail for the expected reason — then stop and wait for approval.
 3. After approval, write the minimum code to pass; iterate on the code until green; refactor with tests green.
 4. Run `pytest -m "not model"` before finishing. Commit tests first, then implementation, as separate commits.
@@ -353,8 +353,8 @@ Hard rules: never edit, weaken, skip, or xfail an approved test to pass; stay in
 
 ## Reference
 
-- `Constitution.md` — non-negotiable principles (grounding, two pipelines, index correctness, hybrid retrieval, bounded agent loop, citation integrity, evaluation-first, models/environment, TDD, responsible AI, scope)
-- `spec-offline-indexing.md` — what the pipeline must do (user stories, acceptance criteria)
-- `plan-offline-indexing.md` — how it is built (interfaces, design decisions D1–D10, optimisations O1–O9)
-- `tasks-offline-indexing.md` — ordered task list with per-task tests
-- `SPRINT1-SUMMARY.md` — what was built, verification results, and design deviations
+- `docs/constitution.md` — non-negotiable principles (grounding, two pipelines, index correctness, hybrid retrieval, bounded agent loop, citation integrity, evaluation-first, models/environment, TDD, responsible AI, scope)
+- `docs/specs/001-offline-indexing/spec.md` — what the pipeline must do (user stories, acceptance criteria)
+- `docs/specs/001-offline-indexing/plan.md` — how it is built (interfaces, design decisions D1–D10, optimisations O1–O9)
+- `docs/specs/001-offline-indexing/tasks.md` — ordered task list with per-task tests
+- `docs/summary/SPRINT1-SUMMARY.md` — what was built, verification results, and design deviations

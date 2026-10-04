@@ -4,10 +4,11 @@ CodeCompass is a RAG-based Q&A assistant over a git repository. Offline pipeline
 
 ## Source of truth (read before coding)
 
-- `docs/constitution.md`: non-negotiable rules. It is loaded for every session via `opencode.json`. Follow it.
+- `docs/constitution.md`: non-negotiable rules. Follow it. It is **not** loaded automatically by any tool — read it yourself before writing any code or tests.
 - `docs/specs/001-offline-indexing/spec.md`: what to build and the acceptance criteria (ACs).
 - `docs/specs/001-offline-indexing/plan.md`: how it is built (modules, interfaces, design decisions).
 - `docs/specs/001-offline-indexing/tasks.md`: the ordered task list. Work comes from here.
+- `docs/summary/SPRINT1-SUMMARY.md`: what was built in Sprint 1, verification results, and design deviations. Read it for context and to avoid redoing or contradicting finished work; it is a **record, not authority** — where it and the spec or plan disagree, the spec and plan win.
 
 These files are not read automatically. When given a task, read the constitution, the task in `tasks.md`, and the spec and plan sections it references.
 
