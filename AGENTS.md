@@ -130,3 +130,19 @@ An answer counts as **hallucinated** if **any** of the following is true:
 - **hit rate@k** = share of answerable questions with at least one ground-truth file in the top k. It is measured at k = 1, 5 and 10 on the RRF shortlist (before re-ranking) and at k = 1, 5 and `final_k` (default 8) on the chunks the generator receives (after re-ranking). The headline is hit rate@10 before re-ranking, compared with hit rate@`final_k` after re-ranking. Unanswerable controls are excluded.
 - **Citation accuracy** = cited `Sources` entries that the checker verifies ÷ all cited entries.
 - **Latency** is recorded per configuration from the audit-log stage timings.
+
+### Open questions (to be resolved in Spec 003)
+Raised by Nicole on 2026-10-07 from a review of this section against the constitution and Spec 002, and shared with the team. Until each one is resolved, treat it as `[NEEDS CLARIFICATION]`: do not guess.
+
+1. **No-retrieval baseline.** Article VII.2 requires (a) no retrieval, (b) RAG only, (c) RAG + tools. This section does not yet say how H1 and H2 apply to (a), where there is no context.
+2. **Evaluation repo decision.** Constitution Appendix A #12 still lists the evaluation repo and question set as deferred. The Flask/FastAPI choice above must be recorded in Spec 003, and Appendix A updated by an amendment PR.
+3. **H1 scope.** The checker also returns G when an inline marker has no `Sources` entry (a format slip, not a fabrication). Decide whether H1 counts only unmatched entries, or records both separately.
+4. **Context for H2 grading.** H2 needs the full context. Spec 002 AC-7.1 logs chunk scores and only a "result summary" for tool calls. The audit log needs the chunks actually sent (or their ids at the indexed commit) and the full tool output.
+5. **Abstention.** `QueryResult` has no abstention field, and a correct abstention with no `Sources` section is G (Spec 002 §6). Decide whether the checker, `QueryResult` or the harness marks abstentions.
+6. **hit rate@k before re-ranking.** The audit log must keep the full RRF shortlist in order, with each chunk's file path.
+7. **hit rate@k after re-ranking.** The context budget can send fewer than `final_k` chunks (Spec 002 AC-2.6, plan D4). Measure on the chunks actually sent, and log them. The @1 and @5 figures are the like-for-like comparison; @10 vs @`final_k` compares different k.
+8. **Hallucination-rate denominator.** Define whether "questions answered" includes abstentions and pipeline errors (e.g. `llama-server` unreachable).
+9. **Citation accuracy.** State whether it is micro-averaged (over all entries) or macro-averaged (per answer).
+10. **Verification Gain needs a tools-off flag.** Spec 002 defines only the default path; Article VII.3 requires configurations selectable by flag.
+11. **Results-file fields.** Add temperature and seed (Article VII.6), the llama.cpp release and the GGUF checksum (Article VIII.2).
+12. **Latency coverage.** Spec 002 T11.1 times retrieval, re-ranking, generation, tools and the citation check, but not `ensure_current`, query embedding or the total.
