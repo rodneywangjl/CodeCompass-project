@@ -12,6 +12,10 @@ CodeCompass is a RAG-based Q&A assistant over a git repository. Offline pipeline
 
 These files are not read automatically. When given a task, read the constitution, the task in `tasks.md`, and the spec and plan sections it references.
 
+Later specs follow the same layout: `docs/specs/002-online-retrieval/` (online query pipeline) and `docs/specs/003-evaluation/` (evaluation framework, once written). Work on those features comes from their own `spec.md`, `plan.md` and `tasks.md`.
+
+**Claude Code users:** Claude Code reads `CLAUDE.md` / `CLAUDE.local.md`, not this file. Put `@AGENTS.md` at the top of your personal, git-ignored `CLAUDE.local.md` so these rules load in every session.
+
 ## How to work
 
 1. Do **one task at a time**, only the one you are asked to do. Respect its "Depends on" and "Touches".
@@ -91,3 +95,38 @@ Kept the structure and the loader. Rewrote the chunk-overlap handling to
 count tokens and added a test for chunks at the size limit.
 ```
 
+
+## 4.3 Evaluation rules and definitions (Article VII)
+
+> **Status: provisional.** Proposed by Nicole (evaluation owner) on 2026-10-07 for team review. It will move into `docs/specs/003-evaluation/spec.md` once that spec is written; until then, this section is the working definition. Change it only by agreement in a reviewed PR.
+
+### Evaluation data rules
+- **Development repo:** `pallets/flask`, pinned to one commit recorded in the question-set file. Ground-truth files and line ranges are only valid at that commit.
+- **Held-out repo:** `fastapi/fastapi`. Do not index it, query it, or tune anything against it during development. It is run once, at the end, for the 10-question generalisation check.
+- **Frozen references:** the question set, reference answers, reference citations and ground-truth files are fixed before any tuning (Article VII.1). Never edit them to match system output. A genuine error in a reference is fixed in its own commit, with the reason, and is flagged in the results.
+- **Reported results** use the `prod` (32B) profile (Article VIII.5). Results from `dev` (14B) are development signals only.
+- **Results files** are versioned under `eval/results/`, not `runs/`, which is git-ignored. Each file records: the git commit of CodeCompass, the pinned Flask commit, the generator profile and model id, the embedder and re-ranker revisions, the configuration flags, and per-question outputs (Article VII.6).
+
+### Hallucinated answer (used for Verification Gain)
+An answer counts as **hallucinated** if **any** of the following is true:
+
+| # | Condition | How it is decided |
+|---|---|---|
+| H1 | **Fabricated or unmatched citation.** The citation checker returns outcome **G** for an answer that makes claims about the repository (Article VI). | Automatic, from the checker result |
+| H2 | **Unsupported claim.** The answer makes at least one factual claim about the repository that is not supported by the evidence actually placed in the generator's context (retrieved chunks and tool results). This includes a claim that happens to be true of Flask but came from the model's training knowledge rather than the context (Article I.1–I.2). | Human grading against the context in the per-query audit log |
+| H3 | **Fabricated answer to an unanswerable control.** The system gives a substantive answer instead of stating that it could not determine it (Article I.2–I.3). | Human grading; unanswerable questions only |
+
+**Not hallucinated:**
+- An explicit abstention ("I could not find enough evidence…") that makes no claims about the repository. This holds even if the checker flags it for having no `Sources` section. On an answerable question it scores 0 for answer quality, but it is recorded as *abstained*, not *hallucinated*.
+- A supported but incomplete answer, which scores 1 ("partially correct").
+
+**Relation to the answer-quality rubric (0/1/2):** H2 and H3 answers always score 0. A score-0 answer that is wrong **only** because it is incomplete or misread, with every claim still traceable to the context, is **not** counted as hallucinated. Graders record the reason for every 0: `unsupported`, `fabricated-citation`, `abstained`, or `wrong-but-grounded`.
+
+**Why both automatic and human checks:** the citation checker only proves that a cited file or commit was *in the context*, not that the claim is *correct* (Article VI.5). An F (cited) answer can still hallucinate, which H2 catches.
+
+### Metrics
+- **Hallucination rate** = hallucinated answers ÷ questions answered in that configuration. It includes the unanswerable controls, and is reported overall and per question category.
+- **Verification Gain** (primary metric) = hallucination rate (**RAG-only**, verifier tools off) − hallucination rate (**full agentic**, verifier tools on). It is measured on the same questions, with the same index commit and the same `prod` model. A positive value means verification helps.
+- **hit rate@k** = share of answerable questions with at least one ground-truth file in the top k. It is measured at k = 1, 5 and 10 on the RRF shortlist (before re-ranking) and at k = 1, 5 and `final_k` (default 8) on the chunks the generator receives (after re-ranking). The headline is hit rate@10 before re-ranking, compared with hit rate@`final_k` after re-ranking. Unanswerable controls are excluded.
+- **Citation accuracy** = cited `Sources` entries that the checker verifies ÷ all cited entries.
+- **Latency** is recorded per configuration from the audit-log stage timings.

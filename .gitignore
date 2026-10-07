@@ -94,3 +94,7 @@ Desktop.ini
 *.temp
 *.bak
 *.log
+
+# Personal AI-assistant context (each member keeps their own; shared rules live in AGENTS.md)
+CLAUDE.local.md
+.claude/settings.local.json
