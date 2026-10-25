@@ -147,3 +147,19 @@ def git_blame(repo, commit: str, path, lines=None, *, timeout: float) -> ToolOut
         for s in owned)
     text = "\n".join(_render(r, "lines " + _ranges(owned[r.sha])) for r in records)
     return ToolOutput(text=text, commits=records)
+
+
+def git_log(repo, commit: str, path, n, *, limit: int, timeout: float) -> ToolOutput:
+    """Commits touching *path* up to *commit*, newest first (Plan D7)."""
+    path = validate_path(repo, commit, path)
+    count = validate_n(n, limit)
+    stdout, error = _run(
+        repo, ["log", "--format=%H%x1f%an%x1f%ad%x1f%s", "--date=short",
+               "-n", str(count), commit, "--", path], "git log", timeout)
+    if error:
+        return error
+    records = tuple(CommitRecord(*line.split("\x1f", 3))
+                    for line in stdout.splitlines() if line)
+    if not records:
+        return ToolOutput(text=f"no commits found for {path}")
+    return ToolOutput(text="\n".join(_render(r) for r in records), commits=records)
