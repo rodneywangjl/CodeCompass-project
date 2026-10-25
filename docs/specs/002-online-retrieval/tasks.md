@@ -25,6 +25,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - Goal: package layout from the plan, online-specific config loader (retrieval params, generator profiles, tool settings), merged with offline config.
 - Tests first: package imports; default retrieval params loaded (`vector_k=50`, `keyword_k=50`, `rrf_constant=60`, `rerank_k=50`, `final_k=8`); profile loader returns `dev` and `prod` profiles; unknown profile raises a loud error; `MAX_VERIFIER_ROUNDS` is 3; all k values, RRF constant, and tool settings are named config values, not hard-coded.
 - ACs: AC-2.5, AC-5.9, FR-4, FR-17. | Touches: `__init__.py`, `config.py`, `models.py`. | Depends on: Sprint 1 complete.
+- **Follow-up [NEEDS CLARIFICATION]:** done, but `max_verifier_rounds` and `allowed_tools` are overridable from config, which Articles V.1 and V.2 do not allow (plan §7). Changing the approved test `test_max_verifier_rounds_and_tools_config` needs reviewer sign-off first.
 
 **T0.2 Extended fixture repo**
 - Goal: extend the Sprint 1 fixture-repo builder with additional commits that have meaningful commit messages (e.g. "fix auth timeout by adding retry logic") so verifier-tool tests can assert on `git log` / `git blame` output.
@@ -32,8 +33,8 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: enables US3 testing. | Touches: `tests/support/fixture_repo.py`. | Depends on: T0.1.
 
 **T0.3 Stub generator**
-- Goal: a deterministic `StubGenerator` that returns canned responses (configurable per test). Supports: a plain answer with valid citations, an answer with a tool-call request, an answer with invalid citations, an answer with no `Sources` section, a malformed tool-call response.
-- Tests first: stub returns the configured response; calling `generate()` with messages returns the expected text; multiple calls cycle through configured responses (for multi-round tests).
+- Goal: a deterministic `StubGenerator` that returns canned responses (configurable per test). Supports: a plain answer with valid citations, an answer with a tool-call request, an answer with invalid citations, an answer with no `Sources` section, a malformed tool-call response. Also implements `count_tokens` (whitespace-separated tokens) for budgeting tests (plan D4).
+- Tests first: stub returns the configured response; `count_tokens` is deterministic; calling `generate()` with messages returns the expected text; multiple calls cycle through configured responses (for multi-round tests).
 - ACs: enables Article IX.7. | Touches: `tests/support/stub_generator.py`. | Depends on: T0.1.
 
 **T0.4 Stub re-ranker**
@@ -63,7 +64,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 
 **T2.3 Query embedding**
 - Tests first: the query is embedded with the same embedder instance used for the index; the result is a single vector of the correct dimension; a mismatched embedder identity between the query embedder and the index is refused by `open_index` (already tested in Sprint 1, but confirm the online path triggers it).
-- ACs: AC-2.2, FR-1. | Touches: `retrieval/embedder.py`. | Depends on: T2.1.
+- ACs: AC-2.2, FR-1. | Touches: `retrieval/embedder.py`. | Depends on: T2.1, and the plan §3 clarification on how the query embedder is reached through the offline public API.
 
 **T2.4 Hybrid retrieval integration**
 - Tests first (stub embedder, real stores on fixture repo): a question retrieves results from both vector and keyword paths; results are passed through RRF merge; the merged list contains chunks from both sources; a chunk found by both is not duplicated; the output has at most `rerank_k` items.
@@ -82,25 +83,25 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 ## S4: Context assembly
 
 **T4.1 Chunk formatting**
-- Tests first: each chunk is formatted as a block with file path, line range, language, and indexed commit; the generator sees plain text with metadata, never raw vectors or chunk ids; the format matches the plan's D3 template.
+- Tests first: each chunk is formatted as a block with file path, line range, language, and indexed commit; the header text before ` | ` is exactly the `Sources` code-citation form (`path, lines X-Y (indexed at abc1234)`); the generator sees plain text with metadata, never raw vectors or chunk ids; the format matches the plan's D3 template.
 - ACs: AC-1.4, FR-5. | Touches: `context.py`. | Depends on: T0.1.
 
 **T4.2 Context budgeting**
-- Tests first: chunks are added in re-ranker score order until the token budget is exceeded; the remaining chunks are dropped; the token count uses the embedder's tokenizer; `final_k` is capped by the budget (fewer chunks if the budget is tight); a very small budget results in zero chunks (handled gracefully); `generation_reserve` is subtracted from the context window.
-- ACs: AC-2.6, plan D4. | Touches: `context.py`. | Depends on: T4.1, T3.2.
+- Tests first: chunks are added in re-ranker score order until the chunk budget is exceeded; the remaining chunks are dropped; token counts come from `Generator.count_tokens`; `final_k` is capped by the budget (fewer chunks if the budget is tight); a very small budget results in zero chunks (handled gracefully); the profile's `max_tokens` and `MAX_VERIFIER_ROUNDS × max_tool_output_tokens` are reserved before chunks are added.
+- ACs: AC-2.6, plan D4. | Touches: `context.py`. | Depends on: T4.1, T3.2, T0.3.
 
 ## S5: Verifier tools
 
 **T5.1 Tool argument validation**
-- Tests first: a path with `..` is rejected; a path starting with `/` is rejected; a path containing shell metacharacters (`; | & $ \` \\ ( )`) is rejected; a valid repo-relative path passes; a line range `42-58` passes; a reversed range `58-42` is rejected; a non-numeric range is rejected; a path not in the repo is rejected.
+- Tests first: a path with a `..` component is rejected; an absolute path is rejected; a path starting with `-` is rejected; a path that does not exist at the indexed commit is rejected; a valid repo-relative path passes, including names with `(`, `)` or `$` (e.g. `app/(auth)/page.tsx`); a line range `42-58` passes; a reversed range `58-42` is rejected; a range past the file's last line is rejected; a non-numeric range is rejected; `n` outside 1..`git_log_limit` is rejected.
 - ACs: AC-3.3, AC-3.4. | Touches: `agent/tools.py`. | Depends on: T0.2.
 
 **T5.2 git_blame executor**
-- Tests first: `git_blame` on a fixture file returns blame output containing the expected commit hash and author; with a line range, only those lines are blamed; the command runs with `shell=False`; a timeout produces an error message, not a crash; the executor returns text output.
+- Tests first: `git_blame` runs `--porcelain` against the indexed commit (not HEAD); the result carries parsed commit records (hash, author, date, subject) with the expected values; with a line range, only those lines are blamed; the command runs with `shell=False` and `--` before the path; a timeout produces an error message, not a crash; the rendered text is one line per commit.
 - ACs: AC-3.2, AC-3.4. | Touches: `agent/tools.py`. | Depends on: T5.1.
 
 **T5.3 git_log executor**
-- Tests first: `git_log` on a fixture file returns log entries with commit hash, author, date, subject; the output is limited to the configured `n` commits; the command runs with `shell=False`; a timeout produces an error message; an empty log (file with no history) returns an empty result.
+- Tests first: `git_log` runs against the indexed commit; fields are split on the 0x1F separator, so an author name with spaces and a subject with commas parse exactly; the output is limited to `n` commits; the command runs with `shell=False`; a timeout produces an error message; an empty log (file with no history) returns an empty result.
 - ACs: AC-3.2, AC-3.4. | Touches: `agent/tools.py`. | Depends on: T5.1.
 
 **T5.4 Tool allow list**
@@ -111,6 +112,10 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - Tests first: calling the same tool with the same args twice returns the cached result; the cache records `cache_hit=True` on the second call; different args produce different cache keys; the cache is a per-call dictionary (not shared across `ask` calls).
 - ACs: AC-3.5, plan D8. | Touches: `agent/cache.py`. | Depends on: T5.2.
 
+**T5.6 Tool output cap**
+- Tests first: a tool result over `max_tool_output_tokens` is truncated and ends with `[output truncated: N more lines]`; a result under the cap is unchanged; truncation never splits a commit record line.
+- ACs: AC-3.5, plan D4. | Touches: `agent/tools.py`. | Depends on: T5.2, T5.3, T0.3.
+
 ## S6: Tool-call parser
 
 **T6.1 Parse tool calls from model output**
@@ -120,7 +125,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 ## S7: Generator
 
 **T7.1 Model profile loading**
-- Tests first: loading `dev` profile returns the 14B config; loading `prod` returns the 32B config; an unknown profile name raises a loud error; the default profile is `dev`; `GENERATOR_PROFILE` env var overrides the default; each profile has all required fields (model_id, context_window, temperature, max_tokens, stop_tokens).
+- Tests first: loading `dev` profile returns the 14B config; loading `prod` returns the 32B config; an unknown profile name raises a loud error; the default profile is `dev`; `GENERATOR_PROFILE` env var overrides the default; each profile has all required fields (model_id, backend, context_window, server_args, temperature, seed, max_tokens, stop_tokens); a `backend` other than `llama.cpp` is rejected loudly.
 - ACs: AC-5.1, AC-5.2, AC-5.9, FR-17. | Touches: `generator/profiles.py`. | Depends on: T0.1.
 
 **T7.2 LlamaServerGenerator**
@@ -128,8 +133,8 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-5.3, AC-5.4, AC-5.6, FR-12. | Touches: `generator/llama.py`. | Depends on: T7.1.
 
 **T7.3 Health check**
-- Tests first (mocked HTTP): `health_check()` pings `/health` and returns True on 200; returns False on connection error; the generator refuses to generate if the health check fails.
-- ACs: AC-5.10. | Touches: `generator/server.py`. | Depends on: T7.2.
+- Tests first (mocked HTTP): `health_check()` pings `/health` and returns True on 200; returns False on connection error; it fails loudly when `/props` reports a per-slot `n_ctx` smaller than the profile's `context_window`, or a model path that does not end with the profile's `gguf_file`; the generator refuses to generate if the health check fails; the launch command built from the profile contains `-c <context_window>`, `--host 127.0.0.1` and the profile's `server_args`.
+- ACs: AC-5.10, AC-5.12. | Touches: `generator/server.py`. | Depends on: T7.2.
 
 **T7.4 Localhost binding**
 - Tests first: the default server URL is `http://127.0.0.1:<port>`; a config with a non-localhost URL is accepted (for flexibility) but logged as a warning.
@@ -146,7 +151,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-3.1, AC-3.5, AC-3.6. | Touches: `agent/harness.py`. | Depends on: T8.1, T5.4, T5.5.
 
 **T8.3 Round limit enforcement**
-- Tests first (stub generator always requests tools): after 3 tool rounds, the harness stops and treats the last response as the final answer; the audit log records all 3 rounds; the system proceeds to the citation checker with whatever answer text it has.
+- Tests first (stub generator always requests tools): exactly 3 tools execute; the harness then makes one final generate call whose messages say no more tools are available; any `<tool>` block in that final response is removed before the citation checker; at most 4 generator calls are made; the audit log records all 3 tool rounds and the final call; when a response contains two `<tool>` blocks, only the first executes.
 - ACs: AC-3.1, FR-6. | Touches: `agent/harness.py`. | Depends on: T8.2.
 
 **T8.4 Tool error handling**
@@ -164,11 +169,11 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-4.5. | Touches: `citation/parser.py`. | Depends on: T0.1.
 
 **T9.2 Citation checker: outcome F (all valid)**
-- Tests first: an answer where every code source matches a retrieved chunk (path matches, line range overlaps, commit prefix matches) and every commit source matches a tool result → outcome F; the answer is shown normally.
+- Tests first: an answer where every code source is covered by retrieved chunks (same path, every cited line inside the retrieved chunks' ranges, including a range spanning two adjacent chunks; commit prefix matches) and every commit source matches a parsed commit record from a tool result → outcome F; the answer is shown normally.
 - ACs: AC-4.1, AC-4.3. | Touches: `citation/checker.py`. | Depends on: T9.1.
 
 **T9.3 Citation checker: outcome G (invalid citation)**
-- Tests first: a code source citing a file not in retrieved context → outcome G; a code source with a wrong line range → outcome G; a commit source citing a hash not in any tool result → outcome G; an inline marker `[N]` with no corresponding `Sources` entry → outcome G; a `Sources` entry with no matching inline marker → outcome G; no `Sources` section at all → outcome G.
+- Tests first: a code source citing a file not in retrieved context → outcome G; a code source with a wrong line range → outcome G; a code source whose range overlaps a retrieved chunk but extends past it → outcome G; a commit source citing a hash not in any tool result → outcome G; an inline marker `[N]` with no corresponding `Sources` entry → outcome G; a `Sources` entry with no matching inline marker → outcome G; no `Sources` section at all → outcome G.
 - ACs: AC-4.1, AC-4.4, AC-4.5. | Touches: `citation/checker.py`. | Depends on: T9.2.
 
 **T9.4 Flagged answer formatting**
@@ -176,7 +181,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-4.4, FR-10. | Touches: `citation/formatter.py`. | Depends on: T9.3.
 
 **T9.5 Harness-copied commit metadata**
-- Tests first: when the answer contains a commit source `[N] Commit hash, ...`, the harness replaces the model's subject, author, and date with values from the matching `git log` tool result; if the hash is not in any tool result, the source is marked unverified; the replacement is exact (no model-generated commit details survive).
+- Tests first: when the answer contains a commit source `[N] Commit hash, ...`, the harness replaces the model's subject, author, and date with values from the matching commit record of a `git log` or `git blame --porcelain` tool result; if the hash is not in any tool result, the source is marked unverified; the replacement is exact (no model-generated commit details survive).
 - ACs: AC-4.6, FR-16. | Touches: `citation/checker.py`. | Depends on: T9.3, T5.3.
 
 **T9.6 Citation checker is non-bypassable**
