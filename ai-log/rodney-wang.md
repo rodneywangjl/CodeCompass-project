@@ -54,3 +54,14 @@ T0.3: a deterministic stand-in for the generator so the harness, budgeting and c
 TODO (member)
 ### What I kept or changed
 Kept "responses in order, then repeat the last", so a round-limit test needs only one tool-call response. Kept recording a deep copy of each call's messages, after a test showed that storing the list itself lets later rounds rewrite earlier records. Added `count_tokens` (whitespace tokens) because the revised plan D4 counts tokens through the generator. Committed an empty module with the tests so they failed on missing behaviour, not on an import error.
+
+## 2026-10-26 · T0.4 Stub re-ranker
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** tests/support/stub_reranker.py, tests/online/test_stub_reranker_t04.py
+- **Outcome:** Changed
+### What I asked for
+T0.4: a model-free stand-in for the `bge-reranker-v2-m3` cross-encoder. Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+The task suggested scoring by text length. Changed it to count shared query words, so later integration tests can check that a relevant chunk really moves up, rather than just that the order changed. Kept a record of every call's inputs so T3.2 can prove the re-ranker only sees the shortlist (Article IV.3).
