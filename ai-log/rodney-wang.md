@@ -208,3 +208,14 @@ T9.1: parse the answer's `Sources` section into code and commit entries in the c
 TODO (member)
 ### What I kept or changed
 Kept strict entry patterns, since the constitution fixes the format so checking can be exact. Entries that start with `[N]` but match neither form are kept as `invalid` rather than dropped, so the checker flags them instead of losing them. Accepted common heading variants (`## Sources`, `**Sources**`, `Sources:`) because models vary there and it carries no evidence. Inline markers ignore indexing such as `arr[0]`, so code in an answer is not read as a citation.
+
+## 2026-10-26 · T9.2 Citation checker: verified answers
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/citation/checker.py, tests/online/test_citation_checker_f_t92.py
+- **Outcome:** Kept
+### What I asked for
+T9.2: the deterministic checker that marks an answer F when every citation matches evidence actually placed in context (Article VI.1). Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept containment as the rule: a cited range must be fully covered by retrieved chunks of that file, and may span adjacent chunks. Coverage is checked by walking sorted chunk intervals rather than listing every cited line, so a model citing `lines 1-999999999` cannot make the checker loop for a long time. Commit citations match only parsed commit records from tool results, not any text that happens to contain the hash.
