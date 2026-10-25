@@ -153,3 +153,14 @@ T5.3: run `git log` on a file for the model, limited to a configured number of c
 TODO (member)
 ### What I kept or changed
 Kept the 0x1F-separated format from the revised plan D7. The test case that motivated it, author "Alice Tan" with the subject "Handle flaky upstream service, raise MAX_RETRIES to 5", would have been split wrongly by the original space-separated format. Output reuses the same commit records and one-line rendering as `git_blame`, so the citation checker handles both tools the same way.
+
+## 2026-10-26 · T5.4 Tool allow list
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/tools.py, tests/online/test_tool_allowlist_t54.py
+- **Outcome:** Kept
+### What I asked for
+T5.4: only `git_blame` and `git_log` may run; any other tool request is refused with a message the model can read (Article V.2). Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept the dispatch table as the allow list, so `allowed_tools` in config cannot add a tool; a test sets `git_diff` in config and checks it is still refused. This keeps to Article V.2 without touching the approved T0.1 test, which still reads `allowed_tools`. Unexpected arguments (e.g. a `format` passed to `git_log`) are refused too, so the model cannot pass flags through.

@@ -163,3 +163,32 @@ def git_log(repo, commit: str, path, n, *, limit: int, timeout: float) -> ToolOu
     if not records:
         return ToolOutput(text=f"no commits found for {path}")
     return ToolOutput(text="\n".join(_render(r) for r in records), commits=records)
+
+
+# The dispatch table is the allow list (Article V.2): config cannot widen it.
+_PARAMS = {"git_blame": {"path", "lines"}, "git_log": {"path", "n"}}
+ALLOWED_TOOLS = tuple(_PARAMS)
+
+
+def execute(repo, commit: str, call, *, settings) -> ToolOutput:
+    """Run one allow-listed tool call; bad model input becomes an error output."""
+    if call.tool not in _PARAMS:
+        return ToolOutput(
+            text=f"error: tool {call.tool!r} is not allowed; "
+                 f"available tools: {', '.join(ALLOWED_TOOLS)}",
+            error=True)
+    unexpected = sorted(set(call.args) - _PARAMS[call.tool])
+    if unexpected:
+        return ToolOutput(
+            text=f"error: unexpected argument(s) for {call.tool}: {', '.join(unexpected)}",
+            error=True)
+    args = call.args
+    try:
+        if call.tool == "git_blame":
+            return git_blame(repo, commit, args.get("path"), args.get("lines"),
+                             timeout=settings.git_blame_timeout)
+        return git_log(repo, commit, args.get("path"),
+                       args.get("n", settings.git_log_limit),
+                       limit=settings.git_log_limit, timeout=settings.git_log_timeout)
+    except ToolArgumentError as exc:
+        return ToolOutput(text=f"error: {exc}", error=True)
