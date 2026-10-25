@@ -98,3 +98,14 @@ T2.2: BM25 search through the read-only keyword handle from `open_index`, tested
 TODO (member)
 ### What I kept or changed
 Kept a thin wrapper: the Sprint 1 handle already parses queries leniently, and a test with a question full of punctuation (`authenticate()`, quotes, `?`) confirmed it does not crash. Added an early return for blank queries. The vector half (T2.1) is blocked: the read-only vector handle has no search method, and adding one changes Sprint 1 code outside the task's scope.
+
+## 2026-10-26 · T3.1 Re-ranker protocol
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/retrieval/reranker.py, tests/online/test_reranker_protocol_t31.py
+- **Outcome:** Kept
+### What I asked for
+T3.1: the re-ranker interface the pipeline codes against, so the stub and the real `bge-reranker-v2-m3` wrapper are interchangeable. Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept a runtime-checkable `Reranker` protocol only. The real `BgeReranker` is left to T13.1, where it can be tested against the actual model; writing it now would be untested code in the required suite.
