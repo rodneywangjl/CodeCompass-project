@@ -192,3 +192,26 @@ def execute(repo, commit: str, call, *, settings) -> ToolOutput:
                        limit=settings.git_log_limit, timeout=settings.git_log_timeout)
     except ToolArgumentError as exc:
         return ToolOutput(text=f"error: {exc}", error=True)
+
+
+def cap_output(output: ToolOutput, max_tokens: int, count_tokens) -> ToolOutput:
+    """Keep whole lines within *max_tokens* and mark the cut (Plan D4).
+
+    Commits whose line was cut are dropped, so only what the model saw is
+    citable.
+    """
+    if count_tokens(output.text) <= max_tokens:
+        return output
+    lines = output.text.splitlines()
+    kept: list[str] = []
+    used = count_tokens(f"[output truncated: {len(lines)} more lines]")
+    for line in lines:
+        cost = count_tokens(line)
+        if used + cost > max_tokens:
+            break
+        kept.append(line)
+        used += cost
+    marker = f"[output truncated: {len(lines) - len(kept)} more lines]"
+    text = "\n".join(kept + [marker])
+    commits = tuple(c for c in output.commits if c.sha[:7] in text)
+    return ToolOutput(text=text, commits=commits, error=output.error)

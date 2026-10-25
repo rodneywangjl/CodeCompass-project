@@ -175,3 +175,14 @@ T5.5: cache tool results within one question and record cache hits for the audit
 TODO (member)
 ### What I kept or changed
 Kept a per-call cache keyed by the tool and its arguments serialised with sorted keys, so argument order does not matter and list values do not crash the hashing. Repo and commit are not in the key because one cache only lives for one `ask` call, where both are fixed; the docstring says so, so a reviewer can check it against Article V.3's key list. Rewrote the tests to import the module rather than the class, so the first run failed on missing behaviour instead of an import error.
+
+## 2026-10-26 · T5.6 Tool output cap
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/tools.py, tests/online/test_tool_cap_t56.py
+- **Outcome:** Changed
+### What I asked for
+T5.6 (added in the spec review): cap each tool result so three tool rounds can never overflow the context window. Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept whole-line truncation with a visible `[output truncated: N more lines]` marker. Added a rule the task did not state: commits whose line was cut are removed from the result's records, so the citation checker cannot verify a commit the model never saw (Article VI.1). Refactored the first version, which re-counted the whole text for every line, to count each line once, because the real token counter is an HTTP call to `llama-server`.
