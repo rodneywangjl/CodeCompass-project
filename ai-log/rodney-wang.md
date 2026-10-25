@@ -43,3 +43,14 @@ T0.2: a fixture repo with meaningful commit messages, known authors and dates, s
 TODO (member)
 ### What I kept or changed
 Kept a separate `build_history_repo` rather than adding commits to the Sprint 1 fixture, which rewrites its own history and is relied on by the offline tests. The history includes an author name with a space and a subject with a comma (for the 0x1F log format in plan D7) and a final "wip" commit for the no-rationale case (Article V.5). Fixed dates and identities make the shas identical on every build.
+
+## 2026-10-26 · T0.3 Stub generator
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** tests/support/stub_generator.py, tests/online/test_stub_generator_t03.py
+- **Outcome:** Kept
+### What I asked for
+T0.3: a deterministic stand-in for the generator so the harness, budgeting and citation tests need no `llama-server`. Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept "responses in order, then repeat the last", so a round-limit test needs only one tool-call response. Kept recording a deep copy of each call's messages, after a test showed that storing the list itself lets later rounds rewrite earlier records. Added `count_tokens` (whitespace tokens) because the revised plan D4 counts tokens through the generator. Committed an empty module with the tests so they failed on missing behaviour, not on an import error.
