@@ -197,3 +197,14 @@ T6.1: read `<tool>name(key="value")</tool>` requests from the model's text, trea
 TODO (member)
 ### What I kept or changed
 Kept parsing with Python's `ast` module rather than a hand-written regex for the arguments. It accepts only `name(key=literal)`, rejects positional arguments, `**kwargs`, attribute calls like `os.system(...)` and nested calls, and never evaluates anything; a test replaces `eval` with a trap to check that. Added `strip_tool_blocks` for the forced final answer in plan D15. Unknown tool names still parse, so the allow-list refusal message (T5.4) reaches the model instead of the request being silently dropped.
+
+## 2026-10-26 · T9.1 Source entry parser
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/citation/parser.py, tests/online/test_source_parser_t91.py
+- **Outcome:** Kept
+### What I asked for
+T9.1: parse the answer's `Sources` section into code and commit entries in the constitution's fixed format (Article VI.4). Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept strict entry patterns, since the constitution fixes the format so checking can be exact. Entries that start with `[N]` but match neither form are kept as `invalid` rather than dropped, so the checker flags them instead of losing them. Accepted common heading variants (`## Sources`, `**Sources**`, `Sources:`) because models vary there and it carries no evidence. Inline markers ignore indexing such as `arr[0]`, so code in an answer is not read as a citation.
