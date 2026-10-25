@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 
-from codecompass.online.citation.parser import parse_answer
+from codecompass.online.citation.parser import body_markers, parse_answer
 from codecompass.online.models import CitationResult, SourceEntry
 
 
@@ -33,8 +33,18 @@ def _verified(entry: SourceEntry, chunks, commits) -> bool:
 def check(answer: str, chunks, commits) -> CitationResult:
     """Match each Sources entry against the evidence placed in context (Plan D9)."""
     parsed = parse_answer(answer)
-    sources = [dataclasses.replace(s, verified=_verified(s, chunks, commits))
-               for s in parsed.sources]
-    unverified = [s.marker for s in sources if not s.verified]
-    return CitationResult(outcome="G" if unverified else "F", sources=sources,
+    markers = body_markers(parsed.body)
+    counts: dict[int, int] = {}
+    for s in parsed.sources:
+        counts[s.marker] = counts.get(s.marker, 0) + 1
+    # An entry is verified only if its evidence is in context, its marker is
+    # used in the body, and no other entry claims the same marker.
+    sources = [dataclasses.replace(
+        s, verified=(s.marker in markers and counts[s.marker] == 1
+                     and _verified(s, chunks, commits)))
+        for s in parsed.sources]
+    unverified = sorted({s.marker for s in sources if not s.verified}
+                        | (markers - counts.keys()))
+    flagged = bool(unverified) or not parsed.has_sources
+    return CitationResult(outcome="G" if flagged else "F", sources=sources,
                           unverified=unverified, answer_text=answer)
