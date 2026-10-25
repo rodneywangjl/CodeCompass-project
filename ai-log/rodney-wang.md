@@ -241,3 +241,14 @@ T9.4: show a flagged answer with a banner over the whole answer and a mark on ea
 TODO (member)
 ### What I kept or changed
 Kept the plan D11 banner and `[UNVERIFIED]` prefix, with a test that the banner never uses the word "true" (Article VI.5: verified means "found in context", not "correct"). Added a line for an inline marker that has no `Sources` entry at all, which the plan did not cover; otherwise the developer would see the banner but no marked source to check. Only lines after the answer body are marked, so a body line that happens to start with `[1]` is left alone.
+
+## 2026-10-26 · T9.5 Harness-copied commit metadata
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/citation/checker.py, tests/online/test_commit_metadata_t95.py
+- **Outcome:** Kept
+### What I asked for
+T9.5: the commit subject, author and date shown in `Sources` must come from the tool result, never from the model (Article VI.4). Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept the copy inside `check`, so no answer can leave the checker with model-written commit details. The rewritten `Sources` line is what the formatter shows; a test has the model claim "Mallory, 1999-01-01" and checks that the name appears nowhere in the rendered answer. Unverified commit entries are left exactly as written, so the reader sees what the model actually claimed next to the `[UNVERIFIED]` mark. A test against the real history fixture confirms records from `git blame` and `git log` both work.

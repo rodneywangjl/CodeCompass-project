@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import re
 
 from codecompass.online.citation.parser import body_markers, parse_answer
 from codecompass.online.models import CitationResult, SourceEntry
@@ -30,6 +31,26 @@ def _verified(entry: SourceEntry, chunks, commits) -> bool:
     return False
 
 
+def _copy_commit_metadata(answer: str, body: str, sources, commits):
+    """Replace the model's commit subject/author/date with the tool record (Plan D10)."""
+    lines = answer.splitlines()
+    body_len = len(body.splitlines())
+    out = []
+    for s in sources:
+        if s.kind == "commit" and s.verified:
+            rec = next(r for r in commits if r.sha.startswith(s.commit))
+            s = dataclasses.replace(s, subject=rec.subject, author=rec.author,
+                                    date=rec.date)
+            entry = re.compile(rf"\s*\[{s.marker}\]\s*Commit ")
+            for i in range(body_len, len(lines)):
+                if entry.match(lines[i]):
+                    lines[i] = (f'[{s.marker}] Commit {s.commit}, "{s.subject}", '
+                                f"{s.author}, {s.date}")
+        out.append(s)
+    text = "\n".join(lines) + ("\n" if answer.endswith("\n") else "")
+    return text, out
+
+
 def check(answer: str, chunks, commits) -> CitationResult:
     """Match each Sources entry against the evidence placed in context (Plan D9)."""
     parsed = parse_answer(answer)
@@ -46,5 +67,6 @@ def check(answer: str, chunks, commits) -> CitationResult:
     unverified = sorted({s.marker for s in sources if not s.verified}
                         | (markers - counts.keys()))
     flagged = bool(unverified) or not parsed.has_sources
+    answer, sources = _copy_commit_metadata(answer, parsed.body, sources, commits)
     return CitationResult(outcome="G" if flagged else "F", sources=sources,
                           unverified=unverified, answer_text=answer)
