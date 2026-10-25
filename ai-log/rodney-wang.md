@@ -230,3 +230,14 @@ T9.3: every way a citation can fail must produce outcome G (Article VI.3). Tests
 TODO (member)
 ### What I kept or changed
 Nine of the fourteen tests passed on first run, because T9.2's per-entry check already flags a bad entry; the five that failed covered marker cross-checks and a missing `Sources` section, which is what this task added. Kept a test for a range that overlaps a chunk but runs past it (`lines 50-70` against a chunk at 42-58), the case the original plan's overlap rule let through. Duplicate entries for one marker are flagged rather than accepting whichever matches. A missing `Sources` section is G as the spec says today; how such answers are shown is still an open team question.
+
+## 2026-10-26 · T9.4 Flagged answer formatting
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/citation/formatter.py, tests/online/test_citation_format_t94.py
+- **Outcome:** Kept
+### What I asked for
+T9.4: show a flagged answer with a banner over the whole answer and a mark on each unverified source, so it never looks like a verified one (Article VI.3). Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept the plan D11 banner and `[UNVERIFIED]` prefix, with a test that the banner never uses the word "true" (Article VI.5: verified means "found in context", not "correct"). Added a line for an inline marker that has no `Sources` entry at all, which the plan did not cover; otherwise the developer would see the banner but no marked source to check. Only lines after the answer body are marked, so a body line that happens to start with `[1]` is left alone.
