@@ -109,3 +109,14 @@ T3.1: the re-ranker interface the pipeline codes against, so the stub and the re
 TODO (member)
 ### What I kept or changed
 Kept a runtime-checkable `Reranker` protocol only. The real `BgeReranker` is left to T13.1, where it can be tested against the actual model; writing it now would be untested code in the required suite.
+
+## 2026-10-26 · T4.1 Chunk formatting
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/context.py, tests/online/test_context_format_t41.py
+- **Outcome:** Kept
+### What I asked for
+T4.1: format retrieved chunks as plain text with file, line, language and commit metadata for the generator (Article IV.4). Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept the revised plan D3 header, whose first part is exactly the `Sources` code-citation form, and a separate `citation_label` function that the citation checker can reuse so the two cannot drift apart. `RetrievedChunk.from_record` drops the stored vector when it builds the chunk, so a vector cannot reach the prompt by accident.
