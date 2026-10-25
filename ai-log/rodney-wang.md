@@ -186,3 +186,14 @@ T5.6 (added in the spec review): cap each tool result so three tool rounds can n
 TODO (member)
 ### What I kept or changed
 Kept whole-line truncation with a visible `[output truncated: N more lines]` marker. Added a rule the task did not state: commits whose line was cut are removed from the result's records, so the citation checker cannot verify a commit the model never saw (Article VI.1). Refactored the first version, which re-counted the whole text for every line, to count each line once, because the real token counter is an HTTP call to `llama-server`.
+
+## 2026-10-26 · T6.1 Tool-call parser
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/tool_parser.py, tests/online/test_tool_parser_t61.py
+- **Outcome:** Kept
+### What I asked for
+T6.1: read `<tool>name(key="value")</tool>` requests from the model's text, treating anything malformed as a final answer (Article VIII.2: no server-side tool calling). Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept parsing with Python's `ast` module rather than a hand-written regex for the arguments. It accepts only `name(key=literal)`, rejects positional arguments, `**kwargs`, attribute calls like `os.system(...)` and nested calls, and never evaluates anything; a test replaces `eval` with a trap to check that. Added `strip_tool_blocks` for the forced final answer in plan D15. Unknown tool names still parse, so the allow-list refusal message (T5.4) reaches the model instead of the request being silently dropped.
