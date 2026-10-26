@@ -16,7 +16,7 @@ None of these files load automatically. Before any task, read them yourself:
 |---|---|
 | `001-offline-indexing` | Done (Sprint 1) |
 | `002-online-retrieval` | **Current**: online query pipeline |
-| `003-evaluation` | Not yet written. Draft rules are in `docs/specs/003-evaluation/draft-rules.md` |
+| `003-evaluation` | Not yet written. Until it exists, the rules under "Evaluation data" below apply |
 
 - `docs/summary/SPRINT1-SUMMARY.md`: what Sprint 1 built, its verification results and design deviations. It is a **record, not authority**: where it disagrees with a spec or plan, the spec and plan win.
 
@@ -71,12 +71,12 @@ Never run `pytest -m model`, start `llama-server`, or download model weights unl
 
 ## Evaluation data
 
-Full definitions are in `docs/specs/003-evaluation/draft-rules.md` (provisional). The rules an agent must never break:
+Spec 003 is not written yet, and there is no draft rules file. Until it exists, these rules are the full set, and an agent must never break them:
 
 - Never index, query, or tune anything against the held-out repo `fastapi/fastapi`.
 - Never edit the question set, reference answers, reference citations, or ground-truth files to match system output.
 - Versioned results go in `eval/results/`, not `runs/` (git-ignored).
-- Any open question in that file is `[NEEDS CLARIFICATION]`.
+- Any open question about evaluation is `[NEEDS CLARIFICATION]`: ask, do not guess.
 
 ## Environment
 
