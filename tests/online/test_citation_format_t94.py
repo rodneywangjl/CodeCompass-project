@@ -58,6 +58,9 @@ def test_flagged_never_identical_to_cited():
     assert formatter.render(result) != text
 
 
-def test_no_sources_section_still_gets_banner():
+def test_no_sources_section_gets_uncited_note():
+    # Changed by T9.7 (spec AC-4.8, team decision Q1, 2026-10-26): an answer
+    # with no citations shows the uncited note, not the unverified banner.
+    # Approved-test change; needs reviewer sign-off (Article IX.3).
     out = render("Five retries.")
-    assert out == formatter.BANNER + "\n\nFive retries."
+    assert out == formatter.UNCITED_NOTE + "\n\nFive retries."
