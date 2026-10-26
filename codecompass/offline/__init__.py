@@ -117,6 +117,9 @@ class ReadOnlyVectorStore:
     def count(self) -> int:
         return self._store.count()
 
+    def search(self, vector, limit: int) -> list:
+        return self._store.search(vector, limit)
+
     def records_for_ids(self, ids) -> dict:
         return self._store.records_for_ids(ids)
 

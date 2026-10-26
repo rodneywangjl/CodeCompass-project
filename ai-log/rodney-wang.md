@@ -252,3 +252,14 @@ T9.5: the commit subject, author and date shown in `Sources` must come from the 
 TODO (member)
 ### What I kept or changed
 Kept the copy inside `check`, so no answer can leave the checker with model-written commit details. The rewritten `Sources` line is what the formatter shows; a test has the model claim "Mallory, 1999-01-01" and checks that the name appears nowhere in the rendered answer. Unverified commit entries are left exactly as written, so the reader sees what the model actually claimed next to the `[UNVERIFIED]` mark. A test against the real history fixture confirms records from `git blame` and `git log` both work.
+
+## 2026-10-26 · Vector search on the read-only index handle
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/offline/stores/vector.py, codecompass/offline/__init__.py, tests/offline/test_vector_search.py
+- **Outcome:** Changed
+### What I asked for
+A repo review found that `open_index` handles had no vector ANN search, which blocks the online vector retriever (Spec 002 T2.1). I asked for a tests-first fix.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Added `search(vector, limit)` returning ranked chunk ids, mirroring `KeywordIndex.search`. It returns `[]` on an empty store and caps `limit` at the store size. The read-only facade passes it through and still has no write methods.
