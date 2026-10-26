@@ -230,6 +230,10 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - Tests first: `python -m codecompass.online.cli ask <repo> "<question>"` runs and prints the answer; `--profile prod` selects the prod profile; `--verbose` prints retrieval details; flagged answers display the banner; stale-index warnings are displayed before the answer; exit code 0 on success; at startup the CLI logs the active profile name and resolved model id once (to stderr, so the printed answer stays clean).
 - ACs: AC-8.1, AC-8.2, AC-8.3, AC-8.4, AC-5.8. | Touches: `cli.py`. | Depends on: T12.1.
 
+**T12.4 Evaluation modes**
+- Tests first (stub generator, stub re-ranker, stub embedder): `pipeline.mode` defaults to `rag_tools`; an unknown mode raises a loud error at startup; `rag_tools` behaves as T12.2; `rag` retrieves and re-ranks, leaves D14 rule 3 out of the system prompt, runs no tool even when the stub requests one (the block is removed and logged), and the answer still goes to the citation checker; `no_retrieval` calls `ensure_current` but does no embedding, search or re-rank, sends no chunks, and a stub answer citing a file is flagged G; every mode uses the same profile and model id; the audit log records the mode.
+- ACs: AC-10.1–10.5, FR-18. | Touches: `config.py`, `__init__.py`. | Depends on: T12.2.
+
 ## S13: Real model tests (local only, `model` marker)
 
 **T13.1 Real cross-encoder re-ranker**

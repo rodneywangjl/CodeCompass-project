@@ -1,7 +1,7 @@
 # Spec 002: Online Query Pipeline
 
 **Project:** CodeCompass (SE201 G1-T1) | **Sprint:** 2 | **Status:** Draft for review
-**Constitution version:** 1.2.0 | **Constitution articles touched:** I, II, III, IV, V, VI, VIII, IX, X, XI (see "Constitution Check")
+**Constitution version:** 1.2.0 | **Constitution articles touched:** I, II, III, IV, V, VI, VII, VIII, IX, X, XI (see "Constitution Check")
 
 > This spec says **what** the online query pipeline must do and how we will know it works. It does not choose class designs, file layouts, or prompt templates beyond what the constitution already fixes; those belong in the plan.
 
@@ -156,6 +156,16 @@ Priorities: **P1** = required for the sprint to be done, **P2** = should ship, *
 - **AC-9.1** A single `ask(repo_path, question, *, config, profile)` function returns a structured result containing: answer text, sources list (with verification status per source), citation outcome (F or G), stale-index flag, and the audit log.
 - **AC-9.2** The function does not print to stdout; all output is returned in the result object.
 
+### US10 (P2): Evaluation configurations
+
+*As the evaluation (Spec 003), I need to run the same questions through the three configurations Article VII.2 compares, from one codebase, so that differences come only from retrieval and verification.*
+
+- **AC-10.1** One configuration setting selects exactly one of: **(a)** no-retrieval baseline, **(b)** RAG only, **(c)** RAG + tool verification (Article VII.3). The default is (c). An unknown value fails loudly at startup.
+- **AC-10.2** (a) places no retrieved chunks in the generator's context; (b) retrieves and re-ranks as normal but runs no verifier tool; (c) is the full pipeline.
+- **AC-10.3** All three use the same generator profile and model; the setting never changes the model (Article VII.4).
+- **AC-10.4** The citation checker runs in every configuration and cannot be skipped (Article VI.2).
+- **AC-10.5** The active configuration is recorded in every per-query audit log.
+
 ## 5. Functional Requirements
 
 | ID | Requirement | Satisfied by |
@@ -177,6 +187,7 @@ Priorities: **P1** = required for the sprint to be done, **P2** = should ship, *
 | FR-15 | Every query **MUST** produce a structured audit log. | AC-7.1 |
 | FR-16 | Commit metadata in `Sources` entries **MUST** be harness-copied from tool results. | AC-4.6 |
 | FR-17 | All model names, parameters, and paths **MUST** be configuration, not hard-coded. | Article VIII.1 |
+| FR-18 | The three evaluation configurations **MUST** be selectable by one config setting, with the same model and the citation checker in every one. | AC-10.1–10.5, Article VII.3 |
 
 ## 6. Edge Cases
 
@@ -237,6 +248,7 @@ Each of these needs at least one test:
 | IV (Hybrid retrieval) | Both semantic and keyword search, RRF merge, cross-encoder on shortlist only, configurable k values (AC-2.1–2.7). |
 | V (Agent loop) | Bounded at 3 rounds, allow-listed tools, validated args, cached results, per-query logging (AC-3.1–3.8). |
 | VI (Citation integrity) | Deterministic checker, F/G outcomes, fixed format, harness-copied commit metadata, non-bypassable (AC-4.1–4.7). |
+| VII (Evaluation first) | The three Article VII.2 configurations are one config setting in this codebase; same model in all; no tuning here (US10). |
 | VIII (Models/environment) | llama.cpp only, switchable profiles, pinned GGUF, localhost, no mlx-lm, all config (AC-5.1–5.11). |
 | IX (Spec-driven, TDD) | Every AC is testable; stub generator for required suite; tests first (section 10). |
 | X (Responsible AI) | Citations as navigable references, stale-index warnings, "no rationale found" honesty, local-only by default (AC-1.3, 3.7, 4.7, 6.3). |

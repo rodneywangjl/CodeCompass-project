@@ -275,6 +275,16 @@ a1b2c3d | 2024-03-14 | Alice | handle flaky upstream service
 
 Rejections and errors use the same wrapper with an `error="..."` attribute. A tool run that finds no commits is never sent as an empty block: the wrapper's body says `No commit history found for <path>` (plus the line range for blame), so the model is told plainly that history gives no rationale (Article V.5). The `tool` role is **not** used: it belongs to llama-server's built-in tool-calling feature, which the harness must not rely on (Article VIII.2), and depending on server launch flags and chat template a `tool`-role message may be rejected or rendered in a form the model was not trained on. A `user` message with a tag renders the same on every llama-server setup and for both profiles. This is how the plan reads Article V.3's "appended as tool messages": messages that carry tool results (spec C12). The citation checker does not depend on roles; it matches against parsed commit records.
 
+**D17. Evaluation modes (Article VII.3).** `pipeline.mode` selects one of three values. `ask` branches on it in one place; no other module reads it.
+
+| Mode | Retrieval and re-rank | Verifier tools | Generator context |
+|---|---|---|---|
+| `rag_tools` (default) | yes | yes, up to `MAX_VERIFIER_ROUNDS` | chunks + tool results |
+| `rag` | yes | **none**: D14 rule 3 is left out of the prompt, and any `<tool>` block in a response is removed and logged, never run | chunks only |
+| `no_retrieval` | **none**: no embedding, search or re-rank | none, as in `rag` | the question only |
+
+Every mode calls `ensure_current` (Article III.2), uses the same active profile (Article VII.4) and runs the citation checker (Article VI.2). In `no_retrieval` any citation is therefore unverified (G), which is exactly what the baseline should measure. An unknown mode raises at startup, like an unknown profile. The mode is written to every audit log so evaluation result files can record it.
+
 ## 6. Optimisations
 
 | # | Optimisation | Saves | Must not break |
@@ -290,6 +300,9 @@ Rejections and errors use the same wrapper with an `error="..."` attribute. A to
 Online-specific additions to `codecompass.toml`:
 
 ```toml
+[pipeline]
+mode = "rag_tools"   # rag_tools | rag | no_retrieval (D17, Article VII.3)
+
 [retrieval]
 vector_k = 50
 keyword_k = 50
@@ -360,6 +373,7 @@ query_log_dir = ""   # default: <index_dir>/queries/
 | AC-7.x audit logging | `logging.py` | unit and integration (log content assertions) |
 | AC-8.x CLI | `cli.py` | CLI smoke test |
 | AC-9.x API | `__init__.ask` | unit (return structure) |
+| AC-10.x evaluation modes | `config.py`, `__init__.ask` (D17) | integration (stub generator: per mode, which stages run and what reaches the context) |
 
 ## 9. Risks
 
@@ -402,6 +416,7 @@ query_log_dir = ""   # default: <index_dir>/queries/
 | IV | Both search paths, RRF merge with rank-only scores, cross-encoder on shortlist, configurable k values |
 | V | `MAX_VERIFIER_ROUNDS = 3`, allow-listed tools, validated args, cached results, per-query log |
 | VI | Deterministic checker, F/G outcomes, fixed format, harness-copied commit metadata, non-bypassable in production |
+| VII | Three evaluation configurations as one `pipeline.mode` setting; same model in all; citation checker in all (D17) |
 | VIII | llama.cpp only, switchable profiles, pinned GGUF, localhost, no mlx-lm, all config; hardware-independent required tests |
 | IX | Every slice starts with failing tests; required suite needs no GPU/network/model; stub generator and reranker |
 | X | Citations as navigable references; stale warnings; "no rationale found" honesty; local-only default |
