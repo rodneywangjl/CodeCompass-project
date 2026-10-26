@@ -39,3 +39,37 @@ def format_chunk(chunk: RetrievedChunk) -> str:
 
 def format_context(chunks: list[RetrievedChunk]) -> str:
     return "\n\n".join(format_chunk(c) for c in chunks)
+
+
+def _tool_reserve(tools) -> int:
+    return tools.max_verifier_rounds * tools.max_tool_output_tokens
+
+
+def chunk_budget(profile, tools, prefix_tokens: int) -> int:
+    """Tokens left for chunks once the answer, prompt and tool rounds are reserved (Plan D4)."""
+    return (profile.context_window - profile.max_tokens - prefix_tokens
+            - _tool_reserve(tools))
+
+
+def fit_chunks(chunks: list[RetrievedChunk], budget: int, count_tokens) -> list[RetrievedChunk]:
+    """Chunks in order while each formatted block fits; the first misfit ends it."""
+    kept: list[RetrievedChunk] = []
+    used = 0
+    for chunk in chunks:
+        cost = count_tokens(format_chunk(chunk))
+        if used + cost > budget:
+            break
+        kept.append(chunk)
+        used += cost
+    return kept
+
+
+def check_round_reserve(profile, tools, system_tokens: int) -> None:
+    """Fail loudly when the configured tool rounds leave no room for chunks."""
+    room = profile.context_window - profile.max_tokens - system_tokens - _tool_reserve(tools)
+    if room <= 0:
+        raise ValueError(
+            f"tools.max_verifier_rounds={tools.max_verifier_rounds} reserves "
+            f"{_tool_reserve(tools)} tokens for tool results, leaving no room for "
+            f"retrieved code in a {profile.context_window}-token context window "
+            "(Article V.1)")

@@ -27,6 +27,7 @@ DEFAULT_GIT_LOG_LIMIT = 20
 DEFAULT_GIT_BLAME_TIMEOUT = 30
 DEFAULT_GIT_LOG_TIMEOUT = 30
 DEFAULT_ALLOWED_TOOLS = ("git_blame", "git_log")
+DEFAULT_MAX_TOOL_OUTPUT_TOKENS = 768
 
 # Generator & Re-ranker defaults (Article VIII.1, VIII.2, Plan §7)
 DEFAULT_RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
@@ -87,6 +88,7 @@ class ToolsConfig:
     git_blame_timeout: int = DEFAULT_GIT_BLAME_TIMEOUT
     git_log_timeout: int = DEFAULT_GIT_LOG_TIMEOUT
     allowed_tools: tuple[str, ...] = DEFAULT_ALLOWED_TOOLS
+    max_tool_output_tokens: int = DEFAULT_MAX_TOOL_OUTPUT_TOKENS
 
 
 @dataclass(frozen=True)
