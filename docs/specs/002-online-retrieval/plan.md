@@ -28,9 +28,9 @@ ask(repo, question, *, config, profile)
   │     ├─ build messages: system + context + conversation
   │     ├─ generate(messages)                             # llama-server HTTP
   │     ├─ parse response:
-  │     │     ├─ tool call? → validate args → execute → cache → log → append to messages → round++ → loop if round < 3
+  │     │     ├─ tool call? → validate args → execute at indexed commit → cap output → cache → log → append to messages → round++ → loop if round < 3
   │     │     └─ answer? → break
-  │     └─ round == 3? → force answer from last response
+  │     └─ round == 3 and still a tool request? → one final generate call with tools disabled (D15)
   ├─ citation_check(answer, context)                     # deterministic F/G
   ├─ if commit sources → harness copies metadata from tool results
   ├─ build QueryResult (answer, sources, outcome, stale_flag, audit_log)
@@ -88,7 +88,9 @@ tests/
   online/            unit + integration tests mirroring the modules
 ```
 
-**Boundary rule (Article II.2):** the online package imports from `codecompass.offline` only: `ensure_current`, `open_index`, `status`, `EnsureResult`, `IndexHandles`, `IndexStatus`. It never imports scanner, chunker, embedder-writing, or store-writing code.
+**Boundary rule (Article II.2):** the online package imports from `codecompass.offline` only through its public API (`__all__`: `ensure_current`, `status`, `open_index`, `check_consistency`). It never imports scanner, chunker, embedder-writing, or store-writing code. Result types (`EnsureResult`, `IndexHandles`, `IndexStatus`) are used as the return values of those functions, not imported.
+
+**[NEEDS CLARIFICATION] Query embedder access.** D1 originally reused `CodeEmbedder` from `codecompass.offline.embedding`, which is not part of the public API. Proposed resolution: the handles returned by `open_index` gain an `embed_query(text) -> list[float]` method backed by an embedder whose identity `open_index` has already checked against the index metadata. Query embedding then goes through the public API, and Article II.4 (same embedder) holds by construction rather than by convention. This changes Sprint 1 code (`codecompass/offline/__init__.py`), so it needs team agreement and its own task before T2.3.
 
 ## 4. Interfaces (the contracts tests are written against)
 
@@ -97,6 +99,9 @@ tests/
 class Generator(Protocol):
     def generate(self, messages: list[dict]) -> str:
         """Send chat messages, return the model's text response."""
+        ...
+    def count_tokens(self, text: str) -> int:
+        """Token count in the generator's own tokenizer (context budgeting, D4)."""
         ...
 
 # --- Re-ranker ---
@@ -135,7 +140,7 @@ Production code depends only on these protocols. Tests supply a `StubGenerator` 
 
 ## 5. Key design decisions
 
-**D1. Query embedding reuses the offline embedder.** The online pipeline instantiates the same `CodeEmbedder` (or `StubEmbedder` in tests) and calls `embed([question])`. This guarantees Article II.4 (same model and revision). The embedder identity is checked against the index metadata by `open_index` (already built in Sprint 1).
+**D1. Query embedding uses the index's own embedder.** The query is embedded by the same embedder model and revision as the index (Article II.4), obtained through the offline public API (see the clarification under §3). Tests inject `StubEmbedder`. The embedder is loaded once per process and reused across questions.
 
 **D2. RRF merge is a pure function.** Input: two ranked lists of `(chunk_id, rank)`. Output: a single list of `(chunk_id, rrf_score)` sorted descending. A chunk appearing in both lists gets the sum of its two contributions. The RRF constant and k values are parameters, never hard-coded.
 
@@ -152,14 +157,28 @@ def rrf_merge(vector_hits, keyword_hits, *, k=50, constant=60):
 **D3. Context assembly.** Each chunk is formatted as a block:
 
 ```
---- File: src/auth/client.py, lines 42-58 (language: python, indexed at a1b2c3d) ---
+--- src/auth/client.py, lines 42-58 (indexed at a1b2c3d) | python ---
 def authenticate(user, password):
     ...
 ```
 
+The header text before ` | ` is exactly the code-citation form required in `Sources` (Article VI.4), so the model cites a chunk by copying its header and never has to recompute line numbers. Citing a whole chunk is always valid under D9.
+
 The generator receives these blocks as the `user` message content, preceded by a system message. No raw vectors, no chunk ids in the prompt (Article IV.4).
 
-**D4. Context budgeting.** The context budget (in tokens) is `context_window - system_prompt_tokens - generation_reserve`. Chunks are added in re-ranker-score order until the budget would be exceeded; remaining chunks are dropped. The token count uses the embedder's tokenizer (shared, already loaded). `generation_reserve` is a profile setting (default: 1024 tokens for the response).
+**D4. Context budgeting.** The budget covers the whole conversation, including the tool rounds that come after the chunks, not only the first prompt:
+
+```
+budget = context_window - max_tokens - tokens(system prompt + question)
+chunk_budget = budget - MAX_VERIFIER_ROUNDS * max_tool_output_tokens
+```
+
+1. Chunks are added in re-ranker-score order while they fit in `chunk_budget`; the rest are dropped. `final_k` is therefore capped by the budget (AC-2.6).
+2. Each tool result is truncated to `max_tool_output_tokens` before it is appended, ending with a visible `[output truncated: N more lines]` line so the model knows it is partial. Together with step 1, the conversation can never exceed the context window, whatever the tools return.
+3. The reserve for the answer is the profile's `max_tokens`. A separate, smaller `generation_reserve_tokens` would let a long answer overflow the window, so that key is retired (it is not covered by an approved test).
+4. Token counts come from the generator interface (`Generator.count_tokens`), because the budget is measured in the generator's tokens, which differ from the embedder's. `LlamaServerGenerator` calls llama-server's `/tokenize` endpoint; `StubGenerator` counts whitespace-separated tokens so tests stay model-free.
+
+Example for an 8192-token profile (window 8192, `max_tokens` 2048, three tool results of 768): about 3,500 tokens remain for chunks, so 6-7 chunks of the 512-token target fit.
 
 **D5. Tool-call format.** The system prompt instructs the model to use:
 
@@ -171,27 +190,32 @@ The generator receives these blocks as the `user` message content, preceded by a
 The harness uses a regex to extract tool calls. If no `<tool>...</tool>` block is found, the response is treated as a final answer. If the format is malformed, it is also treated as a final answer (no crash). The harness never relies on server-side tool-call features (Article VIII.2).
 
 **D6. Tool argument validation.** Before execution:
-1. `path` must be repo-relative, must not contain `..`, must not start with `/`, must not contain shell metacharacters (`; | & $ \` \\ ( )`).
-2. `lines` (if present) must be a valid range (`N` or `N-M` where N ≤ M).
-3. The path must exist in the repository at the indexed commit.
-4. Rejected arguments produce a tool-error message appended to context (the model sees the rejection and can try differently).
+1. `path` is normalised (`posixpath.normpath`) and must be repo-relative: not absolute, not starting with `-`, and with no `..` component.
+2. The path must exist as a file in the git tree at the indexed commit. This one check also rejects anything outside the repository, so no character blacklist is needed: commands run with `shell=False` and pass `--` before the path, so shell metacharacters are inert. Real file names such as `app/(auth)/page.tsx` or `Outer$Inner.java` must stay valid.
+3. `lines` (if present) must be `N` or `N-M` with `1 ≤ N ≤ M ≤` the file's line count at the indexed commit.
+4. `n` (git_log) must be an integer from 1 to `git_log_limit`.
+5. Rejected arguments produce a tool-error message appended to context (the model sees the rejection and can try differently). A rejected call still uses up its round, so a model that keeps sending bad calls still terminates (Article V.1).
 
 **D7. Tool execution.** Both tools run via `subprocess.run` with `capture_output=True`, `shell=False`, `cwd=repo_path`, and a timeout. The harness builds the argument list; the model never controls the command line.
 
-- `git blame`: `git blame -L <start>,<end> <commit> -- <path>` (or without `-L` for the whole file).
-- `git log`: `git log --format=format:"%H %an %ad %s" --date=short -n <limit> <commit> -- <path>`.
+- `git blame`: `git blame --porcelain -L <start>,<end> <indexed_commit> -- <path>` (or without `-L` for the whole file). Porcelain output carries each commit's full hash, author, author time and summary, so D10 can copy commit metadata from blame results, not only from log results.
+- `git log`: `git log --format=%H%x1f%an%x1f%ad%x1f%s --date=short -n <n> <indexed_commit> -- <path>`. Fields are separated by the unit-separator byte (0x1F), which cannot occur in names or subjects, so parsing is exact even though author names contain spaces.
+
+Both tools run against the **indexed commit**, not HEAD, so blame line numbers always match the retrieved chunks, including when the index is stale (D12).
+
+The executor parses each result into commit records (full hash, author, date, subject) kept on the `ToolResult`, and renders a compact text form for the context: one line per commit (`<7-char hash> <date> <author> "<subject>"`), plus the blamed line ranges for blame. The parsed records are what D9 and D10 match against; the rendered text is what the model sees and what D4 caps.
 
 **D8. Tool-result caching.** A per-`ask`-call dictionary keyed by `(tool_name, frozen_args)`. On cache hit, the result is reused and the log records `cache_hit=True`. The cache is discarded after the `ask` call returns.
 
 **D9. Citation checker algorithm.**
 1. Parse the `Sources` section from the answer text using regex.
 2. For each source entry:
-   - **Code source** `[N] path, lines X-Y (indexed at hash)`: verify that a chunk with a matching `file_path` and overlapping `[start_line, end_line]` range exists in the retrieved context, and that the 7-char commit hash prefix matches the indexed commit.
-   - **Commit source** `[N] Commit hash, "subject", author, date`: verify that a tool result contains output referencing this commit hash.
-3. For each inline marker `[N]` in the answer body, verify that a corresponding `[N]` entry exists in `Sources`.
+   - **Code source** `[N] path, lines X-Y (indexed at hash)`: verify that every line from X to Y is covered by retrieved chunks with the same `file_path` (the union of their line ranges contains `[X, Y]`), and that the 7-char hash equals the indexed commit's prefix. Overlap is not enough: a citation of lines 1-500 that overlaps a chunk at 42-58 would point the reader at code the model never saw (Articles I.1, VI.1).
+   - **Commit source** `[N] Commit hash, "subject", author, date`: verify that the 7-char hash is a prefix of a commit record parsed from a tool result (D7), not merely a substring of some tool output.
+3. Markers and entries must match both ways: every inline marker `[N]` has a `Sources` entry, and every entry is referenced by a marker.
 4. If all pass → outcome F. If any fail → outcome G, with per-source verification status.
 
-**D10. Harness-copied commit metadata (Article VI.4).** When the answer contains a commit source, the harness replaces the model's subject/author/date with the values parsed from the `git log` tool result. This prevents the model from fabricating commit details. If the commit hash is not found in any tool result, the source is marked unverified.
+**D10. Harness-copied commit metadata (Article VI.4).** When the answer contains a commit source, the harness replaces the model's subject/author/date with the values from the matching commit record parsed from a `git log` or `git blame --porcelain` tool result (D7). This prevents the model from fabricating commit details. If the commit hash is not found in any tool result, the source is marked unverified.
 
 **D11. Flagged-answer rendering (Article VI.3).**
 - **Banner:** `⚠ WARNING: Some citations in this answer could not be verified against the retrieved evidence. Verify the marked sources manually.`
@@ -211,6 +235,9 @@ The harness uses a regex to extract tool calls. If no `<tool>...</tool>` block i
 4. Parses the response JSON and returns the assistant message content.
 5. A `health_check()` method pings `/health` before the first query.
 6. Timeout on HTTP calls (configurable, default 120s for generation).
+7. Sends the profile's `seed` with every request, so runs are reproducible where the server supports it (Article VII.6).
+8. `health_check()` also reads `/props` and fails loudly when the server cannot serve the active profile: the per-slot context (`default_generation_settings.n_ctx`) must be at least the profile's `context_window`, and when `gguf_file` is set the loaded model path must end with it. The server is started by hand (spec C9), so this is the only point where the pinned profile is checked against what is actually running.
+9. `count_tokens(text)` calls `/tokenize` (used by D4).
 
 **D14. System prompt.** A minimal, functional prompt (prompt engineering deferred per Article VII.1):
 
@@ -221,7 +248,8 @@ about the repository.
 
 Rules:
 1. Cite every claim with numbered markers [1], [2], etc.
-2. End with a Sources section listing each citation.
+2. End with a Sources section listing each citation. For code, copy the
+   chunk's header line exactly (the part before " | ").
    - Code: [N] file/path.py, lines X-Y (indexed at <7-char hash>)
    - Commit: [N] Commit <7-char hash>, "<subject>", <author>, <date>
 3. If you need commit history to explain WHY code exists, request a tool:
@@ -231,14 +259,17 @@ Rules:
    Do NOT guess or make up file names, line numbers, or commit hashes.
 ```
 
+**D15. Round limit (Article V.1).** One tool call executes per round: the first `<tool>` block in a response; any later blocks are ignored and logged. Rounds count from 0 and the loop continues while `round < MAX_VERIFIER_ROUNDS`. If the response after the third tool result is still a tool request, the harness makes **one final** generate call, adding a message that no more tools are available and an answer is required. Any `<tool>` block in that final response is removed, and the remaining text goes to the citation checker. A question therefore makes at most 3 tool executions and at most 4 generator calls. The earlier design passed the last response to the checker as the answer, but that response is a tool request, not an answer.
+
 ## 6. Optimisations
 
 | # | Optimisation | Saves | Must not break |
 |---|---|---|---|
-| O1 | **Lazy embedder loading:** the query embedder loads only when needed (not when `ensure_current` takes the fast path and the index is current) | Model load time on cache-hit questions | AC-2.2 (same model) |
+| O1 | **Load models once per process:** the embedder, re-ranker and generator client are created once and reused across questions; `ensure_current`'s fast path loads none of them | Model load time on every question after the first | AC-2.2 (same model) |
 | O2 | **Single embedder instance:** reuse the same embedder for query embedding and (if `ensure_current` triggers indexing) the indexing run | Memory (no duplicate model) | Article II.4 |
 | O3 | **Batch re-ranking:** send all shortlist chunks in one call to the cross-encoder | Round-trip overhead | AC-2.7 (shortlist only) |
 | O4 | **Early budget check:** if the question alone exceeds the context budget, fail fast | Wasted retrieval and generation | AC-2.6 |
+| O5 | **Compact tool output:** tools return parsed commit records rendered as one line per commit, not raw porcelain (D7) | Context tokens in every tool round | AC-3.5 (results still citable) |
 
 ## 7. Configuration
 
@@ -260,38 +291,47 @@ device = "cpu"     # or "cuda", "mps"
 default_profile = "dev"
 server_url = "http://127.0.0.1:8080"
 timeout_seconds = 120
-generation_reserve_tokens = 1024
+llama_cpp_release = ""   # pinned llama.cpp release in use (Article VIII.2)
 
 [generator.profiles.dev]
 model_id = "Qwen2.5-Coder-14B-Instruct"
+backend = "llama.cpp"    # the only allowed value (Article VIII.4)
 gguf_file = ""           # set by the user
 gguf_checksum = ""       # SHA-256
 quantisation = "Q4_K_M"
 context_window = 32768
+server_args = []         # extra llama-server launch flags, e.g. ["-ngl", "99"]
 temperature = 0.1
+seed = 42
 max_tokens = 2048
 stop_tokens = ["<|im_end|>", "<|endoftext|>"]
 
 [generator.profiles.prod]
 model_id = "Qwen2.5-Coder-32B-Instruct"
+backend = "llama.cpp"
 gguf_file = ""
 gguf_checksum = ""
 quantisation = "Q4_K_M"
 context_window = 32768
+server_args = []
 temperature = 0.1
+seed = 42
 max_tokens = 2048
 stop_tokens = ["<|im_end|>", "<|endoftext|>"]
 
 [tools]
-max_verifier_rounds = 3
 git_log_limit = 20
 git_blame_timeout = 30
 git_log_timeout = 30
-allowed_tools = ["git_blame", "git_log"]
+max_tool_output_tokens = 768
 
 [logging]
 query_log_dir = ""   # default: <index_dir>/queries/
 ```
+
+`generator/server.py` builds the documented `llama-server` launch command from the active profile (`-m`, `-c context_window`, `--host 127.0.0.1`, the port from `server_url`, then `server_args`), so the context size the server runs with comes from the same config the pipeline budgets against (AC-5.10).
+
+**[NEEDS CLARIFICATION] Round limit and tool list in config.** `config.py` currently lets `codecompass.toml` override `tools.max_verifier_rounds` and `tools.allowed_tools`. Article V.1 makes the round limit a named constant changed only by amendment, and V.2 fixes the tool list, so both should be module constants (`MAX_VERIFIER_ROUNDS`, `ALLOWED_TOOLS`) and the keys removed from `[tools]` as shown above. The approved T0.1 test `test_max_verifier_rounds_and_tools_config` reads them from config, so this change needs reviewer sign-off before the test is updated (Article IX.3).
 
 ## 8. Spec coverage map
 
@@ -314,8 +354,9 @@ query_log_dir = ""   # default: <index_dir>/queries/
 | R1 | Qwen2.5 does not reliably produce the `<tool>...</tool>` format | Failing test first; fallback: treat any response without a tool tag as a final answer; prompt iteration after eval set exists |
 | R2 | Cross-encoder model is too large for CI or dev machines | Use `StubReranker` in required tests; `model`-marked test for real reranker; document minimum RAM |
 | R3 | llama-server API changes across releases | Pin the llama.cpp release; test against the pinned version |
-| R4 | Citation checker false positives (valid citations rejected) | Generous matching: 7-char prefix for commits, overlapping line ranges for code; exhaustive unit tests |
-| R5 | Context budget miscalculation (too many/few chunks) | Token counting uses the embedder's tokenizer (same as chunking); unit test with known token counts |
+| R4 | Citation checker false positives (valid citations rejected) | Exact matching on the fixed format, never loosened to "overlap": copying a chunk header (D3) is always valid, so strict containment does not penalise a well-behaved model; unit tests cover boundary lines and citations spanning two adjacent chunks |
+| R5 | Context budget miscalculation (too many/few chunks) | Tokens counted by the generator's own tokenizer (`/tokenize`); tool output capped and pre-reserved (D4); unit tests with known token counts |
+| R7 | The running `llama-server` does not match the profile (wrong `-c` or model file) | `health_check()` compares `/props` with the profile and fails loudly (D13); launch command generated from the profile |
 | R6 | Tool timeout on large repos (blame/log on big files) | Configurable timeout per tool; timeout produces an error message in context, not a crash |
 
 ## 10. Build order (each slice starts with failing tests, Article IX.3)
