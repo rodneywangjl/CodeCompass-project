@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -76,4 +77,62 @@ def build_fixture_repo(root: str | Path) -> FixtureRepo:
     commits["rewritten"] = _commit(repo, "rewritten history")
 
     (repo / "untracked.txt").write_text("untracked\n")
+    return FixtureRepo(path=repo, commits=commits)
+
+
+# History fixture for verifier-tool tests (T0.2): (key, author, email, date, subject).
+HISTORY = [
+    ("add_auth", "Alice Tan", "alice@example.com", "2024-01-10", "Add auth client"),
+    ("retry", "Bob Lee", "bob@example.com", "2024-02-20",
+     "Fix auth timeout by adding retry logic"),
+    ("raise_retries", "Alice Tan", "alice@example.com", "2024-03-14",
+     "Handle flaky upstream service, raise MAX_RETRIES to 5"),
+    ("wip", "Carol Ng", "carol@example.com", "2024-04-01", "wip"),
+]
+AUTH_COMMITS = {"add_auth", "retry", "raise_retries"}
+
+AUTH_V1 = (
+    "import time\n\n\n"
+    "def authenticate(client, user, password):\n"
+    "    return client.login(user, password)\n"
+)
+AUTH_V2 = (
+    "import time\n\nMAX_RETRIES = 3\n\n\n"
+    "def authenticate(client, user, password):\n"
+    "    for attempt in range(MAX_RETRIES):\n"
+    "        try:\n"
+    "            return client.login(user, password)\n"
+    "        except TimeoutError:\n"
+    "            time.sleep(2 ** attempt)\n"
+    '    raise TimeoutError("login failed after retries")\n'
+)
+AUTH_V3 = AUTH_V2.replace("MAX_RETRIES = 3", "MAX_RETRIES = 5")
+UTIL = "def noop():\n    return None\n"
+
+_HISTORY_FILES = {
+    "add_auth": {"src/auth.py": AUTH_V1},
+    "retry": {"src/auth.py": AUTH_V2},
+    "raise_retries": {"src/auth.py": AUTH_V3},
+    "wip": {"src/util.py": UTIL},
+}
+
+
+def build_history_repo(root: str | Path) -> FixtureRepo:
+    """Create a repo with known authors, dates and messages for git blame/log tests."""
+    repo = Path(root)
+    repo.mkdir(parents=True, exist_ok=True)
+    assert _git(repo, "init", "-q").returncode == 0
+    commits: dict[str, str] = {}
+    for key, author, email, date, subject in HISTORY:
+        for rel, text in _HISTORY_FILES[key].items():
+            (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+            (repo / rel).write_text(text)
+        _git(repo, "add", "-A")
+        stamp = f"{date}T12:00:00+00:00"
+        r = _git(repo, "-c", f"user.name={author}", "-c", f"user.email={email}",
+                 "commit", "-q", "-m", subject,
+                 env={**os.environ, "GIT_AUTHOR_DATE": stamp,
+                      "GIT_COMMITTER_DATE": stamp})
+        assert r.returncode == 0, r.stderr
+        commits[key] = _git(repo, "rev-parse", "HEAD").stdout.strip()
     return FixtureRepo(path=repo, commits=commits)
