@@ -125,11 +125,11 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 ## S7: Generator
 
 **T7.1 Model profile loading**
-- Tests first: loading `dev` profile returns the 14B config; loading `prod` returns the 32B config; an unknown profile name raises a loud error; the default profile is `dev`; `GENERATOR_PROFILE` env var overrides the default; each profile has all required fields (model_id, backend, context_window, server_args, temperature, seed, max_tokens, stop_tokens); a `backend` other than `llama.cpp` is rejected loudly; with default config every local model device is `cpu` (re-ranker, embedder) and no profile field requires a GPU, so CPU-only operation works out of the box.
+- Tests first: loading `dev` profile returns the 14B config; loading `prod` returns the 32B config; an unknown profile name raises a loud error; the default profile is `dev`; `GENERATOR_PROFILE` env var overrides the default; each profile has all required fields (model_id, backend, context_window, server_args, temperature, seed, max_tokens, stop_tokens, cache_prompt); a `backend` other than `llama.cpp` is rejected loudly; with default config every local model device is `cpu` (re-ranker, embedder) and no profile field requires a GPU, so CPU-only operation works out of the box.
 - ACs: AC-5.1, AC-5.2, AC-5.9, AC-5.11, FR-17. | Touches: `generator/profiles.py`. | Depends on: T0.1.
 
 **T7.2 LlamaServerGenerator**
-- Tests first (mocked HTTP): `generate(messages)` sends a POST to `/v1/chat/completions` with the correct chat format; the response is parsed and the assistant content returned; stop tokens from the profile are included in the request; temperature and max_tokens from the profile are sent; a connection error raises a clear error, not a hang; a timeout raises a clear error.
+- Tests first (mocked HTTP): `generate(messages)` sends a POST to `/v1/chat/completions` with the correct chat format; the response is parsed and the assistant content returned; stop tokens from the profile are included in the request; temperature and max_tokens from the profile are sent; the profile's `cache_prompt` value is sent with every request (plan D13 item 10); a connection error raises a clear error, not a hang; a timeout raises a clear error.
 - ACs: AC-5.3, AC-5.4, AC-5.6, FR-12. | Touches: `generator/llama.py`. | Depends on: T7.1.
 
 **T7.3 Health check**
@@ -159,7 +159,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-3.3, AC-3.4. | Touches: `agent/harness.py`. | Depends on: T8.2.
 
 **T8.5 Message building**
-- Tests first: the system prompt is the first message; context chunks are in the user message; tool results are appended as separate `user` messages in the D16 `<tool_result>` wrapper (errors carry an `error` attribute); no message ever has a role other than `system`, `user` or `assistant`; the conversation history grows with each round; the system prompt matches the plan's D14 template, including rule 4 (state what could not be determined) and rule 5 (say so when commit history gives no rationale; never invent one); a tool result with no commits is wrapped with the D16 `No commit history found for <path>` text, never an empty block; the D15 final-call message asks the model to state what it could not determine.
+- Tests first: the system prompt is the first message; context chunks are in the user message; tool results are appended as separate `user` messages in the D16 `<tool_result>` wrapper (errors carry an `error` attribute); no message ever has a role other than `system`, `user` or `assistant`; the conversation history grows with each round and is append-only: every earlier message is unchanged, in the same order, in each later call (plan D13 item 10); the system prompt matches the plan's D14 template, including rule 4 (state what could not be determined) and rule 5 (say so when commit history gives no rationale; never invent one); a tool result with no commits is wrapped with the D16 `No commit history found for <path>` text, never an empty block; the D15 final-call message asks the model to state what it could not determine.
 - ACs: AC-1.4, AC-1.3, AC-3.7, plan D14, D16. | Touches: `agent/harness.py`. | Depends on: T4.1.
 
 ## S9: Citation checker
@@ -213,7 +213,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-7.2, AC-7.3. | Touches: `logging.py`. | Depends on: T11.1.
 
 **T11.3 Profile and model in log**
-- Tests first: the audit log records the active profile name and resolved model id; the profile is recorded on every query log.
+- Tests first: the audit log records the active profile name, resolved model id, `cache_prompt` setting and pipeline mode (D17, Article VII.3); they are recorded on every query log.
 - ACs: AC-5.8, AC-7.1. | Touches: `logging.py`. | Depends on: T11.1.
 
 ## S12: Public API and CLI
@@ -237,8 +237,8 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 ## S13: Real model tests (local only, `model` marker)
 
 **T13.1 Real cross-encoder re-ranker**
-- Tests first (`model`): `BgeReranker` loads `BAAI/bge-reranker-v2-m3`; re-ranking a question against a relevant chunk and an irrelevant chunk gives the relevant chunk a higher score; batch scoring produces deterministic results.
-- ACs: AC-2.7. | Touches: `retrieval/reranker.py`. | Depends on: T3.2.
+- Tests first (`model`): `BgeReranker` loads `BAAI/bge-reranker-v2-m3` at the revision pinned in config (`reranker.revision`, Article VIII.1); re-ranking a question against a relevant chunk and an irrelevant chunk gives the relevant chunk a higher score; batch scoring produces deterministic results. Required-suite test: `reranker.revision` is a config field, and the loader passes it to the model library.
+- ACs: AC-2.7. | Touches: `retrieval/reranker.py`, `config.py` (adds `RerankerConfig.revision`). | Depends on: T3.2.
 
 **T13.2 Real generator smoke test**
 - Tests first (`model`): `LlamaServerGenerator` connects to a running `llama-server`; a simple question about the fixture repo produces an answer with a `Sources` section; the citation checker runs and classifies the outcome.
