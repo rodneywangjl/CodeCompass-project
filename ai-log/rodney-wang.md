@@ -313,3 +313,18 @@ TODO (member)
 Merged with merge commits, so each fix's test-before-fix commit order stays visible. The full required suite passed before the push (327 passed). These changes most need a teammate's look after the fact, because they change Sprint 1 code:
 - `open_index` now takes `embedder=` and refuses unless **both** the config's embedder and the embedder instance match the index.
 - `codecompass/offline/config.py` gained `config_from_dict`, and the online loader no longer writes a temp file.
+
+## 2026-10-26 · Review follow-ups: model setup, eval modes, docs fixes
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** MODEL-SETUP.md, codecompass.toml, AGENTS.md, docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/spec.md, docs/specs/002-online-retrieval/tasks.md
+- **Outcome:** Changed
+### What I asked for
+Work through the remaining review items and push them straight to `main`, without review.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Reviewed and merged `docs/model-setup`. Its `codecompass.toml` loads with the new config loader, and no code or test reads it from the repo root. Updated two notes that would go stale, and flagged that `prod` still has no pinned GGUF (Article VIII.2).
+- AGENTS.md no longer points at `docs/specs/003-evaluation/draft-rules.md`, which was never committed.
+- Plan D8 now explains why its cache key meets Article V.3.
+- Added the three Article VII.3 evaluation modes to Spec 002 (US10, FR-18, D17, T12.4), so `ask` is built with them.
+- Drafted the constitution amendment for the duplicate Appendix A #12, but did not apply it: agents may not edit the constitution.
