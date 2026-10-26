@@ -43,7 +43,7 @@ This constitution is the set of non-negotiable principles that every spec, plan,
 1. Retrieval **MUST** use both semantic (vector ANN) and lexical (BM25) search, and merge the results into one candidate set. Neither alone is acceptable in the default configuration.
 2. Results from the two retrievers **MUST** be merged with **Reciprocal Rank Fusion (RRF)**, using only each chunk's rank in each list (`score = sum(1 / (60 + rank))`, with ranks counted from 0, so a list's top result contributes `1/60`), because cosine similarity and BM25 scores are on incomparable scales and **MUST NOT** be added or averaged directly. A chunk found by both retrievers is counted once, with its contributions summed.
    - Default candidate sizes: retrieve the top **50** from the vector index and the top **50** from BM25; RRF-merge and keep the top **50** as the re-rank shortlist; the cross-encoder re-orders them and the top **8** chunks go to the generator.
-   - The RRF constant (60) and the three k values are named, configurable values, not magic numbers in code. The final k is additionally capped by the active model profile's context budget (Article VIII.4).
+   - The RRF constant (60) and the four k values (vector, BM25, re-rank shortlist, final) are named, configurable values, not magic numbers in code. The final k is additionally capped by the active model profile's context budget (Article VIII.4).
    - These are starting defaults. They **MAY** be changed only with an evaluation run (Article VII.5) once an evaluation set exists.
 3. The cross-encoder re-ranker **MUST** operate only on the shortlist, never on the whole index.
 4. The generator **MUST** receive plain text with file/line/commit metadata, never raw vectors.
@@ -85,7 +85,7 @@ This constitution is the set of non-negotiable principles that every spec, plan,
 2. The evaluation is a three-way comparison on the same questions: **(a)** no-retrieval baseline, **(b)** RAG only, **(c)** RAG + tool verification. Scored on **answer correctness** and **citation accuracy**, with hallucination rate as the headline comparison between (b) and (c).
 3. The three configurations **MUST** be selectable by configuration flags in one codebase, so differences are attributable only to the retrieval/verification features. The active configuration **MUST** be recorded in every per-query log and every evaluation result file, as the model profile is (Article VIII.4).
 4. To keep the comparison unconfounded, the **same single generative model** is used across configurations. Specialisation happens at the retrieval/embedding layer, not by adding more generator models.
-5. Any change to chunking, embeddings, retrieval, re-ranking, prompts, or the generator model **MUST** be followed by a re-run of the evaluation, with results recorded alongside the change.
+5. Once the evaluation set exists (Article VII.1), any change to chunking, embeddings, retrieval, re-ranking, prompts, or the generator model **MUST** be followed by a re-run of the evaluation, with results recorded alongside the change. Before then, building these components is allowed, but tuning them is not (VII.1), and no results may be reported.
 6. Evaluation runs **MUST** be reproducible: pinned model versions, pinned repo commit under test, fixed seeds/temperature where supported, and results written to versioned files.
 
 ## Article VIII: Models and Environment
