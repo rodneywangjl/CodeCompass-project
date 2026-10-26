@@ -259,9 +259,11 @@ Rules:
    evidence you may cite, just like the code context.
 4. If the evidence is insufficient, say what you could not determine.
    Do NOT guess or make up file names, line numbers, or commit hashes.
+5. If the commit history gives no reason for the code (e.g. vague commit
+   messages, or no history found), say so. Do NOT invent a reason.
 ```
 
-**D15. Round limit (Article V.1).** One tool call executes per round: the first `<tool>` block in a response; any later blocks are ignored and logged. Rounds count from 0 and the loop continues while `round < MAX_VERIFIER_ROUNDS`. If the response after the third tool result is still a tool request, the harness makes **one final** generate call, adding a message that no more tools are available and an answer is required. Any `<tool>` block in that final response is removed, and the remaining text goes to the citation checker. A question therefore makes at most 3 tool executions and at most 4 generator calls. The earlier design passed the last response to the checker as the answer, but that response is a tool request, not an answer.
+**D15. Round limit (Article V.1).** One tool call executes per round: the first `<tool>` block in a response; any later blocks are ignored and logged. Rounds count from 0 and the loop continues while `round < MAX_VERIFIER_ROUNDS`. If the response after the third tool result is still a tool request, the harness makes **one final** generate call, adding a message that no more tools are available, an answer is required, and the answer must state what could not be determined (Article I.2). Any `<tool>` block in that final response is removed, and the remaining text goes to the citation checker. A question therefore makes at most 3 tool executions and at most 4 generator calls. The earlier design passed the last response to the checker as the answer, but that response is a tool request, not an answer.
 
 **D16. How tool results enter the conversation.** Only the standard chat roles `system`, `user` and `assistant` are used. The model's tool request stays in the history as its `assistant` message; the harness then appends the result as a **`user`** message wrapped in a tag:
 
@@ -271,7 +273,7 @@ a1b2c3d | 2024-03-14 | Alice | handle flaky upstream service
 </tool_result>
 ```
 
-Rejections and errors use the same wrapper with an `error="..."` attribute. The `tool` role is **not** used: it belongs to llama-server's built-in tool-calling feature, which the harness must not rely on (Article VIII.2), and depending on server launch flags and chat template a `tool`-role message may be rejected or rendered in a form the model was not trained on. A `user` message with a tag renders the same on every llama-server setup and for both profiles. This is how the plan reads Article V.3's "appended as tool messages": messages that carry tool results (spec C12). The citation checker does not depend on roles; it matches against parsed commit records.
+Rejections and errors use the same wrapper with an `error="..."` attribute. A tool run that finds no commits is never sent as an empty block: the wrapper's body says `No commit history found for <path>` (plus the line range for blame), so the model is told plainly that history gives no rationale (Article V.5). The `tool` role is **not** used: it belongs to llama-server's built-in tool-calling feature, which the harness must not rely on (Article VIII.2), and depending on server launch flags and chat template a `tool`-role message may be rejected or rendered in a form the model was not trained on. A `user` message with a tag renders the same on every llama-server setup and for both profiles. This is how the plan reads Article V.3's "appended as tool messages": messages that carry tool results (spec C12). The citation checker does not depend on roles; it matches against parsed commit records.
 
 ## 6. Optimisations
 

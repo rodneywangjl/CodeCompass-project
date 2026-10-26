@@ -252,3 +252,18 @@ T9.5: the commit subject, author and date shown in `Sources` must come from the 
 TODO (member)
 ### What I kept or changed
 Kept the copy inside `check`, so no answer can leave the checker with model-written commit details. The rewritten `Sources` line is what the formatter shows; a test has the model claim "Mallory, 1999-01-01" and checks that the name appears nowhere in the rendered answer. Unverified commit entries are left exactly as written, so the reader sees what the model actually claimed next to the `[UNVERIFIED]` mark. A test against the real history fixture confirms records from `git blame` and `git log` both work.
+
+## 2026-10-26 · Spec 002 follow-up fixes
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** AGENTS.md, docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/spec.md, docs/specs/002-online-retrieval/tasks.md
+- **Outcome:** Changed
+### What I asked for
+A second repo review found gaps that PR #5 did not cover. I asked for them to be fixed one at a time in the spec, plan and tasks, without changing finished tasks or approved tests.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Resolved the plan's query-embedder clarification to match PR `fix/query-embedder`, and removed the AGENTS.md export TODO.
+- `locked` is now treated as stale, like `failed` (D12, T10.1).
+- D2 now matches the approved RRF code: ranks count from 0, ties broken by chunk id. An earlier draft said "from 1", which contradicted the approved T1.1 tests, so I dropped it.
+- Tool results are sent as tagged `user` messages, not the `tool` role (D16, spec C12).
+- Every acceptance criterion that had no task now has one (AC-1.2 reworded; AC-1.3, 3.7, 5.7, 5.8, 5.11 added to T4.2, T7.1, T8.5, T10.3, T12.3). AC-3.7 is handled in the harness, not in the finished T5.2/T5.3.

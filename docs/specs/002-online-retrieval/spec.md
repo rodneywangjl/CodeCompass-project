@@ -66,7 +66,7 @@ Priorities: **P1** = required for the sprint to be done, **P2** = should ship, *
 *As a developer new to a repository, I want to ask a question about the code and get an answer grounded in the actual codebase, so that I can trust it.*
 
 - **AC-1.1** Given a question and an indexed repository, when the pipeline runs, then it returns an answer with inline numbered markers and a closing `Sources` section in the constitution's fixed format (Article VI.4).
-- **AC-1.2** Every factual claim in the answer is traceable to text that was placed in the generator's context (Article I.1).
+- **AC-1.2** Every factual claim in the answer is traceable to text that was placed in the generator's context (Article I.1). Code can check only the deterministic part, that every citation points at evidence actually in context (US4, AC-4.x). Whether each *claim* is supported by the evidence it cites cannot be decided by deterministic code; it is measured by the evaluation (Spec 003, Article VII), not by required tests.
 - **AC-1.3** Given insufficient evidence after all allowed tool rounds, the answer explicitly states what could not be determined rather than guessing (Article I.2, I.3).
 - **AC-1.4** The generator receives plain text with file/line/commit metadata, never raw vectors (Article IV.4).
 
