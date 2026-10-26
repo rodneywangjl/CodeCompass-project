@@ -62,8 +62,8 @@ def test_profiles_differing_only_in_window_fit_different_counts():
 
 
 def test_round_reserve_that_leaves_no_room_fails_loudly():
-    profile = ModelProfile(model_id="m", context_window=4096, max_tokens=2048)
-    context.check_round_reserve(profile, ToolsConfig(), system_tokens=200)
+    profile = ModelProfile(model_id="m", context_window=8192, max_tokens=2048)
+    context.check_round_reserve(profile, ToolsConfig(), system_tokens=200)  # 3640 left
     with pytest.raises(ValueError, match="Article V.1"):
         context.check_round_reserve(
             profile, ToolsConfig(max_verifier_rounds=10), system_tokens=200)
