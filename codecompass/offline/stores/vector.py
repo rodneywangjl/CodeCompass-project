@@ -59,6 +59,15 @@ class VectorStore:
     def count(self) -> int:
         return self._collection.count()
 
+    def search(self, vector, limit: int) -> list[str]:
+        """Chunk ids nearest to *vector* by cosine, nearest first (ANN read path)."""
+        n = min(limit, self._collection.count())
+        if n <= 0:
+            return []
+        got = self._collection.query(
+            query_embeddings=[list(map(float, vector))], n_results=n, include=[])
+        return list(got["ids"][0])
+
     def vectors_for_paths(self, paths) -> dict[str, list[float]]:
         """text_hash -> vector for chunks under *paths* (vector reuse, O3)."""
         paths = list(paths)
