@@ -191,8 +191,8 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 ## S10: Index freshness
 
 **T10.1 ensure_current integration**
-- Tests first: `ask` calls `ensure_current` before retrieval; if `ensure_current` returns `ok=True`, retrieval proceeds normally; if it returns `ok=False` with `status="failed"`, the stale flag is set and retrieval proceeds from the existing index.
-- ACs: AC-6.1, AC-6.2. | Touches: `__init__.py`. | Depends on: T8.1, T9.2.
+- Tests first: `ask` calls `ensure_current` before retrieval; if `ensure_current` returns `ok=True`, retrieval proceeds normally; if it returns `ok=False` with `status="failed"`, the stale flag is set and retrieval proceeds from the existing index; the same holds for `ok=False` with `status="locked"` (lock timeout): stale flag set, answer from the existing index, never silently unflagged; if `ensure_current` fails and **no index exists yet** (`status()` reports `empty`), `ask` returns an answer saying no index is available yet (with the failure reason), attempts no retrieval or generation, and does not raise.
+- ACs: AC-6.1, AC-6.2, AC-6.3. | Touches: `__init__.py`. | Depends on: T8.1, T9.2.
 
 **T10.2 Stale-index fallback**
 - Tests first: when `ensure_current` fails, the answer includes a stale-index warning: `⚠ WARNING: The index may be out of date...`; the `QueryResult.stale_index` is True; the `QueryResult.stale_message` contains the failure reason; the answer is still produced (not an error).

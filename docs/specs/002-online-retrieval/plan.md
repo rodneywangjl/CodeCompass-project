@@ -222,7 +222,7 @@ The executor parses each result into commit records (full hash, author, date, su
 - **Per-source mark:** unverified entries are prefixed with `[UNVERIFIED]`.
 - Flagged answers are never rendered identically to cited answers (the banner is always present for G outcomes).
 
-**D12. Stale-index fallback.** If `ensure_current` returns `ok=False`:
+**D12. Stale-index fallback.** If `ensure_current` returns `ok=False`, whatever the status (`failed` or `locked`); the code checks `ok`, never a specific status string:
 - Set `stale_flag=True` on the `QueryResult`.
 - If the index exists (`status != "empty"`), proceed with retrieval from the existing index.
 - Prepend a stale warning to the output: `⚠ WARNING: The index may be out of date. The answer below is based on an older version of the codebase.`
