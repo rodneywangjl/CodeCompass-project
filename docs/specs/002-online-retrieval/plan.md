@@ -1,6 +1,6 @@
 # Plan 002: Online Query Pipeline
 
-**Implements:** Spec 002 (Online Query Pipeline) | **Constitution:** v1.2.0 | **Status:** Draft for review
+**Implements:** Spec 002 (Online Query Pipeline) | **Constitution:** v1.2.1 | **Status:** Draft for review
 
 > The spec says what the pipeline must do. This plan says how we will build it, in the leanest way that satisfies every acceptance criterion (AC) without adding components the constitution doesn't allow (Article XI).
 
@@ -142,7 +142,7 @@ Production code depends only on these protocols. Tests supply a `StubGenerator` 
 
 **D1. Query embedding uses the index's own embedder.** The query is embedded by the same embedder model and revision as the index (Article II.4), obtained through the offline public API: `open_index(..., embedder=)` returns handles whose `embed_query(question)` uses an embedder already checked against the index (§3). Tests inject `StubEmbedder`. The same instance is passed to `ensure_current(embedder=)` (O2). The embedder is loaded once per process and reused across questions.
 
-**D2. RRF merge is a pure function.** Input: two ranked lists of chunk ids, best first. Output: a single list of `(chunk_id, rrf_score)` sorted by score descending. A chunk appearing in both lists gets the sum of its two contributions. **Ranks count from 0**, so the top hit scores `1/constant` (`1/60` by default), as the approved T1.1 tests assert; Article IV.2 does not fix the rank origin, and changing it would change every score and need an evaluation re-run (Article VII.5). **Ties are broken by chunk id ascending**, so the order never depends on input order. The RRF constant and k are required parameters taken from `RetrievalConfig`, never defaults hard-coded in the function.
+**D2. RRF merge is a pure function.** Input: two ranked lists of chunk ids, best first. Output: a single list of `(chunk_id, rrf_score)` sorted by score descending. A chunk appearing in both lists gets the sum of its two contributions. **Ranks count from 0**, so the top hit scores `1/constant` (`1/60` by default), as the approved T1.1 tests assert and Article IV.2 states (since constitution 1.2.1). **Ties are broken by chunk id ascending**, so the order never depends on input order. The RRF constant and k are required parameters taken from `RetrievalConfig`, never defaults hard-coded in the function.
 
 ```python
 def rrf_merge(vector_hits, keyword_hits, *, k, constant):
@@ -273,7 +273,7 @@ a1b2c3d | 2024-03-14 | Alice | handle flaky upstream service
 </tool_result>
 ```
 
-Rejections and errors use the same wrapper with an `error="..."` attribute. A tool run that finds no commits is never sent as an empty block: the wrapper's body says `No commit history found for <path>` (plus the line range for blame), so the model is told plainly that history gives no rationale (Article V.5). The `tool` role is **not** used: it belongs to llama-server's built-in tool-calling feature, which the harness must not rely on (Article VIII.2), and depending on server launch flags and chat template a `tool`-role message may be rejected or rendered in a form the model was not trained on. A `user` message with a tag renders the same on every llama-server setup and for both profiles. This is how the plan reads Article V.3's "appended as tool messages": messages that carry tool results (spec C12). The citation checker does not depend on roles; it matches against parsed commit records.
+Rejections and errors use the same wrapper with an `error="..."` attribute. A tool run that finds no commits is never sent as an empty block: the wrapper's body says `No commit history found for <path>` (plus the line range for blame), so the model is told plainly that history gives no rationale (Article V.5). The `tool` role is **not** used: it belongs to llama-server's built-in tool-calling feature, which the harness must not rely on (Article VIII.2), and depending on server launch flags and chat template a `tool`-role message may be rejected or rendered in a form the model was not trained on. A `user` message with a tag renders the same on every llama-server setup and for both profiles. This matches Article V.3 (constitution 1.2.1): tool results are messages in the harness's own format, not a server-side tool-calling role (spec C12). The citation checker does not depend on roles; it matches against parsed commit records.
 
 **D17. Evaluation modes (Article VII.3).** `pipeline.mode` selects one of three values. `ask` branches on it in one place; no other module reads it.
 
