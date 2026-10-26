@@ -392,3 +392,17 @@ TODO (member)
 - Headings, code blocks and lead-in lines ending in ":" are skipped.
 - Constitution VI.3 and VI.4, spec AC-4.8, AC-4.9 and FR-19, and plan D11 were updated first.
 - One approved T9.4 test was changed to match AC-4.8. I approved it; second-person reviewer sign-off is still pending (Article IX.3).
+
+## 2026-10-26 · T0.5 Configurable round limit and tool settings validation
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** docs/constitution.md, codecompass/online/config.py, codecompass/online/agent/tools.py, tests/online/test_tool_settings_t05.py, docs/specs/002-online-retrieval/spec.md, docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/tasks.md
+- **Outcome:** Changed
+### What I asked for
+Team decision Q2: keep the round limit in the settings file and allow it to be raised in future, not fixed by the constitution.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Amended the constitution to 1.3.0 (MINOR). `max_verifier_rounds` is configurable (default 3) but always bounded: a negative or non-integer value fails startup, as does a value whose tool-result reserve leaves no room for chunks (the budget check lands in T4.2). The value is logged and counts as a pipeline change (VII.5).
+- `allowed_tools` can switch tools off but never add one, and the tool runner now respects it; before this it was silently ignored.
+- Validation is in the loader, not `ToolsConfig`, so the approved T5.4 test that builds a widened `ToolsConfig` still holds.
+- No approved tests changed.

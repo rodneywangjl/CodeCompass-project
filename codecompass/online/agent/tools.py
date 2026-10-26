@@ -177,6 +177,11 @@ def execute(repo, commit: str, call, *, settings) -> ToolOutput:
             text=f"error: tool {call.tool!r} is not allowed; "
                  f"available tools: {', '.join(ALLOWED_TOOLS)}",
             error=True)
+    if call.tool not in settings.allowed_tools:
+        return ToolOutput(
+            text=f"error: tool {call.tool!r} is switched off in configuration; "
+                 f"available tools: {', '.join(settings.allowed_tools) or 'none'}",
+            error=True)
     unexpected = sorted(set(call.args) - _PARAMS[call.tool])
     if unexpected:
         return ToolOutput(
