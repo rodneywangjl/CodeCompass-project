@@ -238,6 +238,7 @@ The executor parses each result into commit records (full hash, author, date, su
 7. Sends the profile's `seed` with every request, so runs are reproducible where the server supports it (Article VII.6).
 8. `health_check()` also reads `/props` and fails loudly when the server cannot serve the active profile: the per-slot context (`default_generation_settings.n_ctx`) must be at least the profile's `context_window`, and when `gguf_file` is set the loaded model path must end with it. The server is started by hand (spec C9), so this is the only point where the pinned profile is checked against what is actually running.
 9. `count_tokens(text)` calls `/tokenize` (used by D4).
+10. **Prompt reuse across rounds.** One question makes up to four generate calls (D15), and each starts with the same system prompt and retrieved context, which dominate the prompt. Each request sends the profile's `cache_prompt` setting, so llama-server can reuse the already-processed prefix and only process the new messages. This only works if the conversation is **append-only**: the harness never edits, reorders or removes an earlier message, and every round adds messages at the end (D15, D16). Prefill is the slowest step on a laptop (MODEL-SETUP.md measured ~70 s for a 2.6k-token prompt), so this saves most of the per-round cost. llama.cpp documents that reusing the cache can make outputs differ slightly from a cold run, because logits are not guaranteed bit-identical across batch sizes. `cache_prompt` is therefore an explicit profile setting (default `true`), recorded in the per-query log, and an evaluation run that needs bit-for-bit reproducibility sets it to `false` (Article VII.6).
 
 **D14. System prompt.** A minimal, functional prompt (prompt engineering deferred per Article VII.1):
 
@@ -312,6 +313,7 @@ final_k = 8
 
 [reranker]
 model = "BAAI/bge-reranker-v2-m3"
+revision = ""     # pinned Hugging Face commit; required before any reported result (Article VIII.1)
 device = "cpu"     # or "cuda", "mps"
 
 [generator]
