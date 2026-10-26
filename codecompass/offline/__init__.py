@@ -156,17 +156,26 @@ class IndexHandles:
     vector: ReadOnlyVectorStore
     keyword: ReadOnlyKeywordIndex
     meta: object = None
+    embedder: object = None
+
+    def embed_query(self, text: str) -> list:
+        """Embed a question with the index's own embedder (Article II.4)."""
+        return self.embedder.embed([text])[0]
 
     def close(self) -> None:
         self.keyword.close()
         self.vector.close()
 
 
-def open_index(repo_path, *, config, index_dir=None) -> IndexHandles:
+def open_index(repo_path, *, config, index_dir=None,
+               embedder=None) -> IndexHandles:
     """Read-only handles to both indexes with compatibility checks (AC-5.5).
 
     Refuses mismatched embedder identity (AC-5.3) and unknown schema (AC-5.4).
+    The query embedder (default: the pinned one from config, loaded lazily) is
+    attached to the handles; config and embedder must both match the index.
     """
+    from .embedding import CodeEmbedder
     from .stores.keyword import KeywordIndex
     from .stores.vector import VectorStore
     idx = index_path_for(repo_path, _base_dir(config, index_dir))
@@ -174,9 +183,13 @@ def open_index(repo_path, *, config, index_dir=None) -> IndexHandles:
     check_compatible(meta, EmbedderIdentity(
         model=config.embedder.model, revision=config.embedder.revision,
         dimension=config.embedder.dimension))
+    if embedder is None:
+        embedder = CodeEmbedder(config.embedder)
+    check_compatible(meta, embedder.identity)
     return IndexHandles(
         vector=ReadOnlyVectorStore(VectorStore(
             idx / "vector", dimension=meta.embedder.dimension)),
         keyword=ReadOnlyKeywordIndex(KeywordIndex(idx / "keyword")),
         meta=meta,
+        embedder=embedder,
     )
