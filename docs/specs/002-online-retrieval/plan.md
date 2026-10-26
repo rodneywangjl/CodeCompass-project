@@ -220,7 +220,9 @@ The executor parses each result into commit records (full hash, author, date, su
 **D11. Flagged-answer rendering (Article VI.3).**
 - **Banner:** `⚠ WARNING: Some citations in this answer could not be verified against the retrieved evidence. Verify the marked sources manually.`
 - **Per-source mark:** unverified entries are prefixed with `[UNVERIFIED]`.
-- Flagged answers are never rendered identically to cited answers (the banner is always present for G outcomes).
+- Flagged answers are never rendered identically to cited answers: every G outcome carries the banner or, for an answer with no citations at all, the uncited-answer note.
+- **Uncited answer (no markers, no Sources entries):** outcome G, shown with `Note: This answer is not supported by any citation from the repository. Verify it against the source code before relying on it.` above it instead of the banner. The model fabricated nothing; the answer has no evidence.
+- **Uncited parts (answer has citations):** the body is split into parts: paragraphs separated by blank lines, and each list item (`- `, `* `, `1. `) within a paragraph. A part with no `[N]` marker gets ` (not cited)` appended to its last line. Headings (`#`), fenced code blocks and lead-in lines ending in `:` are skipped, because they make no claim. When any part is tagged, `Note: Some statements in this answer are not supported by a citation. They are marked (not cited). Verify them against the source code before relying on them.` goes above the answer, below the banner for G. This is a heuristic: code cannot tell a claim from a linking sentence, so it may tag a harmless line, which errs on the side of caution.
 
 **D12. Stale-index fallback.** If `ensure_current` returns `ok=False`, whatever the status (`failed` or `locked`); the code checks `ok`, never a specific status string:
 - Set `stale_flag=True` on the `QueryResult`.

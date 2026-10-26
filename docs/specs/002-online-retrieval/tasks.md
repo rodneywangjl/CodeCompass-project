@@ -184,6 +184,11 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - Tests first: when the answer contains a commit source `[N] Commit hash, ...`, the harness replaces the model's subject, author, and date with values from the matching commit record of a `git log` or `git blame --porcelain` tool result; if the hash is not in any tool result, the source is marked unverified; the replacement is exact (no model-generated commit details survive).
 - ACs: AC-4.6, FR-16. | Touches: `citation/checker.py`. | Depends on: T9.3, T5.3.
 
+**T9.7 Uncited answers and uncited parts**
+- Tests first: an answer with no markers and no `Sources` entries renders with the AC-4.8 note and without the banner; an answer with citations whose paragraphs or list items lack a marker gets ` (not cited)` on each such part and the AC-4.9 note at the top; headings, fenced code blocks and lines ending in `:` are not tagged; a fully cited F answer is unchanged; a G answer with uncited parts shows the banner, then the note; outcomes are unchanged (no-citation answers stay G, partly cited answers with valid citations stay F).
+- **Approved test change (needs reviewer sign-off, Article IX.3):** T9.4's `test_no_sources_section_still_gets_banner` expects the banner on an uncited answer; spec AC-4.8 replaces that with the uncited note.
+- ACs: AC-4.8, AC-4.9, FR-19. | Touches: `citation/formatter.py`, `tests/online/test_citation_format_t94.py` (the one approved test above). | Depends on: T9.4.
+
 **T9.6 Citation checker is non-bypassable**
 - Tests first: the `ask` function always runs the citation checker; there is no config flag to skip it; calling `ask` with a stub generator that returns invalid citations always produces a G outcome.
 - ACs: AC-4.2. | Touches: `citation/checker.py`, integration test. | Depends on: T9.3.
