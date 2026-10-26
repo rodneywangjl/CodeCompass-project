@@ -328,3 +328,20 @@ TODO (member)
 - Plan D8 now explains why its cache key meets Article V.3.
 - Added the three Article VII.3 evaluation modes to Spec 002 (US10, FR-18, D17, T12.4), so `ask` is built with them.
 - Drafted the constitution amendment for the duplicate Appendix A #12, but did not apply it: agents may not edit the constitution.
+
+## 2026-10-26 · Constitution 1.2.1 clarifications
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** docs/constitution.md, docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/spec.md, docs/specs/002-online-retrieval/tasks.md
+- **Outcome:** Changed
+### What I asked for
+Fix the errors in the constitution that today's review found, choosing the best option for each. I explicitly asked for this, overriding the AGENTS.md rule that agents never edit the constitution.
+### How I checked it
+TODO (member)
+### What I kept or changed
+PATCH 1.2.0 → 1.2.1 with four clarifications, each stating what the spec, plan and approved code already do:
+- IV.2: RRF ranks count from 0. Kept 0 rather than the more common 1, so the approved T1.1 tests stay unchanged.
+- V.1: one tool call per round, and one final answer-only call when the limit is hit.
+- V.3: "tool messages" means the harness's own format, not the server's `tool` role.
+- Appendix A: duplicate #12 renumbered to #13.
+
+Pushed as branch `docs/constitution-1.2.1`, not to `main`: Governance requires amendments to be reviewed, so a teammate should approve it before it merges.
