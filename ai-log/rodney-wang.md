@@ -65,3 +65,25 @@ T0.4: a model-free stand-in for the `bge-reranker-v2-m3` cross-encoder. Tests ap
 TODO (member)
 ### What I kept or changed
 The task suggested scoring by text length. Changed it to count shared query words, so later integration tests can check that a relevant chunk really moves up, rather than just that the order changed. Kept a record of every call's inputs so T3.2 can prove the re-ranker only sees the shortlist (Article IV.3).
+
+## 2026-10-26 · T1.1 RRF merge
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/retrieval/rrf.py, tests/online/test_rrf_t11.py
+- **Outcome:** Kept
+### What I asked for
+T1.1: Reciprocal Rank Fusion of the vector and BM25 result lists, using ranks only (Article IV.2). Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept ranks counted from 0, as plan D2's code does, rather than the 1-based ranks of the original RRF paper; the plan decides how things are built, and the difference is noted for the evaluation work. Returned `(chunk_id, score)` pairs instead of bare ids, because the audit log (AC-7.1) needs each chunk's RRF score. Ties are broken by chunk id so the merge is deterministic.
+
+## 2026-10-26 · T1.2 RRF configuration
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** tests/online/test_rrf_config_t12.py
+- **Outcome:** Kept
+### What I asked for
+T1.2: tests that the RRF constant and k are configurable, plus empty and single-item inputs. Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+The tests passed on first run: T1.1's tests already required `k` and `constant` as parameters, so there was no missing behaviour to make red. Kept them as a test-only task, with no implementation commit, instead of weakening the code to manufacture a failure. Added a test that values loaded from `codecompass.toml` drive the merge, which T1.1 did not cover.
