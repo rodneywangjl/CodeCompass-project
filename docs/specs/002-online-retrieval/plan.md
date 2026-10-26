@@ -45,7 +45,7 @@ ask(repo, question, *, config, profile)
 | Generator | Qwen2.5-Coder-Instruct 14B (dev) / 32B (prod) | Via llama.cpp `llama-server` (Article VIII.2) |
 | Generator client | `httpx` or `urllib3` (standard HTTP) | No `llama-cpp-python` (Article VIII.2) |
 | Cross-encoder | `BAAI/bge-reranker-v2-m3` | Via `sentence-transformers` `CrossEncoder` or `FlagEmbedding`. *Plan decision.* |
-| Query embedder | Same `jinaai/jina-embeddings-v2-base-code` as indexing | Reuses `CodeEmbedder` from offline (Article II.4) |
+| Query embedder | Same `jinaai/jina-embeddings-v2-base-code` as indexing | Bound to the index handles: `open_index(..., embedder=)` then `handles.embed_query` (Article II.2, II.4; §3) |
 | Vector search | Chroma collection `.query()` | Via read-only handles from `open_index` |
 | Keyword search | tantivy `.search()` | Via read-only handles from `open_index` |
 | Git tools | `subprocess` calling `git blame`, `git log` | Validated args, no shell (Article V.2) |
@@ -61,7 +61,7 @@ codecompass/online/
   config.py          online-specific config: retrieval params, profile loading, tool settings
   models.py          QueryResult, SourceEntry, ToolCall, ToolResult, AuditLog, CitationOutcome
   retrieval/
-    embedder.py      query embedding (reuses offline CodeEmbedder, same model)
+    embedder.py      query embedding via handles.embed_query (no offline internals)
     vector.py        vector ANN search wrapper (uses read-only VectorStore)
     keyword.py       BM25 search wrapper (uses read-only KeywordIndex)
     rrf.py           Reciprocal Rank Fusion merge
@@ -90,7 +90,7 @@ tests/
 
 **Boundary rule (Article II.2):** the online package imports from `codecompass.offline` only through its public API (`__all__`: `ensure_current`, `status`, `open_index`, `check_consistency`). It never imports scanner, chunker, embedder-writing, or store-writing code. Result types (`EnsureResult`, `IndexHandles`, `IndexStatus`) are used as the return values of those functions, not imported.
 
-**[NEEDS CLARIFICATION] Query embedder access.** D1 originally reused `CodeEmbedder` from `codecompass.offline.embedding`, which is not part of the public API. Proposed resolution: the handles returned by `open_index` gain an `embed_query(text) -> list[float]` method backed by an embedder whose identity `open_index` has already checked against the index metadata. Query embedding then goes through the public API, and Article II.4 (same embedder) holds by construction rather than by convention. This changes Sprint 1 code (`codecompass/offline/__init__.py`), so it needs team agreement and its own task before T2.3.
+**Resolved: query embedder access** (PR `fix/query-embedder`). D1 originally reused `CodeEmbedder` from `codecompass.offline.embedding`, which is not part of the public API. Resolution, as proposed here: the handles returned by `open_index` gain an `embed_query(text) -> list[float]` method backed by an embedder whose identity `open_index` has already checked against the index metadata. Query embedding then goes through the public API, and Article II.4 (same embedder) holds by construction rather than by convention. Implemented as `open_index(repo, *, config, index_dir=None, embedder=None)`: with no embedder it builds the pinned `CodeEmbedder` from config (the model loads on first `embed_query`); tests pass a `StubEmbedder`. It raises `EmbedderMismatchError` unless the config's embedder **and** the embedder instance both match the index metadata (strict rule, chosen so the config can never name one model while another is used). Tests: `tests/offline/test_query_embedder.py`. The change to Sprint 1 code is reviewed in that PR.
 
 ## 4. Interfaces (the contracts tests are written against)
 
@@ -140,7 +140,7 @@ Production code depends only on these protocols. Tests supply a `StubGenerator` 
 
 ## 5. Key design decisions
 
-**D1. Query embedding uses the index's own embedder.** The query is embedded by the same embedder model and revision as the index (Article II.4), obtained through the offline public API (see the clarification under §3). Tests inject `StubEmbedder`. The embedder is loaded once per process and reused across questions.
+**D1. Query embedding uses the index's own embedder.** The query is embedded by the same embedder model and revision as the index (Article II.4), obtained through the offline public API: `open_index(..., embedder=)` returns handles whose `embed_query(question)` uses an embedder already checked against the index (§3). Tests inject `StubEmbedder`. The same instance is passed to `ensure_current(embedder=)` (O2). The embedder is loaded once per process and reused across questions.
 
 **D2. RRF merge is a pure function.** Input: two ranked lists of `(chunk_id, rank)`. Output: a single list of `(chunk_id, rrf_score)` sorted descending. A chunk appearing in both lists gets the sum of its two contributions. The RRF constant and k values are parameters, never hard-coded.
 
@@ -383,7 +383,7 @@ query_log_dir = ""   # default: <index_dir>/queries/
 | Article | Compliance |
 |---|---|
 | I | Generator prompted to ground in context; "could not determine" when evidence is insufficient; citation checker enforces traceability |
-| II | Online imports only the four public offline exports; embedder identity checked by `open_index`; no scanner/chunker/writer imports |
+| II | Online imports only the four public offline exports; the query embedder is bound to the handles, with config and instance identity checked by `open_index`; no scanner/chunker/writer imports |
 | III | `ensure_current` called before every `ask`; failure → stale flag, not hang; existing index stays usable |
 | IV | Both search paths, RRF merge with rank-only scores, cross-encoder on shortlist, configurable k values |
 | V | `MAX_VERIFIER_ROUNDS = 3`, allow-listed tools, validated args, cached results, per-query log |

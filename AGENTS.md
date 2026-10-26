@@ -62,8 +62,8 @@ Never run `pytest -m model`, start `llama-server`, or download model weights unl
 - Do not add or upgrade a dependency without asking. All dependencies are pinned. Do not use `mlx-lm` or MLX.
 - **Module boundary (Article II.2):**
   - `codecompass.offline` exports only `ensure_current`, `status`, `open_index` and `check_consistency`. `ensure_current` is the only write-capable export.
-  - `codecompass.online` imports from `codecompass.offline` only through that public API. It never imports scanner, chunker, embedder-writing, or store-writing code.
-  - <!-- TODO: plan.md also lists EnsureResult, IndexHandles and IndexStatus as importable, but __all__ does not. Resolve, then update this line. -->
+  - `codecompass.online` imports from `codecompass.offline` only through that public API. It never imports scanner, chunker, embedder, or store code. The query embedder comes bound to the handles: `open_index(..., embedder=)` then `handles.embed_query()`.
+  - The result types `EnsureResult`, `IndexHandles` and `IndexStatus` are what those functions return. They are not in `__all__` and online code does not import them (Plan 002 §3).
 - Required tests must be deterministic and must not need network access, a GPU, `llama-server`, or a model download. Use the stubs in `tests/support/` (`StubEmbedder`, `StubGenerator`, `StubReranker`). Tests that need a real model use the `model` marker.
 - Models, thresholds, sizes, and paths come from config, never hard-coded.
 - If the spec is ambiguous, mark it `[NEEDS CLARIFICATION]` and ask. Do not guess.

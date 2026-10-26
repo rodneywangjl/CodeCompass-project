@@ -63,8 +63,8 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-2.1 (keyword side). | Touches: `retrieval/keyword.py`. | Depends on: T0.1.
 
 **T2.3 Query embedding**
-- Tests first: the query is embedded with the same embedder instance used for the index; the result is a single vector of the correct dimension; a mismatched embedder identity between the query embedder and the index is refused by `open_index` (already tested in Sprint 1, but confirm the online path triggers it).
-- ACs: AC-2.2, FR-1. | Touches: `retrieval/embedder.py`. | Depends on: T2.1, and the plan §3 clarification on how the query embedder is reached through the offline public API.
+- Tests first: the question is embedded with `handles.embed_query` (plan §3, D1), never by importing `codecompass.offline.embedding`; the result is a single vector of the index's dimension; the embedder instance given to `ensure_current` is the same one given to `open_index` (O2); an `EmbedderMismatchError` from `open_index` propagates as a clear error and is never caught and ignored (the refusal itself is tested offline in `tests/offline/test_query_embedder.py`).
+- ACs: AC-2.2, FR-1. | Touches: `retrieval/embedder.py`. | Depends on: T2.1 and PR `fix/query-embedder` (plan §3).
 
 **T2.4 Hybrid retrieval integration**
 - Tests first (stub embedder, real stores on fixture repo): a question retrieves results from both vector and keyword paths; results are passed through RRF merge; the merged list contains chunks from both sources; a chunk found by both is not duplicated; the output has at most `rerank_k` items.
