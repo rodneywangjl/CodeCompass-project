@@ -1,7 +1,7 @@
 # Spec 002: Online Query Pipeline
 
 **Project:** CodeCompass (SE201 G1-T1) | **Sprint:** 2 | **Status:** Draft for review
-**Constitution version:** 1.2.0 | **Constitution articles touched:** I, II, III, IV, V, VI, VII, VIII, IX, X, XI (see "Constitution Check")
+**Constitution version:** 1.2.1 | **Constitution articles touched:** I, II, III, IV, V, VI, VII, VIII, IX, X, XI (see "Constitution Check")
 
 > This spec says **what** the online query pipeline must do and how we will know it works. It does not choose class designs, file layouts, or prompt templates beyond what the constitution already fixes; those belong in the plan.
 
@@ -291,7 +291,7 @@ Every AC above becomes one or more tests written **before** the code that satisf
 | C9 | Server lifecycle | For Sprint 2, `llama-server` is assumed to be started externally (manually or by a script). The `ask` function connects to a configured URL. A health-check is performed before the first query. Server lifecycle management is documented but not automated in Sprint 2. |
 | C10 | Tool calls per round | One. Only the first tool call in a response is executed; Article V.1's limit of 3 rounds therefore means at most 3 tool executions per question. |
 | C11 | Commit the tools run against | The indexed commit, not HEAD, so `git blame` line numbers match the retrieved chunks even when the index is stale. |
-| C12 | "Tool messages" (Article V.3, AC-3.5) | Read as "messages that carry tool results", not the chat API's `tool` role, which belongs to the server-side tool-calling feature the harness must not use (Article VIII.2). Tool results are sent as `user`-role messages wrapped in `<tool_result>` tags (plan D16). If reviewers read V.3 as requiring the `tool` role, that needs a PATCH clarification amendment to the constitution. |
+| C12 | "Tool messages" (Article V.3, AC-3.5) | Read as "messages that carry tool results", not the chat API's `tool` role, which belongs to the server-side tool-calling feature the harness must not use (Article VIII.2). Tool results are sent as `user`-role messages wrapped in `<tool_result>` tags (plan D16). Constitution 1.2.1 states this reading in Article V.3. |
 
 ## 12. What Comes Next
 

@@ -1,6 +1,6 @@
 # CodeCompass Constitution
 
-**Version:** 1.2.0 | **Project:** CodeCompass (SE201 G1-T1) | **Status:** In force
+**Version:** 1.2.1 | **Project:** CodeCompass (SE201 G1-T1) | **Status:** In force
 
 CodeCompass is a RAG-based Q&A assistant that helps new developers understand a repository. It retrieves real code and commit history, verifies claims with git tooling, and answers with citations that are checked before they are shown.
 
@@ -41,7 +41,7 @@ This constitution is the set of non-negotiable principles that every spec, plan,
 ## Article IV: Hybrid Retrieval, Then Re-ranking
 
 1. Retrieval **MUST** use both semantic (vector ANN) and lexical (BM25) search, and merge the results into one candidate set. Neither alone is acceptable in the default configuration.
-2. Results from the two retrievers **MUST** be merged with **Reciprocal Rank Fusion (RRF)**, using only each chunk's rank in each list (`score = sum(1 / (60 + rank))`), because cosine similarity and BM25 scores are on incomparable scales and **MUST NOT** be added or averaged directly. A chunk found by both retrievers is counted once, with its contributions summed.
+2. Results from the two retrievers **MUST** be merged with **Reciprocal Rank Fusion (RRF)**, using only each chunk's rank in each list (`score = sum(1 / (60 + rank))`, with ranks counted from 0, so a list's top result contributes `1/60`), because cosine similarity and BM25 scores are on incomparable scales and **MUST NOT** be added or averaged directly. A chunk found by both retrievers is counted once, with its contributions summed.
    - Default candidate sizes: retrieve the top **50** from the vector index and the top **50** from BM25; RRF-merge and keep the top **50** as the re-rank shortlist; the cross-encoder re-orders them and the top **8** chunks go to the generator.
    - The RRF constant (60) and the three k values are named, configurable values, not magic numbers in code. The final k is additionally capped by the active model profile's context budget (Article VIII.4).
    - These are starting defaults. They **MAY** be changed only with an evaluation run (Article VII.5) once an evaluation set exists.
@@ -52,9 +52,9 @@ This constitution is the set of non-negotiable principles that every spec, plan,
 
 ## Article V: Bounded, Auditable Agent Loop
 
-1. The generator either answers or requests a tool call. The loop is governed by the "Enough context?" check `round < 3`: rounds are counted from 0, so the verifier tool may run **at most 3 times** per question. When the generator has enough context, or the round limit is reached, the system proceeds to the citation checker with what it has; it **MUST NOT** loop indefinitely. The limit is a named constant (`MAX_VERIFIER_ROUNDS = 3`), changed only by amending this article.
+1. The generator either answers or requests a tool call. The loop is governed by the "Enough context?" check `round < 3`: rounds are counted from 0, so the verifier tool may run **at most 3 times** per question. When the generator has enough context, or the round limit is reached, the system proceeds to the citation checker with what it has; it **MUST NOT** loop indefinitely. Each round executes at most one tool call. The limit counts tool executions, not generator calls: if the generator still requests a tool after the third tool result, that request is not executed, and the harness makes one final generator call that runs no tool and asks for an answer from the evidence already in context. The limit is a named constant (`MAX_VERIFIER_ROUNDS = 3`), changed only by amending this article.
 2. Tools are **read-only** and **allow-listed**: `git blame` and `git log` only. Adding any other tool (including file search) is out of scope for v1 and requires an amendment. The harness executes tools; the model never gets a raw shell. Arguments **MUST** be validated (path inside repo, line ranges in bounds, no shell interpolation).
-3. Tool results **MUST** be cached (keyed by repo, commit, path, line range, command) and **MUST** be appended to the generator's context as tool messages, so they count as citable evidence.
+3. Tool results **MUST** be cached (keyed by repo, commit, path, line range, command) and **MUST** be appended to the generator's context as messages carrying the tool results, so they count as citable evidence. These are messages in the harness's own documented format, not a server-side tool-calling role (Article VIII.2).
 4. Every tool call and result **MUST** be logged per query (round number, tool, arguments, cache hit/miss) so that any answer can be audited after the fact.
 5. When commit history gives no useful rationale (e.g. uninformative messages), the system **MUST** say so explicitly instead of inventing a "why".
 
@@ -192,7 +192,7 @@ This constitution is the set of non-negotiable principles that every spec, plan,
 
 | # | Question | Notes |
 |---|----------|-------|
-| 12 | Evaluation repo and question set | Not decided; the team is building first. This does not block building, but Article VII.1 blocks tuning retrieval parameters, prompts, or models until it exists, and no results may be reported before then. |
+| 13 | Evaluation repo and question set | Not decided; the team is building first. This does not block building, but Article VII.1 blocks tuning retrieval parameters, prompts, or models until it exists, and no results may be reported before then. |
 
 ## Appendix B: Traceability (diagram node → articles)
 

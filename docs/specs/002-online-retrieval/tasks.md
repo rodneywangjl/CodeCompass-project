@@ -1,6 +1,6 @@
 # Tasks 002: Online Query Pipeline
 
-**Implements:** Plan 002 / Spec 002 | **Constitution:** v1.2.0
+**Implements:** Plan 002 / Spec 002 | **Constitution:** v1.2.1
 
 ## How to use this list
 
