@@ -345,3 +345,14 @@ PATCH 1.2.0 → 1.2.1 with four clarifications, each stating what the spec, plan
 - Appendix A: duplicate #12 renumbered to #13.
 
 Pushed as branch `docs/constitution-1.2.1`, not to `main`: Governance requires amendments to be reviewed, so a teammate should approve it before it merges.
+
+## 2026-10-26 · T2.1 Vector search wrapper
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/retrieval/vector.py, tests/online/test_vector_search_t21.py
+- **Outcome:** Kept
+### What I asked for
+T2.1: a wrapper that returns the top-k chunk ids by cosine similarity from the read-only vector handle, written tests-first.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept as drafted: `vector_search(index, query_vector, k)` mirrors `keyword_search` and calls the handle's `search` (added in `fix/vector-search`). It takes a vector, not text, because embedding the question is T2.3's job. The ordering test checks the exact cosine order, which holds because Chroma searches exactly on a collection this small.
