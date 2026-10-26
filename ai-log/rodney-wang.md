@@ -120,3 +120,80 @@ T4.1: format retrieved chunks as plain text with file, line, language and commit
 TODO (member)
 ### What I kept or changed
 Kept the revised plan D3 header, whose first part is exactly the `Sources` code-citation form, and a separate `citation_label` function that the citation checker can reuse so the two cannot drift apart. `RetrievedChunk.from_record` drops the stored vector when it builds the chunk, so a vector cannot reach the prompt by accident.
+
+## 2026-10-26 · T5.1 Tool argument validation
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/tools.py, tests/online/test_tool_validation_t51.py
+- **Outcome:** Kept
+### What I asked for
+T5.1: validate the path, line range and commit count the model passes to `git blame` / `git log` (Article V.2). Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept the revised plan D6: the real check is that the path is a file in the git tree at the indexed commit, which also rules out anything outside the repo. Added tests that names like `app/(auth)/page.tsx` and `Outer$Inner.java` pass, since the original character blacklist would have rejected them, and that option-like paths (`-rf`, `--output=x`) and directories are rejected. `n=True` is rejected because Python treats `True` as the integer 1.
+
+## 2026-10-26 · T5.2 git_blame executor
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/tools.py, tests/online/test_git_blame_t52.py
+- **Outcome:** Kept
+### What I asked for
+T5.2: run `git blame` for the model safely and return output the citation checker can match commits against. Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept `--porcelain`, parsed into commit records (hash, author, date, subject), and a compact rendering of one line per commit with the lines it owns, instead of passing raw blame output to the model. A test blames an older commit to prove the tool uses the indexed commit, not HEAD. The executor validates its own arguments, so no caller can run it unchecked, and a timeout returns an error the model can read instead of raising.
+
+## 2026-10-26 · T5.3 git_log executor
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/tools.py, tests/online/test_git_log_t53.py
+- **Outcome:** Kept
+### What I asked for
+T5.3: run `git log` on a file for the model, limited to a configured number of commits. Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept the 0x1F-separated format from the revised plan D7. The test case that motivated it, author "Alice Tan" with the subject "Handle flaky upstream service, raise MAX_RETRIES to 5", would have been split wrongly by the original space-separated format. Output reuses the same commit records and one-line rendering as `git_blame`, so the citation checker handles both tools the same way.
+
+## 2026-10-26 · T5.4 Tool allow list
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/tools.py, tests/online/test_tool_allowlist_t54.py
+- **Outcome:** Kept
+### What I asked for
+T5.4: only `git_blame` and `git_log` may run; any other tool request is refused with a message the model can read (Article V.2). Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept the dispatch table as the allow list, so `allowed_tools` in config cannot add a tool; a test sets `git_diff` in config and checks it is still refused. This keeps to Article V.2 without touching the approved T0.1 test, which still reads `allowed_tools`. Unexpected arguments (e.g. a `format` passed to `git_log`) are refused too, so the model cannot pass flags through.
+
+## 2026-10-26 · T5.5 Tool-result cache
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/cache.py, tests/online/test_tool_cache_t55.py
+- **Outcome:** Kept
+### What I asked for
+T5.5: cache tool results within one question and record cache hits for the audit log (Article V.3). Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept a per-call cache keyed by the tool and its arguments serialised with sorted keys, so argument order does not matter and list values do not crash the hashing. Repo and commit are not in the key because one cache only lives for one `ask` call, where both are fixed; the docstring says so, so a reviewer can check it against Article V.3's key list. Rewrote the tests to import the module rather than the class, so the first run failed on missing behaviour instead of an import error.
+
+## 2026-10-26 · T5.6 Tool output cap
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/tools.py, tests/online/test_tool_cap_t56.py
+- **Outcome:** Changed
+### What I asked for
+T5.6 (added in the spec review): cap each tool result so three tool rounds can never overflow the context window. Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept whole-line truncation with a visible `[output truncated: N more lines]` marker. Added a rule the task did not state: commits whose line was cut are removed from the result's records, so the citation checker cannot verify a commit the model never saw (Article VI.1). Refactored the first version, which re-counted the whole text for every line, to count each line once, because the real token counter is an HTTP call to `llama-server`.
+
+## 2026-10-26 · T6.1 Tool-call parser
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/tool_parser.py, tests/online/test_tool_parser_t61.py
+- **Outcome:** Kept
+### What I asked for
+T6.1: read `<tool>name(key="value")</tool>` requests from the model's text, treating anything malformed as a final answer (Article VIII.2: no server-side tool calling). Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept parsing with Python's `ast` module rather than a hand-written regex for the arguments. It accepts only `name(key=literal)`, rejects positional arguments, `**kwargs`, attribute calls like `os.system(...)` and nested calls, and never evaluates anything; a test replaces `eval` with a trap to check that. Added `strip_tool_blocks` for the forced final answer in plan D15. Unknown tool names still parse, so the allow-list refusal message (T5.4) reaches the model instead of the request being silently dropped.
