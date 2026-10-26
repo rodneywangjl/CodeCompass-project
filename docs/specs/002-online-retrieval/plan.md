@@ -142,16 +142,16 @@ Production code depends only on these protocols. Tests supply a `StubGenerator` 
 
 **D1. Query embedding uses the index's own embedder.** The query is embedded by the same embedder model and revision as the index (Article II.4), obtained through the offline public API: `open_index(..., embedder=)` returns handles whose `embed_query(question)` uses an embedder already checked against the index (§3). Tests inject `StubEmbedder`. The same instance is passed to `ensure_current(embedder=)` (O2). The embedder is loaded once per process and reused across questions.
 
-**D2. RRF merge is a pure function.** Input: two ranked lists of `(chunk_id, rank)`. Output: a single list of `(chunk_id, rrf_score)` sorted descending. A chunk appearing in both lists gets the sum of its two contributions. The RRF constant and k values are parameters, never hard-coded.
+**D2. RRF merge is a pure function.** Input: two ranked lists of chunk ids, best first. Output: a single list of `(chunk_id, rrf_score)` sorted by score descending. A chunk appearing in both lists gets the sum of its two contributions. **Ranks count from 0**, so the top hit scores `1/constant` (`1/60` by default), as the approved T1.1 tests assert; Article IV.2 does not fix the rank origin, and changing it would change every score and need an evaluation re-run (Article VII.5). **Ties are broken by chunk id ascending**, so the order never depends on input order. The RRF constant and k are required parameters taken from `RetrievalConfig`, never defaults hard-coded in the function.
 
 ```python
-def rrf_merge(vector_hits, keyword_hits, *, k=50, constant=60):
+def rrf_merge(vector_hits, keyword_hits, *, k, constant):
     scores = {}
-    for rank, cid in enumerate(vector_hits):
-        scores[cid] = scores.get(cid, 0.0) + 1.0 / (constant + rank)
-    for rank, cid in enumerate(keyword_hits):
-        scores[cid] = scores.get(cid, 0.0) + 1.0 / (constant + rank)
-    return sorted(scores, key=scores.get, reverse=True)[:k]
+    for hits in (vector_hits, keyword_hits):
+        for rank, cid in enumerate(hits):          # rank 0 = top hit
+            scores[cid] = scores.get(cid, 0.0) + 1.0 / (constant + rank)
+    ranked = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
+    return ranked[:k]
 ```
 
 **D3. Context assembly.** Each chunk is formatted as a block:
