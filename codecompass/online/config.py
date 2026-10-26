@@ -8,12 +8,11 @@ from __future__ import annotations
 
 import os
 import pathlib
-import tempfile
 import tomllib
 from dataclasses import dataclass, field
 from typing import Any
 
-from codecompass.offline.config import Config as OfflineConfig, load_config as load_offline_config
+from codecompass.offline.config import Config as OfflineConfig, config_from_dict
 
 # Retrieval defaults (Article IV.2, Plan §7)
 DEFAULT_VECTOR_K = 50
@@ -126,31 +125,13 @@ def get_generator_profile(config: OnlineConfig, profile_name: str | None = None)
     return config.generator.profiles[profile_name]
 
 
-def _filter_offline_toml(raw: dict[str, Any]) -> str:
-    """Convert offline-only sections back to TOML text for the offline loader."""
-    lines: list[str] = []
-    for section in sorted(_OFFLINE_SECTIONS):
-        if section in raw and isinstance(raw[section], dict):
-            lines.append(f"[{section}]")
-            for k, v in raw[section].items():
-                if isinstance(v, str):
-                    lines.append(f'{k} = "{v}"')
-                elif isinstance(v, (int, float)):
-                    lines.append(f"{k} = {v}")
-                elif isinstance(v, (list, tuple)):
-                    formatted = ", ".join(f'"{x}"' if isinstance(x, str) else str(x) for x in v)
-                    lines.append(f"{k} = [{formatted}]")
-                elif isinstance(v, bool):
-                    lines.append(f"{k} = {'true' if v else 'false'}")
-            lines.append("")
-    return "\n".join(lines)
-
-
 def load_online_config(path: str | pathlib.Path | None) -> OnlineConfig:
     """Load and merge `codecompass.toml` into a validated :class:`OnlineConfig`."""
     raw: dict[str, Any] = {}
+    anchor: pathlib.Path | None = None
     if path is not None:
         p = pathlib.Path(path)
+        anchor = p.parent
         if p.exists():
             with p.open("rb") as fh:
                 raw = tomllib.load(fh)
@@ -191,19 +172,10 @@ def load_online_config(path: str | pathlib.Path | None) -> OnlineConfig:
     logging_raw = raw.get("logging", {})
     logging = LoggingConfig(**logging_raw)
 
-    # 6. Offline config merge
-    offline_keys = [k for k in raw if k in _OFFLINE_SECTIONS]
-    if offline_keys:
-        offline_toml = _filter_offline_toml(raw)
-        with tempfile.NamedTemporaryFile("w", suffix=".toml", delete=False) as tf:
-            tf.write(offline_toml)
-            temp_path = tf.name
-        try:
-            offline_cfg = load_offline_config(temp_path)
-        finally:
-            pathlib.Path(temp_path).unlink(missing_ok=True)
-    else:
-        offline_cfg = load_offline_config(None)
+    # 6. Offline config merge: pass the parsed sections straight through, so
+    # values are never re-serialised and relative paths keep the file's anchor.
+    offline_cfg = config_from_dict(
+        {k: v for k, v in raw.items() if k in _OFFLINE_SECTIONS}, anchor=anchor)
 
     return OnlineConfig(
         retrieval=retrieval,

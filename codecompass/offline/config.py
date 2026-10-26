@@ -109,6 +109,15 @@ def load_config(path: str | pathlib.Path | None) -> Config:
         if p.exists():
             with p.open("rb") as fh:
                 raw = tomllib.load(fh)
+    return config_from_dict(raw, anchor=anchor)
+
+
+def config_from_dict(raw: dict, *, anchor: pathlib.Path | None = None) -> Config:
+    """Validate parsed TOML *raw* into a :class:`Config`.
+
+    Relative paths resolve against *anchor* (the config file's directory),
+    or the working directory when it is None.
+    """
     for section, values in raw.items():
         if section not in _KNOWN_KEYS:
             raise ValueError(f"unknown config section: {section!r}")
