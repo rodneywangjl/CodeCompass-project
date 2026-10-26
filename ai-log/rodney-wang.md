@@ -377,3 +377,18 @@ TODO (member)
   - several tool calls per round;
   - smaller re-rank candidate sets;
   - re-indexing in the background.
+
+## 2026-10-26 · T9.7 Uncited answers and uncited parts
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/citation/formatter.py, tests/online/test_uncited_t97.py, tests/online/test_citation_format_t94.py, docs/constitution.md, docs/specs/002-online-retrieval/spec.md, docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/tasks.md
+- **Outcome:** Changed
+### What I asked for
+Team decision Q1: anything in an answer that cites nothing should be marked professionally so the developer checks it. Both cases: an answer with no citations at all (A), and the uncited parts of a cited answer (B).
+### How I checked it
+TODO (member)
+### What I kept or changed
+- An answer with no citations stays outcome G, but shows an uncited-answer note instead of the "citations could not be verified" banner, because nothing was fabricated.
+- In a cited answer, each paragraph or list item without a `[N]` marker gets "(not cited)" and a note at the top.
+- Headings, code blocks and lead-in lines ending in ":" are skipped.
+- Constitution VI.3 and VI.4, spec AC-4.8, AC-4.9 and FR-19, and plan D11 were updated first.
+- One approved T9.4 test was changed to match AC-4.8. I approved it; second-person reviewer sign-off is still pending (Article IX.3).
