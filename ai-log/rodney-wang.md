@@ -356,3 +356,24 @@ T2.1: a wrapper that returns the top-k chunk ids by cosine similarity from the r
 TODO (member)
 ### What I kept or changed
 Kept as drafted: `vector_search(index, query_vector, k)` mirrors `keyword_search` and calls the handle's `search` (added in `fix/vector-search`). It takes a vector, not text, because embedding the question is T2.3's job. The ordering test checks the exact cosine order, which holds because Chroma searches exactly on a collection this small.
+
+## 2026-10-26 · Constitution gaps and prompt reuse across rounds
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** docs/constitution.md, docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/tasks.md
+- **Outcome:** Changed
+### What I asked for
+Fix every remaining problem in the constitution and optimise the architecture.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Constitution (still PATCH 1.2.1):
+  - an uncited answer is never F;
+  - the stale warning also covers a locked index;
+  - the re-ranker revision is pinned;
+  - the evaluation configuration is logged;
+  - the Appendix A #2 summary matches Article V.1.
+- Plan: prompt-prefix reuse across rounds (`cache_prompt`, append-only conversation), as an explicit logged profile setting, because llama.cpp says cache reuse can change outputs slightly.
+- Not changed, because each is a trade-off that needs the team or an evaluation (Article VII.5):
+  - several tool calls per round;
+  - smaller re-rank candidate sets;
+  - re-indexing in the background.
