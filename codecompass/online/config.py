@@ -164,8 +164,16 @@ def load_online_config(path: str | pathlib.Path | None) -> OnlineConfig:
 
     # 4. Tools
     tools_raw = dict(raw.get("tools", {}))
+    rounds = tools_raw.get("max_verifier_rounds", MAX_VERIFIER_ROUNDS)
+    if type(rounds) is not int or rounds < 0:
+        raise ValueError(f"tools.max_verifier_rounds must be a non-negative integer "
+                         f"so the loop stays bounded (Article V.1); got {rounds!r}")
     if "allowed_tools" in tools_raw:
         tools_raw["allowed_tools"] = tuple(tools_raw["allowed_tools"])
+        extra = sorted(set(tools_raw["allowed_tools"]) - set(DEFAULT_ALLOWED_TOOLS))
+        if extra:
+            raise ValueError(f"tools.allowed_tools may only switch tools off, not add "
+                             f"them (Article V.2); not allowed: {', '.join(extra)}")
     tools = ToolsConfig(**tools_raw)
 
     # 5. Logging
