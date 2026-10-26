@@ -300,3 +300,16 @@ TODO (member)
 - D2 now matches the approved RRF code: ranks count from 0, ties broken by chunk id. An earlier draft said "from 1", which contradicted the approved T1.1 tests, so I dropped it.
 - Tool results are sent as tagged `user` messages, not the `tool` role (D16, spec C12).
 - Every acceptance criterion that had no task now has one (AC-1.2 reworded; AC-1.3, 3.7, 5.7, 5.8, 5.11 added to T4.2, T7.1, T8.5, T10.3, T12.3). AC-3.7 is handled in the harness, not in the finished T5.2/T5.3.
+
+## 2026-10-26 · Pushed straight to main without review
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** branches `fix/vector-search`, `fix/query-embedder`, `fix/config-merge`, `docs/spec-002-followups`
+- **Outcome:** Changed
+### What I asked for
+Merge the four branches above straight into `main`, with no PRs. This skips the second-person review that AGENTS.md and Article IX.6–IX.7 require, so it is recorded here.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Merged with merge commits, so each fix's test-before-fix commit order stays visible. The full required suite passed before the push (327 passed). These changes most need a teammate's look after the fact, because they change Sprint 1 code:
+- `open_index` now takes `embedder=` and refuses unless **both** the config's embedder and the embedder instance match the index.
+- `codecompass/offline/config.py` gained `config_from_dict`, and the online loader no longer writes a temp file.
