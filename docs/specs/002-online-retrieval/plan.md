@@ -205,7 +205,7 @@ Both tools run against the **indexed commit**, not HEAD, so blame line numbers a
 
 The executor parses each result into commit records (full hash, author, date, subject) kept on the `ToolResult`, and renders a compact text form for the context: one line per commit (`<7-char hash> <date> <author> "<subject>"`), plus the blamed line ranges for blame. The parsed records are what D9 and D10 match against; the rendered text is what the model sees and what D4 caps.
 
-**D8. Tool-result caching.** A per-`ask`-call dictionary keyed by `(tool_name, frozen_args)`. On cache hit, the result is reused and the log records `cache_hit=True`. The cache is discarded after the `ask` call returns.
+**D8. Tool-result caching.** A per-`ask`-call dictionary keyed by `(tool_name, frozen_args)`. This is the full key Article V.3 asks for, `(repo, commit, path, line range, command)`: the repo and the indexed commit are fixed for one `ask` call, the tool name is the command, and the args hold the path, line range and `n`. A cache that outlives one call (deferred, spec C5) must add repo and commit to the key. On cache hit, the result is reused and the log records `cache_hit=True`. The cache is discarded after the `ask` call returns.
 
 **D9. Citation checker algorithm.**
 1. Parse the `Sources` section from the answer text using regex.
