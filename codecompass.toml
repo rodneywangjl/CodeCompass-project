@@ -1,0 +1,50 @@
+## CodeCompass configuration (Article VIII.1: nothing tunable is hard-coded).
+## Sections and top-level keys are optional; anything omitted uses the defaults
+## in codecompass/offline/config.py and codecompass/online/config.py. A
+## [generator.profiles.X] table replaces that whole profile, so it must set
+## model_id.
+
+[generator]
+default_profile = "dev"
+server_url = "http://127.0.0.1:8080"
+timeout_seconds = 120
+generation_reserve_tokens = 1024
+
+# Dev generator: Qwen2.5-Coder-14B-Instruct, Q4_K_M, run by llama.cpp
+# llama-server (Article VIII.2). Pinned artifact:
+#   source repo : https://huggingface.co/Qwen/Qwen2.5-Coder-14B-Instruct-GGUF
+#   file        : qwen2.5-coder-14b-instruct-q4_k_m.gguf
+#   size        : 8,988,110,272 bytes
+#   llama.cpp   : 0.7.0 (build 11669, commit 620d2225c), Homebrew bottle
+# The file is not read by this config yet; it is passed to llama-server on the
+# command line, e.g.:
+#   llama-server -m ~/.cache/codecompass/models/qwen2.5-coder-14b-instruct-q4_k_m.gguf \
+#     --host 127.0.0.1 --port 8080 -c 32768 --jinja
+# Full 32768 context, as in plan.md. Needs roughly 8.4 GiB weights plus ~6 GiB
+# f16 KV cache, so it does not fit a 16 GiB machine; use dev-lowmem there.
+[generator.profiles.dev]
+model_id = "Qwen2.5-Coder-14B-Instruct"
+gguf_file = "qwen2.5-coder-14b-instruct-q4_k_m.gguf"
+gguf_checksum = "c1e659736d89ac1065fb495330fb824d94001974a4bfa78e7270e43476a8d940"
+quantisation = "Q4_K_M"
+context_window = 32768
+temperature = 0.1
+max_tokens = 2048
+stop_tokens = ["<|im_end|>", "<|endoftext|>"]
+
+# Same model and GGUF as dev, with an 8192 context for 16 GiB machines.
+# Select it with GENERATOR_PROFILE=dev-lowmem and start the server with -c 8192:
+#   llama-server -m ~/.cache/codecompass/models/qwen2.5-coder-14b-instruct-q4_k_m.gguf \
+#     --host 127.0.0.1 --port 8080 -c 8192 --jinja
+# On a 16 GiB M3, 16384 already exhausted GPU memory (Metal "Insufficient
+# Memory") and fell back to CPU-speed prefill. Results from this profile are
+# development signals only (Article VIII.5).
+[generator.profiles.dev-lowmem]
+model_id = "Qwen2.5-Coder-14B-Instruct"
+gguf_file = "qwen2.5-coder-14b-instruct-q4_k_m.gguf"
+gguf_checksum = "c1e659736d89ac1065fb495330fb824d94001974a4bfa78e7270e43476a8d940"
+quantisation = "Q4_K_M"
+context_window = 8192
+temperature = 0.1
+max_tokens = 2048
+stop_tokens = ["<|im_end|>", "<|endoftext|>"]
