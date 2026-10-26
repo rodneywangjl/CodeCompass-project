@@ -63,8 +63,8 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-2.1 (keyword side). | Touches: `retrieval/keyword.py`. | Depends on: T0.1.
 
 **T2.3 Query embedding**
-- Tests first: the query is embedded with the same embedder instance used for the index; the result is a single vector of the correct dimension; a mismatched embedder identity between the query embedder and the index is refused by `open_index` (already tested in Sprint 1, but confirm the online path triggers it).
-- ACs: AC-2.2, FR-1. | Touches: `retrieval/embedder.py`. | Depends on: T2.1, and the plan §3 clarification on how the query embedder is reached through the offline public API.
+- Tests first: the question is embedded with `handles.embed_query` (plan §3, D1), never by importing `codecompass.offline.embedding`; the result is a single vector of the index's dimension; the embedder instance given to `ensure_current` is the same one given to `open_index` (O2); an `EmbedderMismatchError` from `open_index` propagates as a clear error and is never caught and ignored (the refusal itself is tested offline in `tests/offline/test_query_embedder.py`).
+- ACs: AC-2.2, FR-1. | Touches: `retrieval/embedder.py`. | Depends on: T2.1 and PR `fix/query-embedder` (plan §3).
 
 **T2.4 Hybrid retrieval integration**
 - Tests first (stub embedder, real stores on fixture repo): a question retrieves results from both vector and keyword paths; results are passed through RRF merge; the merged list contains chunks from both sources; a chunk found by both is not duplicated; the output has at most `rerank_k` items.
@@ -87,8 +87,8 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-1.4, FR-5. | Touches: `context.py`. | Depends on: T0.1.
 
 **T4.2 Context budgeting**
-- Tests first: chunks are added in re-ranker score order until the chunk budget is exceeded; the remaining chunks are dropped; token counts come from `Generator.count_tokens`; `final_k` is capped by the budget (fewer chunks if the budget is tight); a very small budget results in zero chunks (handled gracefully); the profile's `max_tokens` and `MAX_VERIFIER_ROUNDS × max_tool_output_tokens` are reserved before chunks are added.
-- ACs: AC-2.6, plan D4. | Touches: `context.py`. | Depends on: T4.1, T3.2, T0.3.
+- Tests first: chunks are added in re-ranker score order until the chunk budget is exceeded; the remaining chunks are dropped; token counts come from `Generator.count_tokens`; `final_k` is capped by the budget (fewer chunks if the budget is tight); a very small budget results in zero chunks (handled gracefully); the profile's `max_tokens` and `MAX_VERIFIER_ROUNDS × max_tool_output_tokens` are reserved before chunks are added; two profiles that differ only in `context_window` yield different chunk counts for the same input, and `context.py` names no model (the budget comes only from the active profile).
+- ACs: AC-2.6, AC-5.7, plan D4. | Touches: `context.py`. | Depends on: T4.1, T3.2, T0.3.
 
 ## S5: Verifier tools
 
@@ -125,8 +125,8 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 ## S7: Generator
 
 **T7.1 Model profile loading**
-- Tests first: loading `dev` profile returns the 14B config; loading `prod` returns the 32B config; an unknown profile name raises a loud error; the default profile is `dev`; `GENERATOR_PROFILE` env var overrides the default; each profile has all required fields (model_id, backend, context_window, server_args, temperature, seed, max_tokens, stop_tokens); a `backend` other than `llama.cpp` is rejected loudly.
-- ACs: AC-5.1, AC-5.2, AC-5.9, FR-17. | Touches: `generator/profiles.py`. | Depends on: T0.1.
+- Tests first: loading `dev` profile returns the 14B config; loading `prod` returns the 32B config; an unknown profile name raises a loud error; the default profile is `dev`; `GENERATOR_PROFILE` env var overrides the default; each profile has all required fields (model_id, backend, context_window, server_args, temperature, seed, max_tokens, stop_tokens); a `backend` other than `llama.cpp` is rejected loudly; with default config every local model device is `cpu` (re-ranker, embedder) and no profile field requires a GPU, so CPU-only operation works out of the box.
+- ACs: AC-5.1, AC-5.2, AC-5.9, AC-5.11, FR-17. | Touches: `generator/profiles.py`. | Depends on: T0.1.
 
 **T7.2 LlamaServerGenerator**
 - Tests first (mocked HTTP): `generate(messages)` sends a POST to `/v1/chat/completions` with the correct chat format; the response is parsed and the assistant content returned; stop tokens from the profile are included in the request; temperature and max_tokens from the profile are sent; a connection error raises a clear error, not a hang; a timeout raises a clear error.
@@ -147,7 +147,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-3.1 (no-tool path). | Touches: `agent/harness.py`. | Depends on: T6.1, T7.2.
 
 **T8.2 Multi-round tool loop**
-- Tests first (stub generator returns a tool call on round 0, then an answer on round 1): the harness executes the tool, appends the result to messages, calls generate again; the audit log shows round 0 with a tool call and round 1 with the answer; tool results are appended as tool messages in context.
+- Tests first (stub generator returns a tool call on round 0, then an answer on round 1): the harness executes the tool, appends the result to messages, calls generate again; the audit log shows round 0 with a tool call and round 1 with the answer; tool results are appended to context as `user`-role messages wrapped in `<tool_result>` tags (plan D16), after the model's `assistant` tool request.
 - ACs: AC-3.1, AC-3.5, AC-3.6. | Touches: `agent/harness.py`. | Depends on: T8.1, T5.4, T5.5.
 
 **T8.3 Round limit enforcement**
@@ -159,8 +159,8 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-3.3, AC-3.4. | Touches: `agent/harness.py`. | Depends on: T8.2.
 
 **T8.5 Message building**
-- Tests first: the system prompt is the first message; context chunks are in the user message; tool results are appended as separate messages; the conversation history grows with each round; the system prompt matches the plan's D14 template.
-- ACs: AC-1.4, plan D14. | Touches: `agent/harness.py`. | Depends on: T4.1.
+- Tests first: the system prompt is the first message; context chunks are in the user message; tool results are appended as separate `user` messages in the D16 `<tool_result>` wrapper (errors carry an `error` attribute); no message ever has a role other than `system`, `user` or `assistant`; the conversation history grows with each round; the system prompt matches the plan's D14 template, including rule 4 (state what could not be determined) and rule 5 (say so when commit history gives no rationale; never invent one); a tool result with no commits is wrapped with the D16 `No commit history found for <path>` text, never an empty block; the D15 final-call message asks the model to state what it could not determine.
+- ACs: AC-1.4, AC-1.3, AC-3.7, plan D14, D16. | Touches: `agent/harness.py`. | Depends on: T4.1.
 
 ## S9: Citation checker
 
@@ -191,16 +191,16 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 ## S10: Index freshness
 
 **T10.1 ensure_current integration**
-- Tests first: `ask` calls `ensure_current` before retrieval; if `ensure_current` returns `ok=True`, retrieval proceeds normally; if it returns `ok=False` with `status="failed"`, the stale flag is set and retrieval proceeds from the existing index.
-- ACs: AC-6.1, AC-6.2. | Touches: `__init__.py`. | Depends on: T8.1, T9.2.
+- Tests first: `ask` calls `ensure_current` before retrieval; if `ensure_current` returns `ok=True`, retrieval proceeds normally; if it returns `ok=False` with `status="failed"`, the stale flag is set and retrieval proceeds from the existing index; the same holds for `ok=False` with `status="locked"` (lock timeout): stale flag set, answer from the existing index, never silently unflagged; if `ensure_current` fails and **no index exists yet** (`status()` reports `empty`), `ask` returns an answer saying no index is available yet (with the failure reason), attempts no retrieval or generation, and does not raise.
+- ACs: AC-6.1, AC-6.2, AC-6.3. | Touches: `__init__.py`. | Depends on: T8.1, T9.2.
 
 **T10.2 Stale-index fallback**
 - Tests first: when `ensure_current` fails, the answer includes a stale-index warning: `⚠ WARNING: The index may be out of date...`; the `QueryResult.stale_index` is True; the `QueryResult.stale_message` contains the failure reason; the answer is still produced (not an error).
 - ACs: AC-6.3, FR-14. | Touches: `__init__.py`. | Depends on: T10.1.
 
 **T10.3 Empty index**
-- Tests first: when the index is empty (no chunks), `ask` returns an answer saying no evidence is available; no retrieval or generation is attempted; the answer is not flagged as stale (it's just empty).
-- ACs: AC-6.3 (edge case). | Touches: `__init__.py`. | Depends on: T10.1.
+- Tests first: when the index is empty (no chunks), `ask` returns an answer saying no evidence is available; no retrieval or generation is attempted; the answer is not flagged as stale (it's just empty); when the index has chunks but retrieval returns none for the question, or the context budget leaves zero chunks, `ask` returns an "I could not find enough evidence" answer without calling the generator.
+- ACs: AC-6.3 (edge case), AC-1.3. | Touches: `__init__.py`. | Depends on: T10.1.
 
 ## S11: Audit logging
 
@@ -227,8 +227,8 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: all P1 and P2 ACs (integration). | Touches: integration test only. | Depends on: T12.1.
 
 **T12.3 CLI entry point**
-- Tests first: `python -m codecompass.online.cli ask <repo> "<question>"` runs and prints the answer; `--profile prod` selects the prod profile; `--verbose` prints retrieval details; flagged answers display the banner; stale-index warnings are displayed before the answer; exit code 0 on success.
-- ACs: AC-8.1, AC-8.2, AC-8.3, AC-8.4. | Touches: `cli.py`. | Depends on: T12.1.
+- Tests first: `python -m codecompass.online.cli ask <repo> "<question>"` runs and prints the answer; `--profile prod` selects the prod profile; `--verbose` prints retrieval details; flagged answers display the banner; stale-index warnings are displayed before the answer; exit code 0 on success; at startup the CLI logs the active profile name and resolved model id once (to stderr, so the printed answer stays clean).
+- ACs: AC-8.1, AC-8.2, AC-8.3, AC-8.4, AC-5.8. | Touches: `cli.py`. | Depends on: T12.1.
 
 ## S13: Real model tests (local only, `model` marker)
 

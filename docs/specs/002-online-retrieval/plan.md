@@ -45,7 +45,7 @@ ask(repo, question, *, config, profile)
 | Generator | Qwen2.5-Coder-Instruct 14B (dev) / 32B (prod) | Via llama.cpp `llama-server` (Article VIII.2) |
 | Generator client | `httpx` or `urllib3` (standard HTTP) | No `llama-cpp-python` (Article VIII.2) |
 | Cross-encoder | `BAAI/bge-reranker-v2-m3` | Via `sentence-transformers` `CrossEncoder` or `FlagEmbedding`. *Plan decision.* |
-| Query embedder | Same `jinaai/jina-embeddings-v2-base-code` as indexing | Reuses `CodeEmbedder` from offline (Article II.4) |
+| Query embedder | Same `jinaai/jina-embeddings-v2-base-code` as indexing | Bound to the index handles: `open_index(..., embedder=)` then `handles.embed_query` (Article II.2, II.4; §3) |
 | Vector search | Chroma collection `.query()` | Via read-only handles from `open_index` |
 | Keyword search | tantivy `.search()` | Via read-only handles from `open_index` |
 | Git tools | `subprocess` calling `git blame`, `git log` | Validated args, no shell (Article V.2) |
@@ -61,7 +61,7 @@ codecompass/online/
   config.py          online-specific config: retrieval params, profile loading, tool settings
   models.py          QueryResult, SourceEntry, ToolCall, ToolResult, AuditLog, CitationOutcome
   retrieval/
-    embedder.py      query embedding (reuses offline CodeEmbedder, same model)
+    embedder.py      query embedding via handles.embed_query (no offline internals)
     vector.py        vector ANN search wrapper (uses read-only VectorStore)
     keyword.py       BM25 search wrapper (uses read-only KeywordIndex)
     rrf.py           Reciprocal Rank Fusion merge
@@ -90,7 +90,7 @@ tests/
 
 **Boundary rule (Article II.2):** the online package imports from `codecompass.offline` only through its public API (`__all__`: `ensure_current`, `status`, `open_index`, `check_consistency`). It never imports scanner, chunker, embedder-writing, or store-writing code. Result types (`EnsureResult`, `IndexHandles`, `IndexStatus`) are used as the return values of those functions, not imported.
 
-**[NEEDS CLARIFICATION] Query embedder access.** D1 originally reused `CodeEmbedder` from `codecompass.offline.embedding`, which is not part of the public API. Proposed resolution: the handles returned by `open_index` gain an `embed_query(text) -> list[float]` method backed by an embedder whose identity `open_index` has already checked against the index metadata. Query embedding then goes through the public API, and Article II.4 (same embedder) holds by construction rather than by convention. This changes Sprint 1 code (`codecompass/offline/__init__.py`), so it needs team agreement and its own task before T2.3.
+**Resolved: query embedder access** (PR `fix/query-embedder`). D1 originally reused `CodeEmbedder` from `codecompass.offline.embedding`, which is not part of the public API. Resolution, as proposed here: the handles returned by `open_index` gain an `embed_query(text) -> list[float]` method backed by an embedder whose identity `open_index` has already checked against the index metadata. Query embedding then goes through the public API, and Article II.4 (same embedder) holds by construction rather than by convention. Implemented as `open_index(repo, *, config, index_dir=None, embedder=None)`: with no embedder it builds the pinned `CodeEmbedder` from config (the model loads on first `embed_query`); tests pass a `StubEmbedder`. It raises `EmbedderMismatchError` unless the config's embedder **and** the embedder instance both match the index metadata (strict rule, chosen so the config can never name one model while another is used). Tests: `tests/offline/test_query_embedder.py`. The change to Sprint 1 code is reviewed in that PR.
 
 ## 4. Interfaces (the contracts tests are written against)
 
@@ -140,18 +140,18 @@ Production code depends only on these protocols. Tests supply a `StubGenerator` 
 
 ## 5. Key design decisions
 
-**D1. Query embedding uses the index's own embedder.** The query is embedded by the same embedder model and revision as the index (Article II.4), obtained through the offline public API (see the clarification under §3). Tests inject `StubEmbedder`. The embedder is loaded once per process and reused across questions.
+**D1. Query embedding uses the index's own embedder.** The query is embedded by the same embedder model and revision as the index (Article II.4), obtained through the offline public API: `open_index(..., embedder=)` returns handles whose `embed_query(question)` uses an embedder already checked against the index (§3). Tests inject `StubEmbedder`. The same instance is passed to `ensure_current(embedder=)` (O2). The embedder is loaded once per process and reused across questions.
 
-**D2. RRF merge is a pure function.** Input: two ranked lists of `(chunk_id, rank)`. Output: a single list of `(chunk_id, rrf_score)` sorted descending. A chunk appearing in both lists gets the sum of its two contributions. The RRF constant and k values are parameters, never hard-coded.
+**D2. RRF merge is a pure function.** Input: two ranked lists of chunk ids, best first. Output: a single list of `(chunk_id, rrf_score)` sorted by score descending. A chunk appearing in both lists gets the sum of its two contributions. **Ranks count from 0**, so the top hit scores `1/constant` (`1/60` by default), as the approved T1.1 tests assert; Article IV.2 does not fix the rank origin, and changing it would change every score and need an evaluation re-run (Article VII.5). **Ties are broken by chunk id ascending**, so the order never depends on input order. The RRF constant and k are required parameters taken from `RetrievalConfig`, never defaults hard-coded in the function.
 
 ```python
-def rrf_merge(vector_hits, keyword_hits, *, k=50, constant=60):
+def rrf_merge(vector_hits, keyword_hits, *, k, constant):
     scores = {}
-    for rank, cid in enumerate(vector_hits):
-        scores[cid] = scores.get(cid, 0.0) + 1.0 / (constant + rank)
-    for rank, cid in enumerate(keyword_hits):
-        scores[cid] = scores.get(cid, 0.0) + 1.0 / (constant + rank)
-    return sorted(scores, key=scores.get, reverse=True)[:k]
+    for hits in (vector_hits, keyword_hits):
+        for rank, cid in enumerate(hits):          # rank 0 = top hit
+            scores[cid] = scores.get(cid, 0.0) + 1.0 / (constant + rank)
+    ranked = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
+    return ranked[:k]
 ```
 
 **D3. Context assembly.** Each chunk is formatted as a block:
@@ -222,7 +222,7 @@ The executor parses each result into commit records (full hash, author, date, su
 - **Per-source mark:** unverified entries are prefixed with `[UNVERIFIED]`.
 - Flagged answers are never rendered identically to cited answers (the banner is always present for G outcomes).
 
-**D12. Stale-index fallback.** If `ensure_current` returns `ok=False`:
+**D12. Stale-index fallback.** If `ensure_current` returns `ok=False`, whatever the status (`failed` or `locked`); the code checks `ok`, never a specific status string:
 - Set `stale_flag=True` on the `QueryResult`.
 - If the index exists (`status != "empty"`), proceed with retrieval from the existing index.
 - Prepend a stale warning to the output: `⚠ WARNING: The index may be out of date. The answer below is based on an older version of the codebase.`
@@ -255,11 +255,25 @@ Rules:
 3. If you need commit history to explain WHY code exists, request a tool:
    <tool>git_blame(path="file/path.py", lines="X-Y")</tool>
    <tool>git_log(path="file/path.py", n=10)</tool>
+   The result comes back in a <tool_result>...</tool_result> block. It is
+   evidence you may cite, just like the code context.
 4. If the evidence is insufficient, say what you could not determine.
    Do NOT guess or make up file names, line numbers, or commit hashes.
+5. If the commit history gives no reason for the code (e.g. vague commit
+   messages, or no history found), say so. Do NOT invent a reason.
 ```
 
-**D15. Round limit (Article V.1).** One tool call executes per round: the first `<tool>` block in a response; any later blocks are ignored and logged. Rounds count from 0 and the loop continues while `round < MAX_VERIFIER_ROUNDS`. If the response after the third tool result is still a tool request, the harness makes **one final** generate call, adding a message that no more tools are available and an answer is required. Any `<tool>` block in that final response is removed, and the remaining text goes to the citation checker. A question therefore makes at most 3 tool executions and at most 4 generator calls. The earlier design passed the last response to the checker as the answer, but that response is a tool request, not an answer.
+**D15. Round limit (Article V.1).** One tool call executes per round: the first `<tool>` block in a response; any later blocks are ignored and logged. Rounds count from 0 and the loop continues while `round < MAX_VERIFIER_ROUNDS`. If the response after the third tool result is still a tool request, the harness makes **one final** generate call, adding a message that no more tools are available, an answer is required, and the answer must state what could not be determined (Article I.2). Any `<tool>` block in that final response is removed, and the remaining text goes to the citation checker. A question therefore makes at most 3 tool executions and at most 4 generator calls. The earlier design passed the last response to the checker as the answer, but that response is a tool request, not an answer.
+
+**D16. How tool results enter the conversation.** Only the standard chat roles `system`, `user` and `assistant` are used. The model's tool request stays in the history as its `assistant` message; the harness then appends the result as a **`user`** message wrapped in a tag:
+
+```
+<tool_result tool="git_log" path="src/auth/client.py">
+a1b2c3d | 2024-03-14 | Alice | handle flaky upstream service
+</tool_result>
+```
+
+Rejections and errors use the same wrapper with an `error="..."` attribute. A tool run that finds no commits is never sent as an empty block: the wrapper's body says `No commit history found for <path>` (plus the line range for blame), so the model is told plainly that history gives no rationale (Article V.5). The `tool` role is **not** used: it belongs to llama-server's built-in tool-calling feature, which the harness must not rely on (Article VIII.2), and depending on server launch flags and chat template a `tool`-role message may be rejected or rendered in a form the model was not trained on. A `user` message with a tag renders the same on every llama-server setup and for both profiles. This is how the plan reads Article V.3's "appended as tool messages": messages that carry tool results (spec C12). The citation checker does not depend on roles; it matches against parsed commit records.
 
 ## 6. Optimisations
 
@@ -383,7 +397,7 @@ query_log_dir = ""   # default: <index_dir>/queries/
 | Article | Compliance |
 |---|---|
 | I | Generator prompted to ground in context; "could not determine" when evidence is insufficient; citation checker enforces traceability |
-| II | Online imports only the four public offline exports; embedder identity checked by `open_index`; no scanner/chunker/writer imports |
+| II | Online imports only the four public offline exports; the query embedder is bound to the handles, with config and instance identity checked by `open_index`; no scanner/chunker/writer imports |
 | III | `ensure_current` called before every `ask`; failure → stale flag, not hang; existing index stays usable |
 | IV | Both search paths, RRF merge with rank-only scores, cross-encoder on shortlist, configurable k values |
 | V | `MAX_VERIFIER_ROUNDS = 3`, allow-listed tools, validated args, cached results, per-query log |

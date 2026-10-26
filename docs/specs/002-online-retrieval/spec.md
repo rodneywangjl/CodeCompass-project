@@ -66,7 +66,7 @@ Priorities: **P1** = required for the sprint to be done, **P2** = should ship, *
 *As a developer new to a repository, I want to ask a question about the code and get an answer grounded in the actual codebase, so that I can trust it.*
 
 - **AC-1.1** Given a question and an indexed repository, when the pipeline runs, then it returns an answer with inline numbered markers and a closing `Sources` section in the constitution's fixed format (Article VI.4).
-- **AC-1.2** Every factual claim in the answer is traceable to text that was placed in the generator's context (Article I.1).
+- **AC-1.2** Every factual claim in the answer is traceable to text that was placed in the generator's context (Article I.1). Code can check only the deterministic part, that every citation points at evidence actually in context (US4, AC-4.x). Whether each *claim* is supported by the evidence it cites cannot be decided by deterministic code; it is measured by the evaluation (Spec 003, Article VII), not by required tests.
 - **AC-1.3** Given insufficient evidence after all allowed tool rounds, the answer explicitly states what could not be determined rather than guessing (Article I.2, I.3).
 - **AC-1.4** The generator receives plain text with file/line/commit metadata, never raw vectors (Article IV.4).
 
@@ -279,6 +279,7 @@ Every AC above becomes one or more tests written **before** the code that satisf
 | C9 | Server lifecycle | For Sprint 2, `llama-server` is assumed to be started externally (manually or by a script). The `ask` function connects to a configured URL. A health-check is performed before the first query. Server lifecycle management is documented but not automated in Sprint 2. |
 | C10 | Tool calls per round | One. Only the first tool call in a response is executed; Article V.1's limit of 3 rounds therefore means at most 3 tool executions per question. |
 | C11 | Commit the tools run against | The indexed commit, not HEAD, so `git blame` line numbers match the retrieved chunks even when the index is stale. |
+| C12 | "Tool messages" (Article V.3, AC-3.5) | Read as "messages that carry tool results", not the chat API's `tool` role, which belongs to the server-side tool-calling feature the harness must not use (Article VIII.2). Tool results are sent as `user`-role messages wrapped in `<tool_result>` tags (plan D16). If reviewers read V.3 as requiring the `tool` role, that needs a PATCH clarification amendment to the constitution. |
 
 ## 12. What Comes Next
 
