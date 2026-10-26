@@ -243,7 +243,7 @@ Each of these needs at least one test:
 | Article | How this spec complies |
 |---------|------------------------|
 | I (Grounding) | Every claim must trace to context; insufficient evidence produces an explicit "could not determine" answer (AC-1.2, 1.3). |
-| II (Two pipelines) | Online pipeline uses only the offline public API: `ensure_current` (write), `open_index` (read), and `status` (read). Same embedder enforced (AC-2.2). How the query embedder is reached through that API is open (plan §3, [NEEDS CLARIFICATION]). |
+| II (Two pipelines) | Online pipeline uses only the offline public API: `ensure_current` (write), `open_index` (read), and `status` (read). Same embedder enforced (AC-2.2). The query embedder is reached through `open_index` handles (`embed_query`), resolved in plan §3. |
 | III (Index correctness) | `ensure_current` called before every answer; failure produces stale-flagged answer, not a hang (AC-6.1–6.3). |
 | IV (Hybrid retrieval) | Both semantic and keyword search, RRF merge, cross-encoder on shortlist only, configurable k values (AC-2.1–2.7). |
 | V (Agent loop) | Bounded at 3 rounds, allow-listed tools, validated args, cached results, per-query logging (AC-3.1–3.8). |
