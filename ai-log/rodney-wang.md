@@ -87,3 +87,36 @@ T1.2: tests that the RRF constant and k are configurable, plus empty and single-
 TODO (member)
 ### What I kept or changed
 The tests passed on first run: T1.1's tests already required `k` and `constant` as parameters, so there was no missing behaviour to make red. Kept them as a test-only task, with no implementation commit, instead of weakening the code to manufacture a failure. Added a test that values loaded from `codecompass.toml` drive the merge, which T1.1 did not cover.
+
+## 2026-10-26 · T2.2 Keyword search wrapper
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/retrieval/keyword.py, tests/online/test_keyword_search_t22.py
+- **Outcome:** Kept
+### What I asked for
+T2.2: BM25 search through the read-only keyword handle from `open_index`, tested against a real tantivy index built from the history fixture. Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept a thin wrapper: the Sprint 1 handle already parses queries leniently, and a test with a question full of punctuation (`authenticate()`, quotes, `?`) confirmed it does not crash. Added an early return for blank queries. The vector half (T2.1) is blocked: the read-only vector handle has no search method, and adding one changes Sprint 1 code outside the task's scope.
+
+## 2026-10-26 · T3.1 Re-ranker protocol
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/retrieval/reranker.py, tests/online/test_reranker_protocol_t31.py
+- **Outcome:** Kept
+### What I asked for
+T3.1: the re-ranker interface the pipeline codes against, so the stub and the real `bge-reranker-v2-m3` wrapper are interchangeable. Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept a runtime-checkable `Reranker` protocol only. The real `BgeReranker` is left to T13.1, where it can be tested against the actual model; writing it now would be untested code in the required suite.
+
+## 2026-10-26 · T4.1 Chunk formatting
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/context.py, tests/online/test_context_format_t41.py
+- **Outcome:** Kept
+### What I asked for
+T4.1: format retrieved chunks as plain text with file, line, language and commit metadata for the generator (Article IV.4). Tests approved in advance; reviewed in the PR.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept the revised plan D3 header, whose first part is exactly the `Sources` code-citation form, and a separate `citation_label` function that the citation checker can reuse so the two cannot drift apart. `RetrievedChunk.from_record` drops the stored vector when it builds the chunk, so a vector cannot reach the prompt by accident.
