@@ -9,8 +9,8 @@ profiles).
 - **Date:** 2026-10-21
 - **Machine:** Apple M3, 16 GiB unified memory, macOS 27.0.1 (arm64)
 - **Scope:** local setup only. No application code, tests, specs, or docs were
-  modified. The only repo changes are the untracked `codecompass.toml` and
-  this file.
+  modified. The only repo changes are `codecompass.toml` and this file, both
+  committed on 2026-10-26.
 
 ## 1. Model artifact
 
@@ -141,8 +141,11 @@ the pinned dev model itself is an Article VII.5 model change, not a local tweak.
 
 ## 6. Follow-ups (not done)
 
-- `codecompass.toml` is untracked. Decide whether the dev pin belongs in the
-  repo (own small PR) or stays a local file.
+- `codecompass.toml` is committed with the dev pins. The `prod` (32B) profile
+  still has no pinned GGUF file or SHA-256, which Article VIII.2 requires before
+  any reported result; record them when the 32B is downloaded.
+- When T7.1 lands, profiles gain `backend`, `server_args` and `seed`; add them
+  here.
 - `.gitignore` comments claim a sample `codecompass.toml` is committed; it is
   not. Same for `codecompass.local.toml` / `config.local.toml`, which are
   ignored but never loaded by any code.
