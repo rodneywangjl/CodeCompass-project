@@ -1,6 +1,6 @@
 # CodeCompass Constitution
 
-**Version:** 1.2.1 | **Project:** CodeCompass (SE201 G1-T1) | **Status:** In force
+**Version:** 1.3.0 | **Project:** CodeCompass (SE201 G1-T1) | **Status:** In force
 
 CodeCompass is a RAG-based Q&A assistant that helps new developers understand a repository. It retrieves real code and commit history, verifies claims with git tooling, and answers with citations that are checked before they are shown.
 
@@ -52,8 +52,8 @@ This constitution is the set of non-negotiable principles that every spec, plan,
 
 ## Article V: Bounded, Auditable Agent Loop
 
-1. The generator either answers or requests a tool call. The loop is governed by the "Enough context?" check `round < 3`: rounds are counted from 0, so the verifier tool may run **at most 3 times** per question. When the generator has enough context, or the round limit is reached, the system proceeds to the citation checker with what it has; it **MUST NOT** loop indefinitely. Each round executes at most one tool call. The limit counts tool executions, not generator calls: if the generator still requests a tool after the third tool result, that request is not executed, and the harness makes one final generator call that runs no tool and asks for an answer from the evidence already in context. The limit is a named constant (`MAX_VERIFIER_ROUNDS = 3`), changed only by amending this article.
-2. Tools are **read-only** and **allow-listed**: `git blame` and `git log` only. Adding any other tool (including file search) is out of scope for v1 and requires an amendment. The harness executes tools; the model never gets a raw shell. Arguments **MUST** be validated (path inside repo, line ranges in bounds, no shell interpolation).
+1. The generator either answers or requests a tool call. The loop is governed by the "Enough context?" check `round < max_verifier_rounds`: rounds are counted from 0, so the verifier tool may run at most `max_verifier_rounds` times per question. The limit is a named configuration value, `max_verifier_rounds`, with a default of **3**. It may be raised or lowered in configuration without amending this article, but the loop **MUST** always be bounded: startup **MUST** fail loudly if the value is not a non-negative integer, or if the context reserved for that many tool results leaves no room for retrieved chunks in the active profile's context window (Article VIII.2). The value in force **MUST** be recorded in every per-query log and evaluation result file, and changing it is a pipeline change under Article VII.5. When the generator has enough context, or the round limit is reached, the system proceeds to the citation checker with what it has; it **MUST NOT** loop indefinitely. Each round executes at most one tool call. The limit counts tool executions, not generator calls: if the generator still requests a tool after the last allowed tool result, that request is not executed, and the harness makes one final generator call that runs no tool and asks for an answer from the evidence already in context.
+2. Tools are **read-only** and **allow-listed**: `git blame` and `git log` only. Adding any other tool (including file search) is out of scope for v1 and requires an amendment. Configuration may switch an allow-listed tool off but **MUST NOT** add one: a tool name outside this list fails startup loudly. The harness executes tools; the model never gets a raw shell. Arguments **MUST** be validated (path inside repo, line ranges in bounds, no shell interpolation).
 3. Tool results **MUST** be cached (keyed by repo, commit, path, line range, command) and **MUST** be appended to the generator's context as messages carrying the tool results, so they count as citable evidence. These are messages in the harness's own documented format, not a server-side tool-calling role (Article VIII.2).
 4. Every tool call and result **MUST** be logged per query (round number, tool, arguments, cache hit/miss) so that any answer can be audited after the fact.
 5. When commit history gives no useful rationale (e.g. uninformative messages), the system **MUST** say so explicitly instead of inventing a "why".
@@ -167,7 +167,7 @@ This constitution is the set of non-negotiable principles that every spec, plan,
 | # | Decision | Where applied |
 |---|----------|---------------|
 | 1 | Generator is Qwen2.5-Coder-Instruct: 14B for development, 32B for production and evaluation, switchable by config profile with no code change | Article VIII.1, VIII.4-5 |
-| 2 | Agent loop uses `round < 3`: at most 3 tool runs, one per round, then one final answer-only call if the model still asks for a tool, then the citation checker | Article V.1 |
+| 2 | Agent loop uses `round < max_verifier_rounds` (configurable, default 3, always bounded): at most that many tool runs, one per round, then one final answer-only call if the model still asks for a tool, then the citation checker | Article V.1 |
 | 3 | Citation format: numbered inline markers plus a `Sources` section with fixed entry formats | Article VI.4 |
 
 **Resolved (continued)**
@@ -205,6 +205,6 @@ This constitution is the set of non-negotiable principles that every spec, plan,
 | Hybrid retriever | IV.1, IV.2 |
 | Re-ranker (cross-encoder) | IV.3 |
 | Agent/Generator | I, V.1, VII.4, VIII |
-| "Enough context?" decision (round < 3) | V.1 |
+| "Enough context?" decision (round < max_verifier_rounds) | V.1 |
 | Verifier tool (git blame/log, cached) | V.2–V.5 |
 | Citation checker → F / G | VI |

@@ -1,6 +1,6 @@
 # Tasks 002: Online Query Pipeline
 
-**Implements:** Plan 002 / Spec 002 | **Constitution:** v1.2.1
+**Implements:** Plan 002 / Spec 002 | **Constitution:** v1.3.0
 
 ## How to use this list
 
@@ -25,7 +25,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - Goal: package layout from the plan, online-specific config loader (retrieval params, generator profiles, tool settings), merged with offline config.
 - Tests first: package imports; default retrieval params loaded (`vector_k=50`, `keyword_k=50`, `rrf_constant=60`, `rerank_k=50`, `final_k=8`); profile loader returns `dev` and `prod` profiles; unknown profile raises a loud error; `MAX_VERIFIER_ROUNDS` is 3; all k values, RRF constant, and tool settings are named config values, not hard-coded.
 - ACs: AC-2.5, AC-5.9, FR-4, FR-17. | Touches: `__init__.py`, `config.py`, `models.py`. | Depends on: Sprint 1 complete.
-- **Follow-up [NEEDS CLARIFICATION]:** done, but `max_verifier_rounds` and `allowed_tools` are overridable from config, which Articles V.1 and V.2 do not allow (plan §7). Changing the approved test `test_max_verifier_rounds_and_tools_config` needs reviewer sign-off first.
+- **Follow-up (resolved, Q2):** `max_verifier_rounds` and `allowed_tools` stay configurable (constitution 1.3.0); validation is added by T0.5. The approved test is unchanged.
 
 **T0.2 Extended fixture repo**
 - Goal: extend the Sprint 1 fixture-repo builder with additional commits that have meaningful commit messages (e.g. "fix auth timeout by adding retry logic") so verifier-tool tests can assert on `git log` / `git blame` output.
@@ -41,6 +41,10 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - Goal: a deterministic `StubReranker` that scores chunks by a fixed function (e.g. text length descending) so re-ranking tests are model-free.
 - Tests first: stub returns scores in deterministic order; same input gives the same output; scores are floats.
 - ACs: enables Article IX.7. | Touches: `tests/support/stub_reranker.py`. | Depends on: T0.1.
+
+**T0.5 Tool settings validation**
+- Tests first: the default `max_verifier_rounds` is 3; a configured 5 and a configured 0 load; `-1`, `2.5`, `"3"` and `true` fail loudly naming Article V.1; `allowed_tools` defaults to both tools; a configured `["git_log"]` loads; a list naming any other tool (e.g. `"cat"`) fails loudly naming Article V.2; `execute` refuses a call to a tool switched off in `settings.allowed_tools`, with a clear error output, and still refuses an unlisted tool (T5.4).
+- ACs: AC-3.9, FR-6. | Touches: `config.py`, `agent/tools.py`. | Depends on: T5.4.
 
 ## S1: RRF merge
 
@@ -87,7 +91,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-1.4, FR-5. | Touches: `context.py`. | Depends on: T0.1.
 
 **T4.2 Context budgeting**
-- Tests first: chunks are added in re-ranker score order until the chunk budget is exceeded; the remaining chunks are dropped; token counts come from `Generator.count_tokens`; `final_k` is capped by the budget (fewer chunks if the budget is tight); a very small budget results in zero chunks (handled gracefully); the profile's `max_tokens` and `MAX_VERIFIER_ROUNDS × max_tool_output_tokens` are reserved before chunks are added; two profiles that differ only in `context_window` yield different chunk counts for the same input, and `context.py` names no model (the budget comes only from the active profile).
+- Tests first: chunks are added in re-ranker score order until the chunk budget is exceeded; the remaining chunks are dropped; token counts come from `Generator.count_tokens`; `final_k` is capped by the budget (fewer chunks if the budget is tight); a very small budget results in zero chunks (handled gracefully); the profile's `max_tokens` and `MAX_VERIFIER_ROUNDS × max_tool_output_tokens` are reserved before chunks are added; a configured `max_verifier_rounds` whose reserve leaves no room for chunks fails loudly at startup, naming Article V.1; two profiles that differ only in `context_window` yield different chunk counts for the same input, and `context.py` names no model (the budget comes only from the active profile).
 - ACs: AC-2.6, AC-5.7, plan D4. | Touches: `context.py`. | Depends on: T4.1, T3.2, T0.3.
 
 ## S5: Verifier tools
@@ -151,7 +155,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-3.1, AC-3.5, AC-3.6. | Touches: `agent/harness.py`. | Depends on: T8.1, T5.4, T5.5.
 
 **T8.3 Round limit enforcement**
-- Tests first (stub generator always requests tools): exactly 3 tools execute; the harness then makes one final generate call whose messages say no more tools are available; any `<tool>` block in that final response is removed before the citation checker; at most 4 generator calls are made; the audit log records all 3 tool rounds and the final call; when a response contains two `<tool>` blocks, only the first executes.
+- Tests first (stub generator always requests tools): exactly `max_verifier_rounds` tools execute (tested with the default 3 and a configured 1 and 5); the harness then makes one final generate call whose messages say no more tools are available; any `<tool>` block in that final response is removed before the citation checker; at most 4 generator calls are made; the audit log records all 3 tool rounds and the final call; when a response contains two `<tool>` blocks, only the first executes.
 - ACs: AC-3.1, FR-6. | Touches: `agent/harness.py`. | Depends on: T8.2.
 
 **T8.4 Tool error handling**
@@ -218,7 +222,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-7.2, AC-7.3. | Touches: `logging.py`. | Depends on: T11.1.
 
 **T11.3 Profile and model in log**
-- Tests first: the audit log records the active profile name, resolved model id, `cache_prompt` setting and pipeline mode (D17, Article VII.3); they are recorded on every query log.
+- Tests first: the audit log records the active profile name, resolved model id, `cache_prompt` setting and pipeline mode (D17, Article VII.3) and `max_verifier_rounds` (Article V.1); they are recorded on every query log.
 - ACs: AC-5.8, AC-7.1. | Touches: `logging.py`. | Depends on: T11.1.
 
 ## S12: Public API and CLI
