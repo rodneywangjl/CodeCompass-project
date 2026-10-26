@@ -1,6 +1,6 @@
 # Plan 002: Online Query Pipeline
 
-**Implements:** Spec 002 (Online Query Pipeline) | **Constitution:** v1.2.0 | **Status:** Draft for review
+**Implements:** Spec 002 (Online Query Pipeline) | **Constitution:** v1.3.0 | **Status:** Draft for review
 
 > The spec says what the pipeline must do. This plan says how we will build it, in the leanest way that satisfies every acceptance criterion (AC) without adding components the constitution doesn't allow (Article XI).
 
@@ -28,7 +28,7 @@ ask(repo, question, *, config, profile)
   │     ├─ build messages: system + context + conversation
   │     ├─ generate(messages)                             # llama-server HTTP
   │     ├─ parse response:
-  │     │     ├─ tool call? → validate args → execute at indexed commit → cap output → cache → log → append to messages → round++ → loop if round < 3
+  │     │     ├─ tool call? → validate args → execute at indexed commit → cap output → cache → log → append to messages → round++ → loop if round < max_verifier_rounds
   │     │     └─ answer? → break
   │     └─ round == 3 and still a tool request? → one final generate call with tools disabled (D15)
   ├─ citation_check(answer, context)                     # deterministic F/G
@@ -142,7 +142,7 @@ Production code depends only on these protocols. Tests supply a `StubGenerator` 
 
 **D1. Query embedding uses the index's own embedder.** The query is embedded by the same embedder model and revision as the index (Article II.4), obtained through the offline public API: `open_index(..., embedder=)` returns handles whose `embed_query(question)` uses an embedder already checked against the index (§3). Tests inject `StubEmbedder`. The same instance is passed to `ensure_current(embedder=)` (O2). The embedder is loaded once per process and reused across questions.
 
-**D2. RRF merge is a pure function.** Input: two ranked lists of chunk ids, best first. Output: a single list of `(chunk_id, rrf_score)` sorted by score descending. A chunk appearing in both lists gets the sum of its two contributions. **Ranks count from 0**, so the top hit scores `1/constant` (`1/60` by default), as the approved T1.1 tests assert; Article IV.2 does not fix the rank origin, and changing it would change every score and need an evaluation re-run (Article VII.5). **Ties are broken by chunk id ascending**, so the order never depends on input order. The RRF constant and k are required parameters taken from `RetrievalConfig`, never defaults hard-coded in the function.
+**D2. RRF merge is a pure function.** Input: two ranked lists of chunk ids, best first. Output: a single list of `(chunk_id, rrf_score)` sorted by score descending. A chunk appearing in both lists gets the sum of its two contributions. **Ranks count from 0**, so the top hit scores `1/constant` (`1/60` by default), as the approved T1.1 tests assert and Article IV.2 states (since constitution 1.2.1). **Ties are broken by chunk id ascending**, so the order never depends on input order. The RRF constant and k are required parameters taken from `RetrievalConfig`, never defaults hard-coded in the function.
 
 ```python
 def rrf_merge(vector_hits, keyword_hits, *, k, constant):
@@ -170,7 +170,7 @@ The generator receives these blocks as the `user` message content, preceded by a
 
 ```
 budget = context_window - max_tokens - tokens(system prompt + question)
-chunk_budget = budget - MAX_VERIFIER_ROUNDS * max_tool_output_tokens
+chunk_budget = budget - max_verifier_rounds * max_tool_output_tokens
 ```
 
 1. Chunks are added in re-ranker-score order while they fit in `chunk_budget`; the rest are dropped. `final_k` is therefore capped by the budget (AC-2.6).
@@ -220,7 +220,9 @@ The executor parses each result into commit records (full hash, author, date, su
 **D11. Flagged-answer rendering (Article VI.3).**
 - **Banner:** `⚠ WARNING: Some citations in this answer could not be verified against the retrieved evidence. Verify the marked sources manually.`
 - **Per-source mark:** unverified entries are prefixed with `[UNVERIFIED]`.
-- Flagged answers are never rendered identically to cited answers (the banner is always present for G outcomes).
+- Flagged answers are never rendered identically to cited answers: every G outcome carries the banner or, for an answer with no citations at all, the uncited-answer note.
+- **Uncited answer (no markers, no Sources entries):** outcome G, shown with `Note: This answer is not supported by any citation from the repository. Verify it against the source code before relying on it.` above it instead of the banner. The model fabricated nothing; the answer has no evidence.
+- **Uncited parts (answer has citations):** the body is split into parts: paragraphs separated by blank lines, and each list item (`- `, `* `, `1. `) within a paragraph. A part with no `[N]` marker gets ` (not cited)` appended to its last line. Headings (`#`), fenced code blocks and lead-in lines ending in `:` are skipped, because they make no claim. When any part is tagged, `Note: Some statements in this answer are not supported by a citation. They are marked (not cited). Verify them against the source code before relying on them.` goes above the answer, below the banner for G. This is a heuristic: code cannot tell a claim from a linking sentence, so it may tag a harmless line, which errs on the side of caution.
 
 **D12. Stale-index fallback.** If `ensure_current` returns `ok=False`, whatever the status (`failed` or `locked`); the code checks `ok`, never a specific status string:
 - Set `stale_flag=True` on the `QueryResult`.
@@ -238,6 +240,7 @@ The executor parses each result into commit records (full hash, author, date, su
 7. Sends the profile's `seed` with every request, so runs are reproducible where the server supports it (Article VII.6).
 8. `health_check()` also reads `/props` and fails loudly when the server cannot serve the active profile: the per-slot context (`default_generation_settings.n_ctx`) must be at least the profile's `context_window`, and when `gguf_file` is set the loaded model path must end with it. The server is started by hand (spec C9), so this is the only point where the pinned profile is checked against what is actually running.
 9. `count_tokens(text)` calls `/tokenize` (used by D4).
+10. **Prompt reuse across rounds.** One question makes up to four generate calls (D15), and each starts with the same system prompt and retrieved context, which dominate the prompt. Each request sends the profile's `cache_prompt` setting, so llama-server can reuse the already-processed prefix and only process the new messages. This only works if the conversation is **append-only**: the harness never edits, reorders or removes an earlier message, and every round adds messages at the end (D15, D16). Prefill is the slowest step on a laptop (MODEL-SETUP.md measured ~70 s for a 2.6k-token prompt), so this saves most of the per-round cost. llama.cpp documents that reusing the cache can make outputs differ slightly from a cold run, because logits are not guaranteed bit-identical across batch sizes. `cache_prompt` is therefore an explicit profile setting (default `true`), recorded in the per-query log, and an evaluation run that needs bit-for-bit reproducibility sets it to `false` (Article VII.6).
 
 **D14. System prompt.** A minimal, functional prompt (prompt engineering deferred per Article VII.1):
 
@@ -263,7 +266,7 @@ Rules:
    messages, or no history found), say so. Do NOT invent a reason.
 ```
 
-**D15. Round limit (Article V.1).** One tool call executes per round: the first `<tool>` block in a response; any later blocks are ignored and logged. Rounds count from 0 and the loop continues while `round < MAX_VERIFIER_ROUNDS`. If the response after the third tool result is still a tool request, the harness makes **one final** generate call, adding a message that no more tools are available, an answer is required, and the answer must state what could not be determined (Article I.2). Any `<tool>` block in that final response is removed, and the remaining text goes to the citation checker. A question therefore makes at most 3 tool executions and at most 4 generator calls. The earlier design passed the last response to the checker as the answer, but that response is a tool request, not an answer.
+**D15. Round limit (Article V.1).** One tool call executes per round: the first `<tool>` block in a response; any later blocks are ignored and logged. Rounds count from 0 and the loop continues while `round < max_verifier_rounds` (config, default 3). If the response after the last allowed tool result is still a tool request, the harness makes **one final** generate call, adding a message that no more tools are available, an answer is required, and the answer must state what could not be determined (Article I.2). Any `<tool>` block in that final response is removed, and the remaining text goes to the citation checker. A question therefore makes at most `max_verifier_rounds` tool executions and at most `max_verifier_rounds + 1` generator calls (3 and 4 by default). The earlier design passed the last response to the checker as the answer, but that response is a tool request, not an answer.
 
 **D16. How tool results enter the conversation.** Only the standard chat roles `system`, `user` and `assistant` are used. The model's tool request stays in the history as its `assistant` message; the harness then appends the result as a **`user`** message wrapped in a tag:
 
@@ -273,13 +276,13 @@ a1b2c3d | 2024-03-14 | Alice | handle flaky upstream service
 </tool_result>
 ```
 
-Rejections and errors use the same wrapper with an `error="..."` attribute. A tool run that finds no commits is never sent as an empty block: the wrapper's body says `No commit history found for <path>` (plus the line range for blame), so the model is told plainly that history gives no rationale (Article V.5). The `tool` role is **not** used: it belongs to llama-server's built-in tool-calling feature, which the harness must not rely on (Article VIII.2), and depending on server launch flags and chat template a `tool`-role message may be rejected or rendered in a form the model was not trained on. A `user` message with a tag renders the same on every llama-server setup and for both profiles. This is how the plan reads Article V.3's "appended as tool messages": messages that carry tool results (spec C12). The citation checker does not depend on roles; it matches against parsed commit records.
+Rejections and errors use the same wrapper with an `error="..."` attribute. A tool run that finds no commits is never sent as an empty block: the wrapper's body says `No commit history found for <path>` (plus the line range for blame), so the model is told plainly that history gives no rationale (Article V.5). The `tool` role is **not** used: it belongs to llama-server's built-in tool-calling feature, which the harness must not rely on (Article VIII.2), and depending on server launch flags and chat template a `tool`-role message may be rejected or rendered in a form the model was not trained on. A `user` message with a tag renders the same on every llama-server setup and for both profiles. This matches Article V.3 (constitution 1.2.1): tool results are messages in the harness's own format, not a server-side tool-calling role (spec C12). The citation checker does not depend on roles; it matches against parsed commit records.
 
 **D17. Evaluation modes (Article VII.3).** `pipeline.mode` selects one of three values. `ask` branches on it in one place; no other module reads it.
 
 | Mode | Retrieval and re-rank | Verifier tools | Generator context |
 |---|---|---|---|
-| `rag_tools` (default) | yes | yes, up to `MAX_VERIFIER_ROUNDS` | chunks + tool results |
+| `rag_tools` (default) | yes | yes, up to `max_verifier_rounds` | chunks + tool results |
 | `rag` | yes | **none**: D14 rule 3 is left out of the prompt, and any `<tool>` block in a response is removed and logged, never run | chunks only |
 | `no_retrieval` | **none**: no embedding, search or re-rank | none, as in `rag` | the question only |
 
@@ -312,6 +315,7 @@ final_k = 8
 
 [reranker]
 model = "BAAI/bge-reranker-v2-m3"
+revision = ""     # pinned Hugging Face commit; required before any reported result (Article VIII.1)
 device = "cpu"     # or "cuda", "mps"
 
 [generator]
@@ -347,6 +351,8 @@ max_tokens = 2048
 stop_tokens = ["<|im_end|>", "<|endoftext|>"]
 
 [tools]
+max_verifier_rounds = 3                    # Article V.1: configurable, always bounded (AC-3.9)
+allowed_tools = ["git_blame", "git_log"]   # Article V.2: may switch a tool off, never add one
 git_log_limit = 20
 git_blame_timeout = 30
 git_log_timeout = 30
@@ -358,7 +364,7 @@ query_log_dir = ""   # default: <index_dir>/queries/
 
 `generator/server.py` builds the documented `llama-server` launch command from the active profile (`-m`, `-c context_window`, `--host 127.0.0.1`, the port from `server_url`, then `server_args`), so the context size the server runs with comes from the same config the pipeline budgets against (AC-5.10).
 
-**[NEEDS CLARIFICATION] Round limit and tool list in config.** `config.py` currently lets `codecompass.toml` override `tools.max_verifier_rounds` and `tools.allowed_tools`. Article V.1 makes the round limit a named constant changed only by amendment, and V.2 fixes the tool list, so both should be module constants (`MAX_VERIFIER_ROUNDS`, `ALLOWED_TOOLS`) and the keys removed from `[tools]` as shown above. The approved T0.1 test `test_max_verifier_rounds_and_tools_config` reads them from config, so this change needs reviewer sign-off before the test is updated (Article IX.3).
+**Resolved: round limit and tool list in config** (team decision Q2, 2026-10-26; constitution 1.3.0). Both stay in `[tools]`. `max_verifier_rounds` may be raised or lowered; `allowed_tools` may only narrow the allow-list. `load_online_config` validates both and fails loudly (AC-3.9). Validation lives in the loader, not in `ToolsConfig`, because the approved T5.4 test builds a widened `ToolsConfig` directly to prove that `execute` still refuses an unlisted tool. The startup budget check (V.1: the reserve must leave room for chunks) belongs to T4.2, where the budget is computed. No approved test changes: T0.1's test checks only the defaults.
 
 ## 8. Spec coverage map
 
@@ -414,7 +420,7 @@ query_log_dir = ""   # default: <index_dir>/queries/
 | II | Online imports only the four public offline exports; the query embedder is bound to the handles, with config and instance identity checked by `open_index`; no scanner/chunker/writer imports |
 | III | `ensure_current` called before every `ask`; failure → stale flag, not hang; existing index stays usable |
 | IV | Both search paths, RRF merge with rank-only scores, cross-encoder on shortlist, configurable k values |
-| V | `MAX_VERIFIER_ROUNDS = 3`, allow-listed tools, validated args, cached results, per-query log |
+| V | `max_verifier_rounds` (config, default 3, validated and always bounded), allow-listed tools that config can only narrow, validated args, cached results, per-query log |
 | VI | Deterministic checker, F/G outcomes, fixed format, harness-copied commit metadata, non-bypassable in production |
 | VII | Three evaluation configurations as one `pipeline.mode` setting; same model in all; citation checker in all (D17) |
 | VIII | llama.cpp only, switchable profiles, pinned GGUF, localhost, no mlx-lm, all config; hardware-independent required tests |

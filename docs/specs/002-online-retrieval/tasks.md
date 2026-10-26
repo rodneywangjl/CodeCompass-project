@@ -1,6 +1,6 @@
 # Tasks 002: Online Query Pipeline
 
-**Implements:** Plan 002 / Spec 002 | **Constitution:** v1.2.0
+**Implements:** Plan 002 / Spec 002 | **Constitution:** v1.3.0
 
 ## How to use this list
 
@@ -25,7 +25,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - Goal: package layout from the plan, online-specific config loader (retrieval params, generator profiles, tool settings), merged with offline config.
 - Tests first: package imports; default retrieval params loaded (`vector_k=50`, `keyword_k=50`, `rrf_constant=60`, `rerank_k=50`, `final_k=8`); profile loader returns `dev` and `prod` profiles; unknown profile raises a loud error; `MAX_VERIFIER_ROUNDS` is 3; all k values, RRF constant, and tool settings are named config values, not hard-coded.
 - ACs: AC-2.5, AC-5.9, FR-4, FR-17. | Touches: `__init__.py`, `config.py`, `models.py`. | Depends on: Sprint 1 complete.
-- **Follow-up [NEEDS CLARIFICATION]:** done, but `max_verifier_rounds` and `allowed_tools` are overridable from config, which Articles V.1 and V.2 do not allow (plan §7). Changing the approved test `test_max_verifier_rounds_and_tools_config` needs reviewer sign-off first.
+- **Follow-up (resolved, Q2):** `max_verifier_rounds` and `allowed_tools` stay configurable (constitution 1.3.0); validation is added by T0.5. The approved test is unchanged.
 
 **T0.2 Extended fixture repo**
 - Goal: extend the Sprint 1 fixture-repo builder with additional commits that have meaningful commit messages (e.g. "fix auth timeout by adding retry logic") so verifier-tool tests can assert on `git log` / `git blame` output.
@@ -41,6 +41,10 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - Goal: a deterministic `StubReranker` that scores chunks by a fixed function (e.g. text length descending) so re-ranking tests are model-free.
 - Tests first: stub returns scores in deterministic order; same input gives the same output; scores are floats.
 - ACs: enables Article IX.7. | Touches: `tests/support/stub_reranker.py`. | Depends on: T0.1.
+
+**T0.5 Tool settings validation**
+- Tests first: the default `max_verifier_rounds` is 3; a configured 5 and a configured 0 load; `-1`, `2.5`, `"3"` and `true` fail loudly naming Article V.1; `allowed_tools` defaults to both tools; a configured `["git_log"]` loads; a list naming any other tool (e.g. `"cat"`) fails loudly naming Article V.2; `execute` refuses a call to a tool switched off in `settings.allowed_tools`, with a clear error output, and still refuses an unlisted tool (T5.4).
+- ACs: AC-3.9, FR-6. | Touches: `config.py`, `agent/tools.py`. | Depends on: T5.4.
 
 ## S1: RRF merge
 
@@ -87,7 +91,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-1.4, FR-5. | Touches: `context.py`. | Depends on: T0.1.
 
 **T4.2 Context budgeting**
-- Tests first: chunks are added in re-ranker score order until the chunk budget is exceeded; the remaining chunks are dropped; token counts come from `Generator.count_tokens`; `final_k` is capped by the budget (fewer chunks if the budget is tight); a very small budget results in zero chunks (handled gracefully); the profile's `max_tokens` and `MAX_VERIFIER_ROUNDS × max_tool_output_tokens` are reserved before chunks are added; two profiles that differ only in `context_window` yield different chunk counts for the same input, and `context.py` names no model (the budget comes only from the active profile).
+- Tests first: chunks are added in re-ranker score order until the chunk budget is exceeded; the remaining chunks are dropped; token counts come from `Generator.count_tokens`; `final_k` is capped by the budget (fewer chunks if the budget is tight); a very small budget results in zero chunks (handled gracefully); the profile's `max_tokens` and `MAX_VERIFIER_ROUNDS × max_tool_output_tokens` are reserved before chunks are added; a configured `max_verifier_rounds` whose reserve leaves no room for chunks fails loudly at startup, naming Article V.1; two profiles that differ only in `context_window` yield different chunk counts for the same input, and `context.py` names no model (the budget comes only from the active profile).
 - ACs: AC-2.6, AC-5.7, plan D4. | Touches: `context.py`. | Depends on: T4.1, T3.2, T0.3.
 
 ## S5: Verifier tools
@@ -125,11 +129,11 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 ## S7: Generator
 
 **T7.1 Model profile loading**
-- Tests first: loading `dev` profile returns the 14B config; loading `prod` returns the 32B config; an unknown profile name raises a loud error; the default profile is `dev`; `GENERATOR_PROFILE` env var overrides the default; each profile has all required fields (model_id, backend, context_window, server_args, temperature, seed, max_tokens, stop_tokens); a `backend` other than `llama.cpp` is rejected loudly; with default config every local model device is `cpu` (re-ranker, embedder) and no profile field requires a GPU, so CPU-only operation works out of the box.
+- Tests first: loading `dev` profile returns the 14B config; loading `prod` returns the 32B config; an unknown profile name raises a loud error; the default profile is `dev`; `GENERATOR_PROFILE` env var overrides the default; each profile has all required fields (model_id, backend, context_window, server_args, temperature, seed, max_tokens, stop_tokens, cache_prompt); a `backend` other than `llama.cpp` is rejected loudly; with default config every local model device is `cpu` (re-ranker, embedder) and no profile field requires a GPU, so CPU-only operation works out of the box.
 - ACs: AC-5.1, AC-5.2, AC-5.9, AC-5.11, FR-17. | Touches: `generator/profiles.py`. | Depends on: T0.1.
 
 **T7.2 LlamaServerGenerator**
-- Tests first (mocked HTTP): `generate(messages)` sends a POST to `/v1/chat/completions` with the correct chat format; the response is parsed and the assistant content returned; stop tokens from the profile are included in the request; temperature and max_tokens from the profile are sent; a connection error raises a clear error, not a hang; a timeout raises a clear error.
+- Tests first (mocked HTTP): `generate(messages)` sends a POST to `/v1/chat/completions` with the correct chat format; the response is parsed and the assistant content returned; stop tokens from the profile are included in the request; temperature and max_tokens from the profile are sent; the profile's `cache_prompt` value is sent with every request (plan D13 item 10); a connection error raises a clear error, not a hang; a timeout raises a clear error.
 - ACs: AC-5.3, AC-5.4, AC-5.6, FR-12. | Touches: `generator/llama.py`. | Depends on: T7.1.
 
 **T7.3 Health check**
@@ -151,7 +155,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-3.1, AC-3.5, AC-3.6. | Touches: `agent/harness.py`. | Depends on: T8.1, T5.4, T5.5.
 
 **T8.3 Round limit enforcement**
-- Tests first (stub generator always requests tools): exactly 3 tools execute; the harness then makes one final generate call whose messages say no more tools are available; any `<tool>` block in that final response is removed before the citation checker; at most 4 generator calls are made; the audit log records all 3 tool rounds and the final call; when a response contains two `<tool>` blocks, only the first executes.
+- Tests first (stub generator always requests tools): exactly `max_verifier_rounds` tools execute (tested with the default 3 and a configured 1 and 5); the harness then makes one final generate call whose messages say no more tools are available; any `<tool>` block in that final response is removed before the citation checker; at most 4 generator calls are made; the audit log records all 3 tool rounds and the final call; when a response contains two `<tool>` blocks, only the first executes.
 - ACs: AC-3.1, FR-6. | Touches: `agent/harness.py`. | Depends on: T8.2.
 
 **T8.4 Tool error handling**
@@ -159,7 +163,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-3.3, AC-3.4. | Touches: `agent/harness.py`. | Depends on: T8.2.
 
 **T8.5 Message building**
-- Tests first: the system prompt is the first message; context chunks are in the user message; tool results are appended as separate `user` messages in the D16 `<tool_result>` wrapper (errors carry an `error` attribute); no message ever has a role other than `system`, `user` or `assistant`; the conversation history grows with each round; the system prompt matches the plan's D14 template, including rule 4 (state what could not be determined) and rule 5 (say so when commit history gives no rationale; never invent one); a tool result with no commits is wrapped with the D16 `No commit history found for <path>` text, never an empty block; the D15 final-call message asks the model to state what it could not determine.
+- Tests first: the system prompt is the first message; context chunks are in the user message; tool results are appended as separate `user` messages in the D16 `<tool_result>` wrapper (errors carry an `error` attribute); no message ever has a role other than `system`, `user` or `assistant`; the conversation history grows with each round and is append-only: every earlier message is unchanged, in the same order, in each later call (plan D13 item 10); the system prompt matches the plan's D14 template, including rule 4 (state what could not be determined) and rule 5 (say so when commit history gives no rationale; never invent one); a tool result with no commits is wrapped with the D16 `No commit history found for <path>` text, never an empty block; the D15 final-call message asks the model to state what it could not determine.
 - ACs: AC-1.4, AC-1.3, AC-3.7, plan D14, D16. | Touches: `agent/harness.py`. | Depends on: T4.1.
 
 ## S9: Citation checker
@@ -183,6 +187,11 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 **T9.5 Harness-copied commit metadata**
 - Tests first: when the answer contains a commit source `[N] Commit hash, ...`, the harness replaces the model's subject, author, and date with values from the matching commit record of a `git log` or `git blame --porcelain` tool result; if the hash is not in any tool result, the source is marked unverified; the replacement is exact (no model-generated commit details survive).
 - ACs: AC-4.6, FR-16. | Touches: `citation/checker.py`. | Depends on: T9.3, T5.3.
+
+**T9.7 Uncited answers and uncited parts**
+- Tests first: an answer with no markers and no `Sources` entries renders with the AC-4.8 note and without the banner; an answer with citations whose paragraphs or list items lack a marker gets ` (not cited)` on each such part and the AC-4.9 note at the top; headings, fenced code blocks and lines ending in `:` are not tagged; a fully cited F answer is unchanged; a G answer with uncited parts shows the banner, then the note; outcomes are unchanged (no-citation answers stay G, partly cited answers with valid citations stay F).
+- **Approved test change (needs reviewer sign-off, Article IX.3):** T9.4's `test_no_sources_section_still_gets_banner` expects the banner on an uncited answer; spec AC-4.8 replaces that with the uncited note.
+- ACs: AC-4.8, AC-4.9, FR-19. | Touches: `citation/formatter.py`, `tests/online/test_citation_format_t94.py` (the one approved test above). | Depends on: T9.4.
 
 **T9.6 Citation checker is non-bypassable**
 - Tests first: the `ask` function always runs the citation checker; there is no config flag to skip it; calling `ask` with a stub generator that returns invalid citations always produces a G outcome.
@@ -213,7 +222,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-7.2, AC-7.3. | Touches: `logging.py`. | Depends on: T11.1.
 
 **T11.3 Profile and model in log**
-- Tests first: the audit log records the active profile name and resolved model id; the profile is recorded on every query log.
+- Tests first: the audit log records the active profile name, resolved model id, `cache_prompt` setting and pipeline mode (D17, Article VII.3) and `max_verifier_rounds` (Article V.1); they are recorded on every query log.
 - ACs: AC-5.8, AC-7.1. | Touches: `logging.py`. | Depends on: T11.1.
 
 ## S12: Public API and CLI
@@ -237,8 +246,8 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 ## S13: Real model tests (local only, `model` marker)
 
 **T13.1 Real cross-encoder re-ranker**
-- Tests first (`model`): `BgeReranker` loads `BAAI/bge-reranker-v2-m3`; re-ranking a question against a relevant chunk and an irrelevant chunk gives the relevant chunk a higher score; batch scoring produces deterministic results.
-- ACs: AC-2.7. | Touches: `retrieval/reranker.py`. | Depends on: T3.2.
+- Tests first (`model`): `BgeReranker` loads `BAAI/bge-reranker-v2-m3` at the revision pinned in config (`reranker.revision`, Article VIII.1); re-ranking a question against a relevant chunk and an irrelevant chunk gives the relevant chunk a higher score; batch scoring produces deterministic results. Required-suite test: `reranker.revision` is a config field, and the loader passes it to the model library.
+- ACs: AC-2.7. | Touches: `retrieval/reranker.py`, `config.py` (adds `RerankerConfig.revision`). | Depends on: T3.2.
 
 **T13.2 Real generator smoke test**
 - Tests first (`model`): `LlamaServerGenerator` connects to a running `llama-server`; a simple question about the fixture repo produces an answer with a `Sources` section; the citation checker runs and classifies the outcome.

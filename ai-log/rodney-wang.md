@@ -328,3 +328,81 @@ TODO (member)
 - Plan D8 now explains why its cache key meets Article V.3.
 - Added the three Article VII.3 evaluation modes to Spec 002 (US10, FR-18, D17, T12.4), so `ask` is built with them.
 - Drafted the constitution amendment for the duplicate Appendix A #12, but did not apply it: agents may not edit the constitution.
+
+## 2026-10-26 · Constitution 1.2.1 clarifications
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** docs/constitution.md, docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/spec.md, docs/specs/002-online-retrieval/tasks.md
+- **Outcome:** Changed
+### What I asked for
+Fix the errors in the constitution that today's review found, choosing the best option for each. I explicitly asked for this, overriding the AGENTS.md rule that agents never edit the constitution.
+### How I checked it
+TODO (member)
+### What I kept or changed
+PATCH 1.2.0 → 1.2.1 with four clarifications, each stating what the spec, plan and approved code already do:
+- IV.2: RRF ranks count from 0. Kept 0 rather than the more common 1, so the approved T1.1 tests stay unchanged.
+- V.1: one tool call per round, and one final answer-only call when the limit is hit.
+- V.3: "tool messages" means the harness's own format, not the server's `tool` role.
+- Appendix A: duplicate #12 renumbered to #13.
+
+Pushed as branch `docs/constitution-1.2.1`, not to `main`: Governance requires amendments to be reviewed, so a teammate should approve it before it merges.
+
+## 2026-10-26 · T2.1 Vector search wrapper
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/retrieval/vector.py, tests/online/test_vector_search_t21.py
+- **Outcome:** Kept
+### What I asked for
+T2.1: a wrapper that returns the top-k chunk ids by cosine similarity from the read-only vector handle, written tests-first.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Kept as drafted: `vector_search(index, query_vector, k)` mirrors `keyword_search` and calls the handle's `search` (added in `fix/vector-search`). It takes a vector, not text, because embedding the question is T2.3's job. The ordering test checks the exact cosine order, which holds because Chroma searches exactly on a collection this small.
+
+## 2026-10-26 · Constitution gaps and prompt reuse across rounds
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** docs/constitution.md, docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/tasks.md
+- **Outcome:** Changed
+### What I asked for
+Fix every remaining problem in the constitution and optimise the architecture.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Constitution (still PATCH 1.2.1):
+  - an uncited answer is never F;
+  - the stale warning also covers a locked index;
+  - the re-ranker revision is pinned;
+  - the evaluation configuration is logged;
+  - the Appendix A #2 summary matches Article V.1.
+- Plan: prompt-prefix reuse across rounds (`cache_prompt`, append-only conversation), as an explicit logged profile setting, because llama.cpp says cache reuse can change outputs slightly.
+- Not changed, because each is a trade-off that needs the team or an evaluation (Article VII.5):
+  - several tool calls per round;
+  - smaller re-rank candidate sets;
+  - re-indexing in the background.
+
+## 2026-10-26 · T9.7 Uncited answers and uncited parts
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/citation/formatter.py, tests/online/test_uncited_t97.py, tests/online/test_citation_format_t94.py, docs/constitution.md, docs/specs/002-online-retrieval/spec.md, docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/tasks.md
+- **Outcome:** Changed
+### What I asked for
+Team decision Q1: anything in an answer that cites nothing should be marked professionally so the developer checks it. Both cases: an answer with no citations at all (A), and the uncited parts of a cited answer (B).
+### How I checked it
+TODO (member)
+### What I kept or changed
+- An answer with no citations stays outcome G, but shows an uncited-answer note instead of the "citations could not be verified" banner, because nothing was fabricated.
+- In a cited answer, each paragraph or list item without a `[N]` marker gets "(not cited)" and a note at the top.
+- Headings, code blocks and lead-in lines ending in ":" are skipped.
+- Constitution VI.3 and VI.4, spec AC-4.8, AC-4.9 and FR-19, and plan D11 were updated first.
+- One approved T9.4 test was changed to match AC-4.8. I approved it; second-person reviewer sign-off is still pending (Article IX.3).
+
+## 2026-10-26 · T0.5 Configurable round limit and tool settings validation
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** docs/constitution.md, codecompass/online/config.py, codecompass/online/agent/tools.py, tests/online/test_tool_settings_t05.py, docs/specs/002-online-retrieval/spec.md, docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/tasks.md
+- **Outcome:** Changed
+### What I asked for
+Team decision Q2: keep the round limit in the settings file and allow it to be raised in future, not fixed by the constitution.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Amended the constitution to 1.3.0 (MINOR). `max_verifier_rounds` is configurable (default 3) but always bounded: a negative or non-integer value fails startup, as does a value whose tool-result reserve leaves no room for chunks (the budget check lands in T4.2). The value is logged and counts as a pipeline change (VII.5).
+- `allowed_tools` can switch tools off but never add one, and the tool runner now respects it; before this it was silently ignored.
+- Validation is in the loader, not `ToolsConfig`, so the approved T5.4 test that builds a widened `ToolsConfig` still holds.
+- No approved tests changed.
