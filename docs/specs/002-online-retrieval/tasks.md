@@ -147,7 +147,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-3.1 (no-tool path). | Touches: `agent/harness.py`. | Depends on: T6.1, T7.2.
 
 **T8.2 Multi-round tool loop**
-- Tests first (stub generator returns a tool call on round 0, then an answer on round 1): the harness executes the tool, appends the result to messages, calls generate again; the audit log shows round 0 with a tool call and round 1 with the answer; tool results are appended as tool messages in context.
+- Tests first (stub generator returns a tool call on round 0, then an answer on round 1): the harness executes the tool, appends the result to messages, calls generate again; the audit log shows round 0 with a tool call and round 1 with the answer; tool results are appended to context as `user`-role messages wrapped in `<tool_result>` tags (plan D16), after the model's `assistant` tool request.
 - ACs: AC-3.1, AC-3.5, AC-3.6. | Touches: `agent/harness.py`. | Depends on: T8.1, T5.4, T5.5.
 
 **T8.3 Round limit enforcement**
@@ -159,7 +159,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-3.3, AC-3.4. | Touches: `agent/harness.py`. | Depends on: T8.2.
 
 **T8.5 Message building**
-- Tests first: the system prompt is the first message; context chunks are in the user message; tool results are appended as separate messages; the conversation history grows with each round; the system prompt matches the plan's D14 template.
+- Tests first: the system prompt is the first message; context chunks are in the user message; tool results are appended as separate `user` messages in the D16 `<tool_result>` wrapper (errors carry an `error` attribute); no message ever has a role other than `system`, `user` or `assistant`; the conversation history grows with each round; the system prompt matches the plan's D14 template.
 - ACs: AC-1.4, plan D14. | Touches: `agent/harness.py`. | Depends on: T4.1.
 
 ## S9: Citation checker
