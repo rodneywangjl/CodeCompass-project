@@ -21,3 +21,146 @@ I asked Claude Code to check that the earlier session's changes were in my repo 
 I read the git output it showed and agreed with its findings: the missing .gitignore lines, the empty CLAUDE.local.md and the hit-rate wording that didn't match. I checked its list of §4.3 gaps against the constitution and Spec 002 myself. I reviewed this log file and the final diff before each commit.
 ### What I kept or changed
 I shared all of its §4.3 findings with the team and added them to AGENTS.md §4.3 as open questions for Spec 003, leaving the existing definitions unchanged. I kept the reminder message, the blank template and the heading-only starter logs for Rodney, Gavin and Kelsey, created with their agreement. After I gave it the AI-use policy, I had the declaration draft reworked to the policy's §5.1 format: one short paragraph covering only what is in the logs.
+
+## 2026-10-28 · Spec 002 block 4 overview
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** ai-log/nicole-goh.md
+- **Outcome:** Kept
+### What I asked for
+Completed block 4 of the Spec 002 rollout on feat/ask-pipeline-audit-log-cli. This phase wires every online stage into `ask()`, the single entry point for a question (T9.6, T12.1, T12.2), adds index-freshness handling (T10.1–T10.3), the per-query audit log (T11.1–T11.3), the `ask` CLI (T12.3) and the three evaluation modes (T12.4), plus a fix so `ensure_current` defaults to the configured embedder. The code and tests were carried over with help from Claude Code. Before carrying them over, I had Claude Code check that block 3 on `main` matched what block 4 expected, predict conflicts and do a throwaway dry run.
+### How I checked it
+All 17 commits applied cleanly, with no conflicts and no adaptations; each patch is identical to the original. Block 3 on `main` matched the code (`git range-diff`), so Kelsey's "deviations" were environment-only. On Windows, tantivy and tree-sitter DLLs are blocked by Application Control and two tests have a Windows-only TOML path issue, outside the scope of this block. Re-ran the full required suite (`pytest -m "not model"`) in WSL (Ubuntu, Python 3.14) on the same branch: all 446 selected tests passed (410 on `main` plus 36 from this block).
+### What I kept or changed
+Until block 5 adds `BgeReranker` (T13.1), `ask()` needs a re-ranker passed in.
+
+## 2026-10-28 · T9.6 Citation checker is non-bypassable
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** tests/online/ask_support.py, tests/online/test_citation_nonbypassable_t96.py, codecompass/online/__init__.py
+- **Outcome:** Kept
+### What I asked for
+T9.6: Every `ask()` runs the citation checker exactly once, in every mode and on the no-evidence path. No configuration field can switch it off, and a generator citing a file that was not retrieved is always flagged G.
+### How I checked it
+test_citation_nonbypassable_t96.py passed in WSL.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-28 · T10.1 ensure_current before answering
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** tests/online/test_ensure_current_t101.py, codecompass/online/__init__.py
+- **Outcome:** Kept
+### What I asked for
+T10.1: `ask()` calls `ensure_current` before opening the index. If it succeeds, the answer is not stale. If it fails or the index is locked, the answer still comes from the existing index with the stale flag set. If there is no index yet, the answer says so without retrieval or generation, and nothing is raised.
+### How I checked it
+test_ensure_current_t101.py passed in WSL.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-28 · T10.2 Stale-index fallback
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** tests/online/test_stale_fallback_t102.py, codecompass/online/__init__.py
+- **Outcome:** Kept
+### What I asked for
+T10.2: When `ensure_current` fails, the answer starts with the stale-index warning and the failure reason, followed by the normal answer. `stale_index` is True and `stale_message` holds the reason.
+### How I checked it
+test_stale_fallback_t102.py passed in WSL.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-28 · T10.3 Empty index and no evidence
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** tests/online/test_empty_index_t103.py, codecompass/online/__init__.py
+- **Outcome:** Kept
+### What I asked for
+T10.3: An index with no chunks, or a context budget that fits no chunk, gives the "could not find enough evidence" answer without calling the generator.
+### How I checked it
+test_empty_index_t103.py passed in WSL.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-28 · T11.1 Per-query audit log
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/logging.py, tests/online/test_audit_log_t111.py
+- **Outcome:** Kept
+### What I asked for
+T11.1: Each query's audit log holds the question, profile, model id, every retrieved chunk with its RRF and re-ranker scores (and whether it was sent), every tool call (round, tool, arguments, cache hit), the citation outcome and per-stage timings.
+### How I checked it
+test_audit_log_t111.py passed in WSL.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-28 · T11.2 Audit log persistence
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/logging.py, tests/online/test_audit_persist_t112.py
+- **Outcome:** Kept
+### What I asked for
+T11.2: Every `ask()` writes its audit log as JSON under `logging.query_log_dir`, with a file name starting with a UTC timestamp. A stale-index warning is recorded in the log.
+### How I checked it
+test_audit_persist_t112.py passed in WSL.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-28 · T11.3 Profile and model in the log
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/logging.py, tests/online/test_audit_profile_t113.py
+- **Outcome:** Kept
+### What I asked for
+T11.3: Every audit log records the profile name, resolved model id, `cache_prompt`, pipeline mode and the `max_verifier_rounds` in force.
+### How I checked it
+test_audit_profile_t113.py passed in WSL.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-28 · T12.1 ask() entry point
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/__init__.py, tests/online/test_ask_t121.py
+- **Outcome:** Kept
+### What I asked for
+T12.1: `ask()` returns a `QueryResult` with the answer, sources, citation outcome, stale flag, stale message and audit log, and prints nothing. The embedder given to `ask()` reaches both `ensure_current` and `open_index`, and an index built with a different embedder is refused.
+### How I checked it
+test_ask_t121.py passed in WSL.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-28 · T12.2 Full pipeline integration test
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/__init__.py, tests/online/test_full_pipeline_t122.py
+- **Outcome:** Kept
+### What I asked for
+T12.2: One question runs end to end on the fixture repo with stubs and real stores: ensure_current, open_index, embedding, vector and keyword search, RRF, re-rank, budget, a tool round, the citation check, then the rendered answer, sources and audit log.
+### How I checked it
+test_full_pipeline_t122.py passed in WSL.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-28 · T12.3 ask CLI
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/cli.py, tests/online/test_cli_t123.py
+- **Outcome:** Kept
+### What I asked for
+T12.3: The `ask` command prints the rendered answer and logs the profile and model id once at startup. `--profile` selects a profile and `--verbose` prints retrieved chunks and tool calls. Flagged and stale answers show their warnings before the answer text.
+### How I checked it
+test_cli_t123.py passed in WSL. On Windows, five of its tests fail because the test writes a Windows path into TOML; this is environment-only and outside this block.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-28 · T12.4 Evaluation modes
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/config.py, codecompass/online/__init__.py, tests/online/test_modes_t124.py
+- **Outcome:** Kept
+### What I asked for
+T12.4: A `pipeline.mode` setting for the three Article VII.3 configurations. The default is `rag_tools`, and an unknown mode fails loudly. `rag` retrieves and re-ranks but runs no tools. `no_retrieval` sends no chunks. Every mode uses the same model, and the log records the mode.
+### How I checked it
+test_modes_t124.py passed in WSL.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-28 · ensure_current default embedder fix
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/offline/__init__.py, tests/offline/test_ensure_default_embedder.py
+- **Outcome:** Kept
+### What I asked for
+Fix outside a numbered task, found while wiring `ask()`: with no embedder given, a needed re-index failed. Like `open_index`, `ensure_current` now builds the pinned embedder from config, and only on the re-index path, so the fast path still loads nothing.
+### How I checked it
+test_ensure_default_embedder.py passed in WSL.
+### What I kept or changed
+Kept unchanged.
