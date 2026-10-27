@@ -1,9 +1,150 @@
 """CodeCompass online query pipeline (Spec 002).
 
-Public exports for query-time hybrid retrieval, generator harness,
-and citation integrity checking.
+Public API: ask(). One call runs the whole pipeline (Plan §1): ensure the
+index is current, retrieve and re-rank, run the bounded agent loop, check
+every citation, and return the rendered answer with its audit log.
 """
 
 from __future__ import annotations
 
+import dataclasses
+import time
+from pathlib import Path
+
+from codecompass.offline import ensure_current, open_index, status
+from codecompass.online.agent.harness import (
+    make_tool_runner, run_agent, system_prompt, user_message)
+from codecompass.online.citation import checker, formatter
+from codecompass.online.config import OnlineConfig, check_mode
+from codecompass.online.context import (
+    RetrievedChunk, check_round_reserve, chunk_budget, fit_chunks)
+from codecompass.online.generator.profiles import resolve_profile
+from codecompass.online.logging import TimedGenerator, new_log, timed, write_log
+from codecompass.online.models import QueryResult
+from codecompass.online.retrieval.hybrid import retrieve
+from codecompass.online.retrieval.reranker import rerank_chunks
+
 __version__ = "0.1.0"
+__all__ = ["ask"]
+
+STALE_WARNING = ("⚠ WARNING: The index may be out of date. The answer below is based "
+                 "on an older version of the codebase.")
+NO_EVIDENCE = "I could not find enough evidence in the indexed code to answer this question."
+NO_INDEX = ("No index is available for this repository yet, so this question cannot "
+            "be answered.")
+
+
+def _default_generator(config: OnlineConfig, profile):
+    from codecompass.online.generator.llama import LlamaServerGenerator
+    return LlamaServerGenerator(profile, server_url=config.generator.server_url,
+                                timeout_seconds=config.generator.timeout_seconds)
+
+
+def _default_reranker(config: OnlineConfig):
+    from codecompass.online.retrieval.reranker import BgeReranker
+    return BgeReranker(config.reranker)
+
+
+def _log_dir(config: OnlineConfig, index_dir) -> Path:
+    if config.logging.query_log_dir:
+        return Path(config.logging.query_log_dir)
+    return Path(index_dir or config.offline.index.dir) / "queries"
+
+
+def _retrieve_and_answer(handles, repo_path, question, *, config, profile, tools, tools_on,
+                         generator, reranker, log):
+    """Hybrid retrieval, re-rank, budget, then the agent loop (Plan §1)."""
+    if handles.vector.count() == 0:
+        return NO_EVIDENCE, [], []
+    with timed(log, "retrieval"):
+        shortlist = retrieve(handles, question, config=config.retrieval)
+        records = handles.vector.records_for_ids([cid for cid, _ in shortlist])
+        chunks = [RetrievedChunk.from_record(cid, records[cid])
+                  for cid, _ in shortlist if cid in records]
+    with timed(log, "reranking"):
+        ranked = rerank_chunks(reranker or _default_reranker(config), question, chunks,
+                               len(chunks))
+    prefix = (generator.count_tokens(system_prompt(tools_enabled=tools_on))
+              + generator.count_tokens(user_message(question, [])))
+    sent = fit_chunks([c for c, _ in ranked[:config.retrieval.final_k]],
+                      chunk_budget(profile, tools, prefix), generator.count_tokens)
+    rrf = dict(shortlist)
+    sent_ids = {c.chunk_id for c in sent}
+    log["retrieved"] = [{"chunk_id": c.chunk_id, "path": c.path,
+                         "lines": f"{c.start_line}-{c.end_line}",
+                         "rrf_score": rrf[c.chunk_id], "rerank_score": score,
+                         "sent": c.chunk_id in sent_ids} for c, score in ranked]
+    if not sent:
+        return NO_EVIDENCE, [], []
+    # tools run at the indexed commit, the version the chunks came from (Plan D7)
+    runner = make_tool_runner(repo_path, handles.meta.indexed_commit, config.tools,
+                              generator.count_tokens)
+    return _agent(generator, question, sent, runner=runner, tools=tools,
+                  tools_on=tools_on, log=log)
+
+
+def _agent(generator, question, chunks, *, runner, tools, tools_on, log):
+    def run_tool(call):
+        with timed(log, "tool_execution"):
+            return runner(call)
+
+    run = run_agent(generator, question, chunks, run_tool=run_tool,
+                    max_rounds=tools.max_verifier_rounds, tools_enabled=tools_on)
+    log.update(tool_calls=run.rounds, generator_calls=run.generator_calls,
+               round_limit_hit=run.round_limit_hit)
+    return run.answer, chunks, run.commits
+
+
+def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None = None,
+        index_dir=None, generator=None, reranker=None, embedder=None) -> QueryResult:
+    """Answer *question* about the repository at *repo_path* (Spec US1, US9).
+
+    generator, reranker and embedder default to the configured models; tests
+    pass stubs. Nothing is printed; everything is in the returned result.
+    """
+    started = time.perf_counter()
+    mode = check_mode(config.pipeline.mode)
+    profile_name, model = resolve_profile(config, profile)
+    tools_on = mode == "rag_tools"
+    tools = (config.tools if tools_on
+             else dataclasses.replace(config.tools, max_verifier_rounds=0))
+    log = new_log(question, profile_name=profile_name, profile=model, mode=mode,
+                  tools=config.tools)
+    gen = TimedGenerator(generator or _default_generator(config, model), log)
+    check_round_reserve(model, tools, gen.count_tokens(system_prompt(tools_enabled=tools_on)))
+
+    with timed(log, "ensure_current"):
+        ensured = ensure_current(repo_path, config=config.offline, index_dir=index_dir,
+                                 embedder=embedder)
+    stale = not ensured.ok
+    reason = (ensured.message or ensured.status) if stale else ""
+    log["index"] = {"ensure_status": ensured.status, "stale": stale, "stale_message": reason}
+
+    if stale and status(repo_path, config=config.offline,
+                        index_dir=index_dir).state == "empty":
+        answer, chunks, commits = f"{NO_INDEX} Indexing failed: {reason}", [], []
+        stale = log["index"]["stale"] = False  # nothing was answered from an old index
+    elif mode == "no_retrieval":
+        answer, chunks, commits = _agent(gen, question, [], runner=None, tools=tools,
+                                         tools_on=False, log=log)
+    else:
+        handles = open_index(repo_path, config=config.offline, index_dir=index_dir,
+                             embedder=embedder)
+        try:
+            answer, chunks, commits = _retrieve_and_answer(
+                handles, repo_path, question, config=config, profile=model, tools=tools,
+                tools_on=tools_on, generator=gen, reranker=reranker, log=log)
+        finally:
+            handles.close()
+
+    with timed(log, "citation_check"):
+        result = checker.check(answer, chunks, commits)
+    rendered = formatter.render(result)
+    if stale:
+        rendered = f"{STALE_WARNING}\nReason: {reason}\n\n{rendered}"
+    log["citation"] = {"outcome": result.outcome, "unverified": list(result.unverified)}
+    log["timings"]["total"] = time.perf_counter() - started
+    path = write_log(log, _log_dir(config, index_dir))
+    return QueryResult(answer=rendered, sources=list(result.sources),
+                       citation_outcome=result.outcome, stale_index=stale,
+                       stale_message=reason, audit_log={**log, "log_file": str(path)})
