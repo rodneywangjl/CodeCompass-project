@@ -102,6 +102,24 @@ class ToolsConfig:
     max_tool_output_tokens: int = DEFAULT_MAX_TOOL_OUTPUT_TOKENS
 
 
+# Evaluation configurations (Article VII.2-VII.3, Plan D17)
+PIPELINE_MODES = ("rag_tools", "rag", "no_retrieval")
+
+
+@dataclass(frozen=True)
+class PipelineConfig:
+    """Which Article VII.2 configuration ask() runs; rag_tools is the product."""
+    mode: str = "rag_tools"
+
+
+def check_mode(mode: str) -> str:
+    """Fail loudly on an unknown pipeline.mode (AC-10.1)."""
+    if mode not in PIPELINE_MODES:
+        raise ValueError(f"pipeline.mode must be one of {', '.join(PIPELINE_MODES)}; "
+                         f"got {mode!r}")
+    return mode
+
+
 @dataclass(frozen=True)
 class LoggingConfig:
     """Audit logging configuration (Article V.4, AC-7.2)."""
@@ -116,11 +134,12 @@ class OnlineConfig:
     generator: GeneratorConfig = field(default_factory=GeneratorConfig)
     tools: ToolsConfig = field(default_factory=ToolsConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    pipeline: PipelineConfig = field(default_factory=PipelineConfig)
     offline: OfflineConfig = field(default_factory=OfflineConfig)
 
 
 _OFFLINE_SECTIONS = {"index", "chunking", "files", "languages", "embedder", "lock"}
-_ONLINE_SECTIONS = {"retrieval", "reranker", "generator", "tools", "logging"}
+_ONLINE_SECTIONS = {"retrieval", "reranker", "generator", "tools", "logging", "pipeline"}
 
 
 def get_generator_profile(config: OnlineConfig, profile_name: str | None = None) -> ModelProfile:
@@ -193,6 +212,8 @@ def load_online_config(path: str | pathlib.Path | None) -> OnlineConfig:
     # 5. Logging
     logging_raw = raw.get("logging", {})
     logging = LoggingConfig(**logging_raw)
+    pipeline = PipelineConfig(**raw.get("pipeline", {}))
+    check_mode(pipeline.mode)
 
     # 6. Offline config merge: pass the parsed sections straight through, so
     # values are never re-serialised and relative paths keep the file's anchor.
@@ -205,5 +226,6 @@ def load_online_config(path: str | pathlib.Path | None) -> OnlineConfig:
         generator=generator,
         tools=tools,
         logging=logging,
+        pipeline=pipeline,
         offline=offline_cfg,
     )
