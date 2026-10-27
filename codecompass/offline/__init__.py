@@ -95,6 +95,10 @@ def ensure_current(repo_path, *, config, index_dir=None, embedder=None,
                 report=RunReport(mode="up-to-date", from_commit=head,
                                  to_commit=head))
     from .orchestrator import run  # heavy imports only on the stale path
+    if embedder is None and embedder_factory is None:
+        def embedder_factory():  # the configured embedder, as open_index uses
+            from . import embedding
+            return embedding.CodeEmbedder(config.embedder)
     try:
         report = run(repo_path, config=config, index_dir=index_dir,
                      embedder=embedder, embedder_factory=embedder_factory)
