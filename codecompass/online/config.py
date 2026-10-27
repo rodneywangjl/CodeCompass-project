@@ -35,6 +35,8 @@ DEFAULT_SERVER_URL = "http://127.0.0.1:8080"
 DEFAULT_TIMEOUT_SECONDS = 120
 DEFAULT_GENERATION_RESERVE_TOKENS = 1024
 DEFAULT_STOP_TOKENS = ("<|im_end|>", "<|endoftext|>")
+DEFAULT_SEED = 42
+BACKEND = "llama.cpp"  # the only backend (Article VIII.2, VIII.4)
 
 
 @dataclass(frozen=True)
@@ -65,6 +67,15 @@ class ModelProfile:
     temperature: float = 0.1
     max_tokens: int = 2048
     stop_tokens: tuple[str, ...] = DEFAULT_STOP_TOKENS
+    backend: str = BACKEND
+    server_args: tuple[str, ...] = ()
+    seed: int = DEFAULT_SEED
+    cache_prompt: bool = True
+
+    def __post_init__(self) -> None:
+        if self.backend != BACKEND:
+            raise ValueError(f"profile {self.model_id!r}: backend must be {BACKEND!r}, "
+                             f"got {self.backend!r} (Article VIII.2)")
 
 
 @dataclass(frozen=True)
@@ -158,8 +169,9 @@ def load_online_config(path: str | pathlib.Path | None) -> OnlineConfig:
         for pname, pvals in generator_raw["profiles"].items():
             if isinstance(pvals, dict):
                 p_kwargs = dict(pvals)
-                if "stop_tokens" in p_kwargs:
-                    p_kwargs["stop_tokens"] = tuple(p_kwargs["stop_tokens"])
+                for key in ("stop_tokens", "server_args"):
+                    if key in p_kwargs:
+                        p_kwargs[key] = tuple(p_kwargs[key])
                 profiles[pname] = ModelProfile(**p_kwargs)
 
     generator = GeneratorConfig(profiles=profiles, **gen_kwargs)
