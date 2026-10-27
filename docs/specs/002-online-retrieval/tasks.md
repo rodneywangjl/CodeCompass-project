@@ -155,7 +155,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-3.1, AC-3.5, AC-3.6. | Touches: `agent/harness.py`. | Depends on: T8.1, T5.4, T5.5.
 
 **T8.3 Round limit enforcement**
-- Tests first (stub generator always requests tools): exactly `max_verifier_rounds` tools execute (tested with the default 3 and a configured 1 and 5); the harness then makes one final generate call whose messages say no more tools are available; any `<tool>` block in that final response is removed before the citation checker; at most 4 generator calls are made; the audit log records all 3 tool rounds and the final call; when a response contains two `<tool>` blocks, only the first executes.
+- Tests first (stub generator always requests tools): exactly `max_verifier_rounds` tools execute (tested with the default 3 and a configured 1 and 5); the harness then makes one final generate call whose messages say no more tools are available; any `<tool>` block in that final response is removed before the citation checker; at most `max_verifier_rounds + 2` generator calls are made (5 by default); the audit log records all 3 tool rounds and the final call; when a response contains two `<tool>` blocks, only the first executes.
 - ACs: AC-3.1, FR-6. | Touches: `agent/harness.py`. | Depends on: T8.2.
 
 **T8.4 Tool error handling**
