@@ -10,3 +10,124 @@ Implementation of Task T0.1 from Tasks 002: test-first implementation of the onl
 Confirmed tests failed first with `ModuleNotFoundError: No module named 'codecompass.online'`. After implementation, verified that all 9 tests in `test_config_t01.py` passed, followed by running the full required suite (`pytest -m "not model"`), with all 143 tests passing (134 offline + 9 online) and zero regressions.
 ### What I kept or changed
 Kept the complete dataclass models (`QueryResult`, `CitationResult`, `SourceEntry`, `ToolCall`, `ToolResult`), default retrieval parameters, generator profile resolver (`dev`/`prod`) with loud `ValueError` on unknown profiles, and the offline configuration merge logic.
+
+## 2026-10-27 · Spec 002 block 3 overview
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** ai-log/kelsey.md
+- **Outcome:** Kept
+### What I asked for
+Completed block 3 of the Spec 002 rollout on feat/llama-server-generator-agent-loop. This phase integrates the core Llama-server generator (T7) and the multi-round agent loop (T8) based on recent team design discussions. The code reflects our agreed-upon constraints for model profiles, HTTP client stability, round limits, and append-only message handling.
+### How I checked it
+All commits applied cleanly. Ran pytest -m "not model" --continue-on-collection-errors on Windows: 350 passed, including every test added in this block. (The known 13 failures and 30 errors are related to Windows Application Control blocking the tantivy DLL and a pre-existing path issue in test_config_merge, which are outside the scope of this block). Re-ran the full required suite (pytest -m "not model") in WSL (Ubuntu, Python 3.14) on the same branch: all 410 selected tests passed, including the tantivy and test_config_merge tests, confirming the Windows failures were environment-only.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-27 · T7.1 Model profile loading
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/config.py, codecompass/online/generator/__init__.py, codecompass/online/generator/profiles.py, tests/online/test_profiles_t71.py
+- **Outcome:** Kept
+### What I asked for
+T7.1: Asked for the implementation of predefined model profiles (dev for the 14B model on laptops, and prod for the 32B model). The system must default to dev unless the GENERATOR_PROFILE environment variable is set. It strictly requires the llama.cpp backend, runs on CPU by default, and fails loudly with a clear error on an unknown profile name rather than silently falling back.
+### How I checked it
+test_profiles_t71.py passed. Read the config.py change: it adds backend, server_args, seed and cache_prompt to ModelProfile and rejects any backend other than llama.cpp; it does not change path handling.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-27 · T7.2 llama-server HTTP client
+- **Tool (model):** Claude Code (claude-opus-5-5).
+- **Files:** codecompass/online/generator/http.py, codecompass/online/generator/llama.py, codecompass/online/generator/protocol.py, tests/support/fake_http.py, tests/online/test_llama_generator_t72.py
+- **Outcome:** Kept
+### What I asked for
+T7.2: Asked for an HTTP client for llama-server. It POSTs directly to /v1/chat/completions (mirroring the OpenAI API format) and transmits the profile’s configuration (temperature, max tokens, stop tokens, and cache_prompt). Added strict error raising instead of infinite hanging if the server is down or timing out.
+### How I checked it
+test_llama_generator_t72.py passed.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-27 · T7.3 Health check and launch command
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/generator/server.py, tests/online/test_health_check_t73.py
+- **Outcome:** Kept
+### What I asked for
+T7.3: Asked for pre-flight health check validations. The generator must ping /health (expecting a 200 OK) and check /props to guarantee the server's context window is sufficient for the profile and the correct model file is loaded, failing loudly if incorrect. It also cleanly constructs the launch command with -c <context window>, --host 127.0.0.1, and necessary profile arguments.
+### How I checked it
+test_health_check_t73.py passed.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-27 · T7.4 Localhost binding warning
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/generator/server.py, tests/online/test_localhost_t74.py
+- **Outcome:** Kept
+### What I asked for
+T7.4: Asked to enforce privacy baselines. The server correctly defaults to 127.0.0.1. While pointing at another address is permitted for deployment flexibility, the system must log a clear warning when the server is not bound to localhost.
+### How I checked it
+test_localhost_t74.py passed.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-27 · D15 generator-call count fix
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/tasks.md
+- **Outcome:** Kept
+### What I asked for
+Docs fix to plan decision D15 based on team discussion: corrected the math on the round-limit rule. The maximum number of model calls is N + 2 (not N + 1): this accounts for one call per tool round, one reply that still requests a tool, and the final forced answer call.
+### How I checked it
+Docs only; checked the commit touches only plan.md and tasks.md.
+### What I kept or changed
+Kept unchanged
+
+## 2026-10-27 · T8.1 Single-round answer
+- **Tool (model):** Claude Code (claude-opus-5-5), via Rodney's referHere branch; carried over with help from Claude (claude-opus-5-5)
+- **Files:** codecompass/online/agent/harness.py, tests/online/harness_support.py, tests/online/test_harness_single_round_t81.py
+- **Outcome:** Kept
+### What I asked for
+T8.1: Asked for the baseline agent loop to immediately return the answer when the model answers in one round (zero tools called), generating a clean, single-call audit log.
+### How I checked it
+test_harness_single_round_t81.py passed.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-27 · T8.2 Multi-round tool loop
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/harness.py, tests/online/test_harness_tool_loop_t82.py
+- **Outcome:** Kept
+### What I asked for
+T8.2: Asked for the multi-round execution loop. When the model requests a tool (like git blame), the harness executes it, wraps the result in <tool_result> tags as a user message, and calls the model again, accurately recording each round in the audit log.
+### How I checked it
+test_harness_tool_loop_t82.py passed.
+### What I kept or changed
+Kept unchanged
+
+## 2026-10-27 · T8.3 Round limit enforcement
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/harness.py, tests/online/test_harness_round_limit_t83.py
+- **Outcome:** Kept
+### What I asked for
+T8.3: Asked to translate D15 into code. The loop runs a maximum of max_verifier_rounds (default 3). If the model exceeds this, it is forced into a final answer-only call, capping executions at N + 2. Any leftover <tool> requests in that final answer are aggressively stripped before reaching the citation checker.
+### How I checked it
+test_harness_round_limit_t83.py passed.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-27 · T8.4 Tool error handling
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/harness.py, tests/online/test_harness_tool_errors_t84.py
+- **Outcome:** Kept
+### What I asked for
+T8.4: Asked for improved loop resilience by catching bad tool calls (wrong arguments, unauthorized tools, timeouts) and feeding the error back to the model as a message, allowing it another round to recover rather than crashing the harness.
+### How I checked it
+test_harness_tool_errors_t84.py passed.
+### What I kept or changed
+Kept unchanged.
+
+## 2026-10-27 · T8.5 Append-only message building
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/harness.py, tests/online/test_harness_messages_t85.py
+- **Outcome:** Kept
+### What I asked for
+T8.5: Asked to enforce strict conversational rules. Messages are strictly append-only (never edited or reordered) to heavily leverage llama-server's caching. Enforced the allowed roles (system, user, assistant), placed retrieved code chunks in the user message, and mapped empty git results to explicit string responses ("No commit history found for ") instead of blank messages.
+### How I checked it
+test_harness_messages_t85.py passed.
+### What I kept or changed
+Kept unchanged
