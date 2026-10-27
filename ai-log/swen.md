@@ -22,13 +22,17 @@ Checked that trailer formatting adheres to the Assisted-by standard and that the
 ### What I kept or changed
 Added Sections 4.1 and 4.2 to AGENTS.md and created ai-log/swen.md with conforming structure.
 
-## 2026-10-26 · Spec 002 copy relay, block 2 (hybrid retrieval, re-ranking, context budget)
+## 2026-10-26 · Hybrid retrieval, re-ranking and context budgeting (T2.3, T2.4, T3.2, T4.2)
 - **Tool (model):** Claude Code (claude-opus-5-5)
-- **Files:** codecompass/online/retrieval/embedder.py, codecompass/online/retrieval/hybrid.py, tests/online/test_query_embedding_t23.py, tests/online/test_hybrid_retrieval_t24.py, tests/online/test_reranker_integration_t32.py, tests/online/test_context_budget_t42.py, ai-log/swen.md
+- **Files:** codecompass/online/retrieval/embedder.py, codecompass/online/retrieval/hybrid.py, codecompass/online/retrieval/reranker.py, codecompass/online/context.py, codecompass/online/config.py, tests/online/test_query_embedding_t23.py, tests/online/test_hybrid_retrieval_t24.py, tests/online/test_reranker_integration_t32.py, tests/online/test_context_budget_t42.py
 - **Outcome:** Kept
 ### What I asked for
-Carry out block 2 of the Spec 002 copy relay: copy the 9 commits fa9dc5c → 393270a (T2.3–T4.2) from Rodney's referHere branch onto feat/hybrid-retrieval-reranking, made from main after the block 1 PR (#12) was merged, with Rodney's ai-log changes left out.
+Tests-first implementation of four Spec 002 tasks, with no approval stops between tests and code:
+- T2.3: embed the question through the index handles (`embed_question`), so the embedder `open_index` checked against the index is the one used.
+- T2.4: hybrid retrieval (`retrieve`) that runs vector and keyword search and merges them with RRF into a shortlist of at most `rerank_k`.
+- T3.2: `rerank_chunks` that scores the shortlist with the re-ranker, sorts best first (ties keep shortlist order) and keeps `final_k`.
+- T4.2: context budgeting in generator tokens. `chunk_budget` reserves the answer, prompt prefix and `max_verifier_rounds × max_tool_output_tokens`; `fit_chunks` keeps chunks in order until the first misfit; `check_round_reserve` raises a ValueError citing Article V.1 when the tool reserve leaves no room for code. Added `tools.max_tool_output_tokens` (default 768, Plan §7).
 ### How I checked it
-Confirmed PR #12 was merged into origin/main before branching. Checked that the 9 commits applied without conflicts, in the same order (test commits before their feature commits, Article IX.3), each under my name and keeping its Assisted-by line. Checked that `git diff 393270a HEAD` shows no differences outside ai-log/. Ran `pytest -m "not model"`: 369 passed, 5 deselected.
+Checked the test cases myself.
 ### What I kept or changed
-Kept all 9 commits unchanged apart from authorship. Added this entry.
+Kept all four implementations. Claude corrected its own T4.2 test (d7d465e): a 4096-token window cannot hold the default reserve (3 × 768) plus a 2048-token answer, so the window was changed to 8192 (dev-lowmem). I reviewed them afterwards.
