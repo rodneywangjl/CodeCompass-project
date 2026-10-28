@@ -15,10 +15,12 @@ about the repository."""
 
 _RULES = [
     "Cite every claim with numbered markers [1], [2], etc.",
-    """End with a Sources section listing each citation. For code, copy the
-   chunk's header line exactly (the part before " | ").
-   - Code: [N] file/path.py, lines X-Y (indexed at <7-char hash>)
-   - Commit: [N] Commit <7-char hash>, "<subject>", <author>, <date>""",
+    """End with a Sources section listing each citation, one per line. Start
+   each line with its marker, with no bullet or number before it. For code,
+   copy the chunk's header line exactly (the part before " | "). Example:
+   Sources
+   [1] file/path.py, lines X-Y (indexed at <7-char hash>)
+   [2] Commit <7-char hash>, "<subject>", <author>, <date>""",
     """If the evidence is insufficient, say what you could not determine.
    Do NOT guess or make up file names, line numbers, or commit hashes.""",
     """If the commit history gives no reason for the code (e.g. vague commit

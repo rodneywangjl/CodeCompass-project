@@ -12,6 +12,32 @@ class Reranker(Protocol):
         ...
 
 
+class BgeReranker:
+    """Pinned local cross-encoder (bge-reranker-v2-m3) via sentence-transformers.
+
+    The model loads lazily on first use, on the configured device, at the
+    pinned revision (Article VIII.1).
+    """
+
+    def __init__(self, reranker_config) -> None:
+        self._config = reranker_config
+        self._model = None
+
+    def _load(self):
+        if self._model is None:
+            from sentence_transformers import CrossEncoder
+            self._model = CrossEncoder(self._config.model,
+                                       revision=self._config.revision,
+                                       device=self._config.device)
+        return self._model
+
+    def rerank(self, query: str, texts: list[str]) -> list[float]:
+        if not texts:
+            return []
+        scores = self._load().predict([(query, t) for t in texts], show_progress_bar=False)
+        return [float(s) for s in scores]
+
+
 def rerank_chunks(reranker: Reranker, question: str, chunks: list, final_k: int) -> list:
     """Re-order the shortlist by score, best first; ties keep shortlist order."""
     if not chunks:

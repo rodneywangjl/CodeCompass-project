@@ -31,6 +31,8 @@ DEFAULT_MAX_TOOL_OUTPUT_TOKENS = 768
 
 # Generator & Re-ranker defaults (Article VIII.1, VIII.2, Plan §7)
 DEFAULT_RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
+# Pinned upstream revision (resolved 2026-10-26; Article VIII.1, VII.6).
+DEFAULT_RERANKER_REVISION = "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
 DEFAULT_SERVER_URL = "http://127.0.0.1:8080"
 DEFAULT_TIMEOUT_SECONDS = 120
 DEFAULT_GENERATION_RESERVE_TOKENS = 1024
@@ -53,6 +55,7 @@ class RetrievalConfig:
 class RerankerConfig:
     """Cross-encoder re-ranking configuration."""
     model: str = DEFAULT_RERANKER_MODEL
+    revision: str = DEFAULT_RERANKER_REVISION
     device: str = "cpu"
 
 
