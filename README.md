@@ -2,7 +2,7 @@
 
 CodeCompass is a RAG-based Q&A assistant that helps developers understand an unfamiliar git repository. It retrieves real code and commit history, verifies claims with git tooling, and answers with citations that are checked before they are shown.
 
-This repository currently implements **Sprint 1: the offline indexing pipeline**. It turns a git repository into two searchable, mutually consistent indexes — a semantic vector index (Chroma/HNSW) and a keyword index (tantivy BM25) — that the online query pipeline will read. The online pipeline (hybrid retrieval, re-ranking, generation, verifier, citation checker) is not yet built.
+This repository implements both pipelines. The **offline indexing pipeline** (Spec 001) turns a git repository into two searchable, mutually consistent indexes: a semantic vector index (Chroma/HNSW) and a keyword index (tantivy BM25). The **online query pipeline** (Spec 002) answers questions from them: hybrid retrieval, cross-encoder re-ranking, a local generator (Qwen2.5-Coder via llama-server), a bounded `git blame`/`git log` verifier loop, and a deterministic citation checker.
 
 > Grounding over fluency: if the evidence is insufficient, CodeCompass says what it could not determine rather than guessing. See [`docs/constitution.md`](docs/constitution.md).
 
@@ -20,6 +20,7 @@ This repository currently implements **Sprint 1: the offline indexing pipeline**
   - [3. Verify index consistency](#3-verify-index-consistency)
   - [4. Use the Python API](#4-use-the-python-api)
   - [5. Configure CodeCompass](#5-configure-codecompass)
+  - [6. Ask a question](#6-ask-a-question)
 - [How indexing works](#how-indexing-works)
 - [Project structure](#project-structure)
 - [Testing](#testing)
@@ -265,6 +266,31 @@ Notes:
 
 ---
 
+### 6. Ask a question
+
+Start `llama-server` with the generator for your profile (see [`MODEL-SETUP.md`](MODEL-SETUP.md); on a 16 GB machine use the `dev-lowmem` profile), then:
+
+```bash
+GENERATOR_PROFILE=dev-lowmem python -m codecompass.online.cli ask /path/to/repo "Why does login retry?"
+python -m codecompass.online.cli ask /path/to/repo "Where is the token refreshed?" --verbose
+```
+
+The index is brought up to date before each question. The answer ends with a `Sources` section, and every entry is checked against the evidence the model was shown:
+
+- **Verified (F):** every citation was found in the retrieved code or the git history the model read.
+- **Flagged (G):** a warning banner, with `[UNVERIFIED]` on each source to check by hand.
+- **Uncited parts** are marked `(not cited)`. An answer with no citations at all carries a note to verify it against the source.
+
+"Verified" means the cited code was in front of the model, not that the claim is true. Each question writes a JSON audit log under `<index dir>/queries/` (or `[logging] query_log_dir`). From Python:
+
+```python
+from codecompass.online import ask
+from codecompass.online.config import load_online_config
+
+result = ask("/path/to/repo", "Why does login retry?", config=load_online_config("codecompass.toml"))
+print(result.answer, result.citation_outcome, result.audit_log["log_file"])
+```
+
 ## How indexing works
 
 1. **Fast path:** read HEAD and `meta.json`; if equal (and config unchanged), return `up-to-date` with no lock, no file reads, no writes.
@@ -338,14 +364,17 @@ Hard rules: never edit, weaken, skip, or xfail an approved test to pass; stay in
 - The verifier is only as useful as the repository's commit history; uninformative messages are reported as-is, never invented.
 - Only the branch/HEAD passed in is indexed; there is no branch selection.
 - Submodules are skipped and reported. Symlinks are flagged, never followed.
-- No numeric performance target yet; run reports record timings so one can be set from measurements.
+- No numeric performance target yet; run reports and query audit logs record timings so one can be set from measurements.
+- Answers describe the code committed at HEAD. Uncommitted changes in the working tree are not indexed.
+- A 14B model on a 16 GB laptop takes about a minute per generator call (`MODEL-SETUP.md` §5).
 
 ---
 
 ## Roadmap
 
-- [x] Sprint 1: offline indexing pipeline (this repo state)
-- [ ] Online pipeline: hybrid retriever (RRF-50/50→50), cross-encoder re-ranker (top 8), generator (Qwen2.5-Coder-Instruct via llama-server), verifier tool loop (`git blame`/`git log`, max 3 rounds), deterministic citation checker
+- [x] Sprint 1: offline indexing pipeline
+- [x] Sprint 2: online pipeline: hybrid retriever (RRF-50/50→50), cross-encoder re-ranker (top 8), generator (Qwen2.5-Coder-Instruct via llama-server), verifier tool loop (`git blame`/`git log`, configurable rounds, default 3), deterministic citation checker, evaluation modes
+- [ ] Pin the `prod` (32B) GGUF and check it on the target machine (Article VIII.2, VIII.5)
 - [ ] Evaluation question set with reference answers/citations; three-way comparison (no-retrieval vs RAG vs RAG+verification); required before any retrieval/prompt/model tuning
 - [ ] Performance target from measured run-report timings
 
@@ -357,4 +386,5 @@ Hard rules: never edit, weaken, skip, or xfail an approved test to pass; stay in
 - `docs/specs/001-offline-indexing/spec.md` — what the pipeline must do (user stories, acceptance criteria)
 - `docs/specs/001-offline-indexing/plan.md` — how it is built (interfaces, design decisions D1–D10, optimisations O1–O9)
 - `docs/specs/001-offline-indexing/tasks.md` — ordered task list with per-task tests
+- `docs/specs/002-online-retrieval/` — spec, plan and tasks for the online pipeline
 - `docs/summary/SPRINT1-SUMMARY.md` — what was built, verification results, and design deviations
