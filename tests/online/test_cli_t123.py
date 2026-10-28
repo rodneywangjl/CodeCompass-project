@@ -33,9 +33,10 @@ FAKE = "Done [1].\n\nSources\n[1] src/missing.py, lines 1-5 (indexed at a1b2c3d)
 def setup(tmp_path, monkeypatch):
     repo = build_history_repo(tmp_path / "repo")
     toml = tmp_path / "codecompass.toml"
-    toml.write_text(f'[index]\ndir = "{tmp_path / "idx"}"\n'
+    # as_posix(): Windows backslashes are escape sequences in TOML basic strings.
+    toml.write_text(f'[index]\ndir = "{(tmp_path / "idx").as_posix()}"\n'
                     '[embedder]\nmodel = "stub"\nrevision = "stub-1"\ndimension = 8\n'
-                    f'[logging]\nquery_log_dir = "{tmp_path / "queries"}"\n')
+                    f'[logging]\nquery_log_dir = "{(tmp_path / "queries").as_posix()}"\n')
     monkeypatch.delenv("GENERATOR_PROFILE", raising=False)
     return repo.path, toml
 
