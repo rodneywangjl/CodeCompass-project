@@ -35,6 +35,19 @@ def parse_tool_calls(text: str) -> list[ToolCall]:
     return [c for c in calls if c is not None]
 
 
+def malformed_blocks(text: str) -> list[str]:
+    """Raw content of each <tool> block parse_tool_calls() cannot read, in order.
+
+    An unclosed <tool> tail (e.g. a reply cut off at max_tokens) counts too, so
+    the harness can send the model back to fix the call (v2 architecture E6).
+    """
+    bad = [m.group(1) for m in _BLOCK.finditer(text) if _parse_one(m.group(1)) is None]
+    tail = _UNCLOSED.search(_BLOCK.sub("", text))
+    if tail:
+        bad.append(tail.group(0)[len("<tool>"):])
+    return bad
+
+
 def strip_tool_blocks(text: str) -> str:
     """Remove all tool blocks, including an unclosed one at the end."""
     return _UNCLOSED.sub("", _BLOCK.sub("", text)).strip()
