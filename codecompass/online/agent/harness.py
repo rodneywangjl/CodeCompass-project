@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from codecompass.online.agent.cache import ToolCache
-from codecompass.online.agent.tool_parser import parse_tool_calls, strip_tool_blocks
+from codecompass.online.agent.tool_parser import (
+    malformed_blocks, parse_tool_calls, strip_tool_blocks)
 from codecompass.online.agent.tools import ToolOutput, cap_output, execute
 from codecompass.online.context import format_context
 
@@ -31,6 +32,10 @@ _TOOL_RULE = """If you need commit history to explain WHY code exists, request a
    <tool>git_log(path="file/path.py", n=10)</tool>
    The result comes back in a <tool_result>...</tool_result> block. It is
    evidence you may cite, just like the code context."""
+
+_FORMAT_HINT = """Write one tool call on its own, with keyword arguments, exactly like:
+<tool>git_blame(path="file/path.py", lines="X-Y")</tool>
+<tool>git_log(path="file/path.py", n=10)</tool>"""
 
 FINAL_MESSAGE = ("Tool limit reached: no more tools are available. Answer now, using "
                  "only the evidence above, and state what you could not determine.")
@@ -66,6 +71,14 @@ def tool_result_message(call, output: ToolOutput) -> str:
     else:
         body = output.text
     return f"<tool_result{attrs}>\n{body}\n</tool_result>"
+
+
+def malformed_result_message(block: str) -> str:
+    """The D16 error wrapper for a <tool> block that could not be parsed (T8.6)."""
+    snippet = " ".join(block.split())[:120] or "(empty)"
+    return (f'<tool_result error="malformed tool call">\n'
+            f"error: your tool call could not be read: {snippet!r}\n"
+            f"{_FORMAT_HINT}\n</tool_result>")
 
 
 def make_tool_runner(repo, commit: str, settings, count_tokens):
@@ -105,11 +118,12 @@ def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: i
         response = generator.generate(messages)
         run.generator_calls += 1
         calls = parse_tool_calls(response)
+        bad = malformed_blocks(response) if tools_enabled and not calls else []
         if calls and not tools_enabled:  # rag / no_retrieval modes (D17)
             run.rounds.append({"round": tool_runs, "ignored_calls": len(calls),
                                "reason": "tools disabled"})
             calls = []
-        if not calls:
+        if not calls and not bad:
             run.answer, run.answer_round = strip_tool_blocks(response), tool_runs
             return run
         messages.append({"role": "assistant", "content": response})
@@ -118,10 +132,17 @@ def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: i
             final = generator.generate(messages)
             run.generator_calls += 1
             run.rounds.append({"round": tool_runs, "final_call": True,
-                               "ignored_calls": len(calls)})
+                               "ignored_calls": len(calls) or len(bad)})
             run.answer, run.answer_round = strip_tool_blocks(final), tool_runs
             run.round_limit_hit = True
             return run
+        if bad:  # a malformed call uses a round, so the loop stays bounded (T8.6)
+            run.rounds.append({"round": tool_runs, "tool": None, "args": {},
+                               "malformed": True, "cache_hit": False, "error": True,
+                               "result_summary": "malformed tool call"})
+            messages.append({"role": "user", "content": malformed_result_message(bad[0])})
+            tool_runs += 1
+            continue
         call = calls[0]
         output, hit = _run_safely(run_tool, call)
         entry = {"round": tool_runs, "tool": call.tool, "args": dict(call.args),

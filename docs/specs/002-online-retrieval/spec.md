@@ -214,7 +214,7 @@ Each of these needs at least one test:
 - `ensure_current` fails (e.g. lock timeout) — answer from stale index with warning.
 - `ensure_current` succeeds but the index is empty (no chunks) — answer says no evidence found.
 - The `llama-server` is not running or unreachable — fail with a clear error, not a hang.
-- The generator produces malformed tool-call syntax — the harness treats it as a final answer (not a crash).
+- The generator produces malformed tool-call syntax — the harness sends the model an error showing the correct format and lets it retry; the attempt uses one round, so the loop stays bounded (not a crash, and not taken as the answer).
 - A very long answer that would exceed the context window — context budgeting caps the number of chunks.
 - A tool result larger than the per-result cap is truncated with a visible marker; across all allowed tool rounds the conversation never exceeds the context window.
 - A citation whose line range overlaps a retrieved chunk but extends beyond it — flagged.
@@ -286,7 +286,7 @@ Every AC above becomes one or more tests written **before** the code that satisf
 | # | Question | Decision |
 |---|----------|----------|
 | C1 | System prompt content | A minimal, functional system prompt is hardcoded in the plan (not the spec). Prompt engineering is deferred until the evaluation set exists (Article VII.1). The prompt instructs the model to cite using the fixed format and to request tools when commit rationale is needed. |
-| C2 | Tool-call format | The harness defines a simple text format (e.g. `<tool>tool_name(arg1, arg2)</tool>`) documented in the plan. The model is prompted to use it. The format is parsed deterministically; malformed tool calls are treated as final answers. |
+| C2 | Tool-call format | The harness defines a simple text format (e.g. `<tool>tool_name(arg1, arg2)</tool>`) documented in the plan. The model is prompted to use it. The format is parsed deterministically; malformed tool calls are sent back to the model as an error and use one round (plan D5, T8.6). |
 | C3 | Context budget | Measured in tokens using the embedder's tokenizer. The budget is `context_window - system_prompt_tokens - generation_reserve`, and the number of chunks is reduced until the assembled context fits. This is a profile-driven value. |
 | C4 | Re-ranker model | `BAAI/bge-reranker-v2-m3` (Article VIII.1). Runs locally via `sentence-transformers` or the `FlagEmbedding` library. Pinned version. |
 | C5 | Cache scope | Tool-result cache is keyed by `(repo_path, commit_sha, tool, args)` and lives for the duration of one `ask` call. Persistent cross-query caching is deferred. |

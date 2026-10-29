@@ -166,6 +166,10 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - Tests first: the system prompt is the first message; context chunks are in the user message; tool results are appended as separate `user` messages in the D16 `<tool_result>` wrapper (errors carry an `error` attribute); no message ever has a role other than `system`, `user` or `assistant`; the conversation history grows with each round and is append-only: every earlier message is unchanged, in the same order, in each later call (plan D13 item 10); the system prompt matches the plan's D14 template, including rule 4 (state what could not be determined) and rule 5 (say so when commit history gives no rationale; never invent one); a tool result with no commits is wrapped with the D16 `No commit history found for <path>` text, never an empty block; the D15 final-call message asks the model to state what it could not determine.
 - ACs: AC-1.4, AC-1.3, AC-3.7, plan D14, D16. | Touches: `agent/harness.py`. | Depends on: T4.1.
 
+**T8.6 Malformed tool-call retry** (added after Sprint 2; v2 architecture E6)
+- Tests first: `tool_parser.malformed_blocks()` finds `<tool>` blocks that `parse_tool_calls()` cannot read, including an unclosed tail, and finds none in a valid call or a plain answer; a malformed call is sent back as a D16 `<tool_result error="malformed tool call">` message that shows the correct format, and the model gets another round; the malformed attempt uses one round (with `max_verifier_rounds = 1` a following valid call is not run and the D15 final call is made); a model that only ever writes malformed calls makes exactly `max_verifier_rounds + 2` generator calls; the attempt is logged with `malformed: true`, `tool: null`, `error: true`; text with no `<tool>` tag is still the final answer; with tools disabled (D17) malformed blocks are stripped and nothing is retried. T6.1 is unchanged: `parse_tool_calls()` still returns `[]` for malformed blocks.
+- ACs: AC-3.3, FR-6; plan D5, D15, D16. | Touches: `agent/tool_parser.py`, `agent/harness.py`. | Depends on: T8.4, T6.1.
+
 ## S9: Citation checker
 
 **T9.1 Source entry parser**

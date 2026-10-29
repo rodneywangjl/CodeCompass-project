@@ -187,7 +187,7 @@ Example for an 8192-token profile (window 8192, `max_tokens` 2048, three tool re
 <tool>git_log(path="src/auth/client.py", n=10)</tool>
 ```
 
-The harness uses a regex to extract tool calls. If no `<tool>...</tool>` block is found, the response is treated as a final answer. If the format is malformed, it is also treated as a final answer (no crash). The harness never relies on server-side tool-call features (Article VIII.2).
+The harness uses a regex to extract tool calls. If no `<tool>...</tool>` block is found, the response is treated as a final answer. If a `<tool>` block is present but cannot be parsed (bad syntax, or an unclosed block at the end of the reply), it is **not** treated as the final answer: the harness sends it back as a D16 `<tool_result error="malformed tool call">` message showing the correct format, and the model tries again. The malformed attempt uses one round (D15), so the loop stays bounded at `max_verifier_rounds + 2` generator calls, and it is logged with `malformed: true` (T8.6; v2 architecture E6). Text that only describes a tool (no `<tool>` tag) is still a final answer. With tools disabled (D17) blocks are stripped as before. The harness never relies on server-side tool-call features (Article VIII.2).
 
 **D6. Tool argument validation.** Before execution:
 1. `path` is normalised (`posixpath.normpath`) and must be repo-relative: not absolute, not starting with `-`, and with no `..` component.
