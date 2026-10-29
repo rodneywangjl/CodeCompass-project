@@ -131,3 +131,14 @@ T8.5: Asked to enforce strict conversational rules. Messages are strictly append
 test_harness_messages_t85.py passed.
 ### What I kept or changed
 Kept unchanged
+
+## 2026-10-29 · T8.6 Malformed tool-call retry (v2 E6)
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/tool_parser.py, codecompass/online/agent/harness.py, tests/online/test_harness_malformed_t86.py, docs/specs/002-online-retrieval/spec.md, docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/tasks.md
+- **Outcome:** Kept
+### What I asked for
+Compared our code against the team's v2 architecture and found E6 (tool-call validator) was only half built: bad arguments were sent back to the model, but a malformed `<tool>` block was silently dropped and the broken reply became the final answer (e.g. just "Let me check the history."). Asked for malformed calls to be sent back with the correct format so the model can retry, and for the spec, plan and tasks to be updated, since they said malformed calls are final answers.
+### How I checked it
+Approved the tests first and saw them fail for the right reason (10 failed, 1 passed; the harness returned "Let me check the history." as the answer). After the code: all 12 tests in test_harness_malformed_t86.py passed. Full required suite (`pytest -m "not model"`) on Windows: 459 passed, 1 failed in test_config_merge.py, the known Windows path issue unrelated to this change. Asked whether the fix depends on the reply's wording: it does not, it detects the `<tool>` tag.
+### What I kept or changed
+Kept. A malformed attempt uses one of the 3 rounds; I agreed because it also prevents the model from looping forever, and keeps the guarantee of at most 5 model calls per question (each 14B call takes about a minute). Kept replies that only say "let me check" with no `<tool>` tag as the final answer, as a known limitation with a test; I agreed because matching words like "let me" would also catch real answers such as "Let me explain...". Added a separate `malformed_blocks()` helper instead of changing `parse_tool_calls()`, so the approved T6.1 tests stay unchanged and both use the same parser. Considered property-based testing (Hypothesis) and agreed to add it later, once open_file and search_again exist and there are more paths to test.
