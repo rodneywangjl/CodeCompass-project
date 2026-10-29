@@ -87,6 +87,16 @@ def test_always_malformed_stays_bounded():
     assert "<tool>" not in run.answer
 
 
+def test_plain_text_without_a_tool_tag_is_still_the_final_answer():
+    # Known limitation: a reply that only *talks* about checking ("Let me check
+    # the history.") has no <tool> tag, so it is taken as the answer.
+    gen = StubGenerator(["Hmm, let me check the history."])
+    run = harness.run_agent(gen, "Why?", CHUNKS, run_tool=FakeTools(), max_rounds=3)
+    assert len(gen.calls) == 1
+    assert run.answer == "Hmm, let me check the history."
+    assert run.rounds == []
+
+
 def test_tools_disabled_still_strips_and_answers():
     gen = StubGenerator(["It retries [1]. " + BAD_SYNTAX])
     run = harness.run_agent(gen, "Why?", CHUNKS, run_tool=FakeTools(), max_rounds=3,
