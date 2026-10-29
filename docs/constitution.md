@@ -1,6 +1,6 @@
 # CodeCompass Constitution
 
-**Version:** 1.3.0 | **Project:** CodeCompass (SE201 G1-T1) | **Status:** In force
+**Version:** 1.4.0 | **Project:** CodeCompass (SE201 G1-T1) | **Status:** In force
 
 CodeCompass is a RAG-based Q&A assistant that helps new developers understand a repository. It retrieves real code and commit history, verifies claims with git tooling, and answers with citations that are checked before they are shown.
 
@@ -52,13 +52,15 @@ This constitution is the set of non-negotiable principles that every spec, plan,
 
 ## Article V: Bounded, Auditable Agent Loop
 
-1. The generator either answers or requests a tool call. The loop is governed by the "Enough context?" check `round < max_verifier_rounds`: rounds are counted from 0, so the verifier tool may run at most `max_verifier_rounds` times per question. The limit is a named configuration value, `max_verifier_rounds`, with a default of **3**. It may be raised or lowered in configuration without amending this article, but the loop **MUST** always be bounded: startup **MUST** fail loudly if the value is not a non-negative integer, or if the context reserved for that many tool results leaves no room for retrieved chunks in the active profile's context window (Article VIII.2). The value in force **MUST** be recorded in every per-query log and evaluation result file, and changing it is a pipeline change under Article VII.5. When the generator has enough context, or the round limit is reached, the system proceeds to the citation checker with what it has; it **MUST NOT** loop indefinitely. Each round executes at most one tool call. The limit counts tool executions, not generator calls: if the generator still requests a tool after the last allowed tool result, that request is not executed, and the harness makes one final generator call that runs no tool and asks for an answer from the evidence already in context.
-2. Tools are **read-only** and **allow-listed**: `git blame` and `git log` only. Adding any other tool (including file search) is out of scope for v1 and requires an amendment. Configuration may switch an allow-listed tool off but **MUST NOT** add one: a tool name outside this list fails startup loudly. The harness executes tools; the model never gets a raw shell. Arguments **MUST** be validated (path inside repo, line ranges in bounds, no shell interpolation).
-3. Tool results **MUST** be cached (keyed by repo, commit, path, line range, command) and **MUST** be appended to the generator's context as messages carrying the tool results, so they count as citable evidence. These are messages in the harness's own documented format, not a server-side tool-calling role (Article VIII.2).
+1. The generator either answers or requests a tool call. The loop is governed by the "Enough context?" check `round < max_verifier_rounds`: rounds are counted from 0, so tools may run at most `max_verifier_rounds` times per question. The limit is a named configuration value, `max_verifier_rounds`, with a default of **3**. It may be raised or lowered in configuration without amending this article, but the loop **MUST** always be bounded: startup **MUST** fail loudly if the value is not a non-negative integer, or if the context reserved for that many tool results leaves no room for retrieved chunks in the active profile's context window (Article VIII.2). The value in force **MUST** be recorded in every per-query log and evaluation result file, and changing it is a pipeline change under Article VII.5. When the generator has enough context, or the round limit is reached, the system proceeds to the citation checker with what it has; it **MUST NOT** loop indefinitely. Each round executes at most one tool call. The limit counts tool executions, not generator calls: if the generator still requests a tool after the last allowed tool result, that request is not executed, and the harness makes one final generator call that runs no tool and asks for an answer from the evidence already in context.
+2. Tools are **read-only** and **allow-listed**: `git blame`, `git log`, `open_file` and `search_again`. `open_file` returns a line range of a file at the indexed commit, capped in size; `search_again` runs a model-written query through the existing hybrid retriever and re-ranker (Article IV) and returns a small number of chunks. Adding any other tool requires an amendment. Configuration may switch an allow-listed tool off but **MUST NOT** add one: a tool name outside this list fails startup loudly. The harness executes tools; the model never gets a raw shell. Arguments **MUST** be validated (path inside repo, line ranges in bounds, query length bounded, no shell interpolation).
+3. Tool results **MUST** be cached (keyed by repo, commit, tool and its arguments (path, line range, or query)) and **MUST** be appended to the generator's context as messages carrying the tool results, so they count as citable evidence. These are messages in the harness's own documented format, not a server-side tool-calling role (Article VIII.2).
 4. Every tool call and result **MUST** be logged per query (round number, tool, arguments, cache hit/miss) so that any answer can be audited after the fact.
 5. When commit history gives no useful rationale (e.g. uninformative messages), the system **MUST** say so explicitly instead of inventing a "why".
 
 *Rationale:* Intent usually lives in commit messages, not code. The verifier is only valuable if it is safe, bounded, and honest when commit hygiene is poor (a known limitation of this design).
+
+*v1.4.0:* Retrieved chunks are often missing different things: sometimes more source, sometimes more history. The agent can now fetch code (`open_file`), retry retrieval with its own query (`search_again`), or fetch history (git blame/log), all read-only and within the same round limit (v2 architecture, tools box E4).
 
 ## Article VI: Citation Integrity (Non-Bypassable)
 
@@ -74,7 +76,7 @@ This constitution is the set of non-negotiable principles that every spec, plan,
      - Code: `[1] src/auth/client.py, lines 42-58 (indexed at a1b2c3d)`
      - Commit: `[2] Commit a1b2c3d, "handle flaky upstream service", Alice, 2024-03-14`
    - File paths are repo-relative. Commit hashes are the 7-character abbreviation of a hash that exists in the repo.
-   - The checker parses only the `Sources` entries and matches each path/line range against retrieved chunk metadata and each commit hash against tool results. A marker with no matching entry, or an entry matching nothing in context, makes the answer **G (flagged)**. An answer with no citations at all is **never** outcome F: with no citations, "all citations verified" would be true of any answer, however unsupported. It is shown as described under *Uncited parts* (VI.3).
+   - The checker parses only the `Sources` entries and matches each path/line range against the code in context (retrieved chunks, plus code returned by `open_file` or `search_again`) and each commit hash against tool results. A marker with no matching entry, or an entry matching nothing in context, makes the answer **G (flagged)**. An answer with no citations at all is **never** outcome F: with no citations, "all citations verified" would be true of any answer, however unsupported. It is shown as described under *Uncited parts* (VI.3).
    - Commit subject, author, and date in an entry **MUST** be copied by the harness from the tool result, not generated by the model.
 5. The checker verifies that a citation *exists in context*, not that the claim is *correct*. UI copy and documentation **MUST NOT** imply "verified" means "true".
 
@@ -106,7 +108,7 @@ This constitution is the set of non-negotiable principles that every spec, plan,
    - Prompt templates, context budgeting (how many chunks fit), and tool-call parsing **MUST** be driven by the active profile and work with both models.
    - The active profile and resolved model id **MUST** be logged at startup, recorded on every per-query log (Article V.4), and stored in every evaluation result file.
    - The default profile is `dev`. Production deployments **MUST** set `prod` explicitly, and startup **MUST** fail loudly on an unknown profile rather than silently falling back.
-5. **Evaluation and release use the 32B.** Reported evaluation results (Article VII) and any production release **MUST** use the `prod` (32B) profile. Results from the 14B are development signals only and **MUST NOT** be reported as evaluation results. Because the models may differ in tool-call reliability and citation compliance, any change that passes on the 14B **MUST** be re-checked on the 32B before release.
+5. **Evaluation uses the 14B.** Reported evaluation results (Article VII) use one 14B profile, chosen once for the whole evaluation, because the 32B does not fit the team's hardware; this is the fallback planned in the project proposal. The profile, context window and model id **MUST** be recorded in every result file, and results from different profiles **MUST NOT** be mixed in one comparison. The 32B (`prod`) remains the intended production model: any change that passes on the 14B **MUST** be re-checked on the 32B before a production release.
 6. Hardware-dependent code is isolated so the required test suite runs anywhere (Article IX.7): everything that needs `llama-server` or a real model sits behind the generator interface and is replaced by a stub generator in tests.
 7. The system **MUST** run end to end on a developer laptop with no paid external service required for the core path (embedding API providers are optional alternatives, not requirements).
 
@@ -166,7 +168,7 @@ This constitution is the set of non-negotiable principles that every spec, plan,
 
 | # | Decision | Where applied |
 |---|----------|---------------|
-| 1 | Generator is Qwen2.5-Coder-Instruct: 14B for development, 32B for production and evaluation, switchable by config profile with no code change | Article VIII.1, VIII.4-5 |
+| 1 | Generator is Qwen2.5-Coder-Instruct: 14B for development and evaluation, 32B for production, switchable by config profile with no code change | Article VIII.1, VIII.4-5 |
 | 2 | Agent loop uses `round < max_verifier_rounds` (configurable, default 3, always bounded): at most that many tool runs, one per round, then one final answer-only call if the model still asks for a tool, then the citation checker | Article V.1 |
 | 3 | Citation format: numbered inline markers plus a `Sources` section with fixed entry formats | Article VI.4 |
 
@@ -183,7 +185,7 @@ This constitution is the set of non-negotiable principles that every spec, plan,
 |---|----------|---------------|
 | 6 | BM25 library: tantivy, behind a keyword-index interface | Article XI.3, VIII.1 |
 | 7 | Flagged-answer UX: whole-answer banner plus a mark on each unverified source | Article VI.3 |
-| 8 | Tools: `git blame` and `git log` only in v1 | Article V.2 |
+| 8 | Tools: `git blame`, `git log`, `open_file`, `search_again` (v1.4.0; v2 architecture E4) | Article V.2 |
 | 9 | CI gating: passing tests is required to merge; required suite is deterministic and model-free | Article IX.7 |
 | 10 | Generator inference via llama.cpp `llama-server` only (pinned release and GGUF checksum, cross-platform); mlx-lm not used | Article VIII.2 |
 | 11 | TDD cycle (create test, red, code until green, refactor) is mandatory | Article IX.3 |
@@ -206,5 +208,5 @@ This constitution is the set of non-negotiable principles that every spec, plan,
 | Re-ranker (cross-encoder) | IV.3 |
 | Agent/Generator | I, V.1, VII.4, VIII |
 | "Enough context?" decision (round < max_verifier_rounds) | V.1 |
-| Verifier tool (git blame/log, cached) | V.2–V.5 |
+| Tools (git blame/log, open_file, search_again; cached) | V.2–V.5 |
 | Citation checker → F / G | VI |
