@@ -82,7 +82,7 @@ Spec 003 is not written yet, and there is no draft rules file. Until it exists, 
 
 - Python 3.11+. Dependencies are pinned in `requirements.txt`.
 - Embedder: `jinaai/jina-embeddings-v2-base-code` at the revision pinned in `codecompass/offline/config.py`.
-- Generator: Qwen2.5-Coder-Instruct through llama.cpp `llama-server` only. Profiles: `dev` (14B) for development, `prod` (32B) for reported results.
+- Generator: Qwen2.5-Coder-Instruct through llama.cpp `llama-server` only. Profiles: `dev` / `dev-lowmem` (14B) for development and reported results, `prod` (32B) for production.
 
 ## Git conventions
 
