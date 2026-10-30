@@ -1,4 +1,4 @@
-"""Verifier tools: git blame and git log, read-only and validated (Article V.2)."""
+"""Agent tools: git blame, git log and open_file, read-only and validated (Article V.2)."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ import re
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+
+from codecompass.online.context import RetrievedChunk, format_chunk
 
 _RANGE = re.compile(r"(\d+)(?:-(\d+))?")
 _BLAME_HEADER = re.compile(r"([0-9a-f]{40}) \d+ (\d+)(?: \d+)?")
@@ -74,10 +76,15 @@ class CommitRecord:
 
 @dataclass(frozen=True)
 class ToolOutput:
-    """Rendered text for the model plus the parsed commits it mentions (Plan D7)."""
+    """Rendered text for the model plus the evidence it carries (Plan D7, D18).
+
+    commits: parsed commit records (git tools). chunks: code the model was shown
+    (open_file, search_again), so the citation checker can verify it (VI.4).
+    """
     text: str
     commits: tuple[CommitRecord, ...] = ()
     error: bool = False
+    chunks: tuple[RetrievedChunk, ...] = ()
 
 
 def _render(record: CommitRecord, suffix: str = "") -> str:
@@ -165,6 +172,68 @@ def git_log(repo, commit: str, path, n, *, limit: int, timeout: float) -> ToolOu
     return ToolOutput(text="\n".join(_render(r) for r in records), commits=records)
 
 
+_LANGUAGES = {".py": "python", ".js": "javascript", ".jsx": "javascript",
+              ".ts": "typescript", ".java": "java"}
+
+
+def _language(path: str) -> str:
+    return _LANGUAGES.get(posixpath.splitext(path)[1].lower(), "text")
+
+
+def _file_lines(repo, commit: str, path: str) -> list[str]:
+    """The file's lines at *commit*, read from git (never the working tree)."""
+    proc = subprocess.run(["git", "cat-file", "-p", f"{commit}:{path}"], cwd=repo,
+                          capture_output=True, shell=False, check=False)
+    return proc.stdout.decode("utf-8", errors="replace").splitlines()
+
+
+def _outline(commit: str, path: str, entries) -> ToolOutput:
+    """Indexed symbols with line ranges; not code, so nothing citable (Plan D18)."""
+    if not entries:
+        return ToolOutput(text=(
+            f"No outline available for {path} at {commit[:7]}. Ask for a line range "
+            f'instead, e.g. open_file(path="{path}", lines="1-60").'))
+    rows = "\n".join(f"  {name}  lines {start}-{end}" for name, start, end in entries)
+    return ToolOutput(text=(f"Outline of {path} (indexed at {commit[:7]}):\n{rows}\n"
+                            f'Read code with open_file(path="{path}", lines="X-Y").'))
+
+
+def open_file(repo, commit: str, path, lines=None, *, max_tokens: int, count_tokens,
+              symbols=None) -> ToolOutput:
+    """Lines of *path* at *commit* as a citable chunk, or an outline (Plan D18).
+
+    A range that does not fit *max_tokens* is cut to whole lines from its start,
+    with a marker saying how to continue; the chunk covers only the lines shown.
+    """
+    path = validate_path(repo, commit, path)
+    if lines is None:
+        return _outline(commit, path, symbols(path) if symbols else [])
+    text_lines = _file_lines(repo, commit, path)
+    start, end = validate_lines(lines, len(text_lines))
+
+    def shown(last: int) -> tuple[RetrievedChunk, str]:
+        chunk = RetrievedChunk(
+            chunk_id=f"open_file:{path}:{start}-{last}",
+            text="\n".join(text_lines[start - 1:last]), path=path, start_line=start,
+            end_line=last, language=_language(path), commit_sha=commit)
+        body = format_chunk(chunk)
+        if last < end:
+            body += (f"\n[showing lines {start}-{last}; "
+                     f"ask for lines {last + 1}-{end} to continue]")
+        return chunk, body
+
+    best = None
+    for last in range(start, end + 1):
+        chunk, body = shown(last)
+        if count_tokens(body) > max_tokens:
+            break
+        best = (chunk, body)
+    if best is None:
+        return ToolOutput(text=(f"error: line {start} of {path} alone does not fit the "
+                                "tool output limit"), error=True)
+    return ToolOutput(text=best[1], chunks=(best[0],))
+
+
 # The dispatch table is the allow list (Article V.2): config cannot widen it.
 _PARAMS = {"git_blame": {"path", "lines"}, "git_log": {"path", "n"}}
 ALLOWED_TOOLS = tuple(_PARAMS)
@@ -219,4 +288,5 @@ def cap_output(output: ToolOutput, max_tokens: int, count_tokens) -> ToolOutput:
     marker = f"[output truncated: {len(lines) - len(kept)} more lines]"
     text = "\n".join(kept + [marker])
     commits = tuple(c for c in output.commits if c.sha[:7] in text)
+    # A cut code block no longer matches its chunk, so it is not citable (VI.4).
     return ToolOutput(text=text, commits=commits, error=output.error)
