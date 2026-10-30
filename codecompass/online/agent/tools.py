@@ -1,4 +1,4 @@
-"""Agent tools: git blame, git log and open_file, read-only and validated (Article V.2)."""
+"""Agent tools: git blame, git log, open_file, search_again; read-only, validated (V.2)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from codecompass.online.context import RetrievedChunk, format_chunk
+from codecompass.online.context import RetrievedChunk, format_chunk, format_context
 
 _RANGE = re.compile(r"(\d+)(?:-(\d+))?")
 _BLAME_HEADER = re.compile(r"([0-9a-f]{40}) \d+ (\d+)(?: \d+)?")
@@ -232,6 +232,51 @@ def open_file(repo, commit: str, path, lines=None, *, max_tokens: int, count_tok
         return ToolOutput(text=(f"error: line {start} of {path} alone does not fit the "
                                 "tool output limit"), error=True)
     return ToolOutput(text=best[1], chunks=(best[0],))
+
+
+MAX_QUERY_CHARS = 200
+
+
+def validate_query(query) -> str:
+    """A non-empty search query of at most MAX_QUERY_CHARS characters (V.2)."""
+    if not isinstance(query, str) or not query.strip():
+        raise ToolArgumentError("query must be a non-empty string")
+    if len(query) > MAX_QUERY_CHARS:
+        raise ToolArgumentError(
+            f"query must be at most {MAX_QUERY_CHARS} characters, got {len(query)}")
+    return query.strip()
+
+
+def search_again(handles, query, *, seen, reranker, config, max_tokens: int,
+                 count_tokens) -> ToolOutput:
+    """New chunks for a model-written query, re-ranked, within the cap (Plan D18).
+
+    Uses the same hybrid retrieval and re-ranker as the first search (Article IV),
+    skips chunk ids in *seen*, and keeps chunks in re-rank order while they fit.
+    """
+    from codecompass.online.retrieval.hybrid import retrieve
+    from codecompass.online.retrieval.reranker import rerank_chunks
+
+    query = validate_query(query)
+    ids = [cid for cid, _ in retrieve(handles, query, config=config) if cid not in seen]
+    records = handles.vector.records_for_ids(ids) if ids else {}
+    chunks = [RetrievedChunk.from_record(cid, records[cid]) for cid in ids if cid in records]
+    if not chunks:
+        return ToolOutput(text=(f"Nothing new found for {query!r}: every match is already "
+                                "in the context above."))
+    ranked = [chunk for chunk, _ in rerank_chunks(reranker, query, chunks, len(chunks))]
+    kept: list[RetrievedChunk] = []
+    for chunk in ranked:
+        if count_tokens(format_context(kept + [chunk])) > max_tokens:
+            break
+        kept.append(chunk)
+    if not kept:
+        best = ranked[0]
+        return ToolOutput(text=(
+            f"The best new match, {best.path} lines {best.start_line}-{best.end_line}, "
+            "is too large to show here. Read part of it with "
+            f'open_file(path="{best.path}", lines="{best.start_line}-{best.end_line}").'))
+    return ToolOutput(text=format_context(kept), chunks=tuple(kept))
 
 
 # The dispatch table is the allow list (Article V.2): config cannot widen it.
