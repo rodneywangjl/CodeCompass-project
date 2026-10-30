@@ -175,3 +175,14 @@ T14.1 from the design (plan D18): an `open_file(path, lines)` tool that reads co
 Reviewed the 14 tests first and ran them on Windows: all failed because `open_file` did not exist yet. After the code: 14 passed. Full required suite in WSL (Ubuntu, Python 3.14): 474 passed. Did not push the red tests, so CI stayed green. Asked whether passing means the feature is done: it does not; the agent cannot call the tool until T14.3 adds it to the allowed tools, the prompt and the citation checker.
 ### What I kept or changed
 Kept. The tool reads the file from git, not the working folder, so it matches the indexed chunks; it grows the range one line at a time and stops at the first line that does not fit, so the citable range is exactly what was shown. `ToolOutput` gained a `chunks` field, so code the model was shown can reach the citation checker (Article VI.4); `cap_output` drops chunks if it ever has to cut a result, because cut code is no longer citable. The file is decoded as UTF-8 explicitly, because the Windows default is not UTF-8. The outline takes a `symbols` function so it can be tested without an index; it is connected to the index in T14.3.
+
+## 2026-10-31 · T14.2 search_again tool
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/tools.py, tests/online/test_search_again_t142.py
+- **Outcome:** Kept
+### What I asked for
+T14.2 from the design (plan D18): a `search_again(query)` tool that lets the agent write its own search query when the first search missed the right code. It runs the query through our existing hybrid retrieval and re-ranker, skips chunks the model already has, and returns as many new chunks as fit the 768-token tool limit, in the same format as retrieved chunks.
+### How I checked it
+Reviewed the 11 tests first. They build a small real index of the fixture repo with the stub embedder and re-ranker, so they test our actual search engine. Ran them in WSL because the index uses tantivy, which Windows blocks: all 11 failed because `search_again` did not exist yet. After the code: 25 passed (with the 14 open_file tests). Full required suite in WSL (Ubuntu, Python 3.14): 485 passed. Kept the red tests local and pushed only once green.
+### What I kept or changed
+Kept. It reuses `retrieve` and `rerank_chunks` instead of a new search, as our v2 plan says ("run it through the existing embedder + vector store + BM25 index"). Chunks already in context are skipped before re-ranking, so no round is wasted on code the model already has. If everything is already known it says "Nothing new found" (not an error). If even the best new chunk is too big, it tells the model which `open_file` call reads part of it, so the two tools work together. The query must be a non-empty string of at most 200 characters (constitution V.2, "query length bounded"). The agent cannot call it yet; that is T14.3.
