@@ -164,3 +164,14 @@ After constitution 1.4.0 was merged, asked for a design for the two new v2 tools
 Asked how open_file works when the model only gets part of a file and whether it can really read the file: the harness reads the file from git at the indexed commit and returns only the requested lines; a longer range needs a second call, and each call uses a round. Asked how the model knows which lines to ask for; it often does not, so we added an outline mode. Asked what search_again does and compared its options. Read the D18 and S14 text before committing. Docs only, no code changed.
 ### What I kept or changed
 Kept: (1) open_file takes a line range limited to the existing 768-token tool cap, not the whole file as in the v2 plan, because a file like Flask's app.py is about twice our 8k context; open_file(path) with no lines returns an outline of functions with line numbers so the model does not guess. (2) search_again returns only chunks not already in context, because repeating a chunk would waste one of the 3 rounds. (3) Code shown by tools is passed to the citation checker, as Article VI.4 now requires, otherwise honest citations would be flagged. (4) Work split into three tests-first tasks T14.1-T14.3.
+
+## 2026-10-30 · T14.1 open_file tool
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/tools.py, tests/online/test_open_file_t141.py
+- **Outcome:** Kept
+### What I asked for
+T14.1 from the design (plan D18): an `open_file(path, lines)` tool that reads code at the indexed commit and returns it with the same header as retrieved chunks, cut to whole lines when it does not fit the 768-token tool limit, and `open_file(path)` without lines returning an outline of functions with line numbers.
+### How I checked it
+Reviewed the 14 tests first and ran them on Windows: all failed because `open_file` did not exist yet. After the code: 14 passed. Full required suite in WSL (Ubuntu, Python 3.14): 474 passed. Did not push the red tests, so CI stayed green. Asked whether passing means the feature is done: it does not; the agent cannot call the tool until T14.3 adds it to the allowed tools, the prompt and the citation checker.
+### What I kept or changed
+Kept. The tool reads the file from git, not the working folder, so it matches the indexed chunks; it grows the range one line at a time and stops at the first line that does not fit, so the citable range is exactly what was shown. `ToolOutput` gained a `chunks` field, so code the model was shown can reach the citation checker (Article VI.4); `cap_output` drops chunks if it ever has to cut a result, because cut code is no longer citable. The file is decoded as UTF-8 explicitly, because the Windows default is not UTF-8. The outline takes a `symbols` function so it can be tested without an index; it is connected to the index in T14.3.
