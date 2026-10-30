@@ -290,6 +290,16 @@ Rejections and errors use the same wrapper with an `error="..."` attribute. A to
 
 Every mode calls `ensure_current` (Article III.2), uses the same active profile (Article VII.4) and runs the citation checker (Article VI.2). In `no_retrieval` any citation is therefore unverified (G), which is exactly what the baseline should measure. An unknown mode raises at startup, like an unknown profile. The mode is written to every audit log so evaluation result files can record it.
 
+**D18. Code tools: `open_file` and `search_again` (Article V.2 as of 1.4.0; v2 architecture E4).** Two read-only tools let the agent gather more *code*, not only history. Both run in the same loop as `git_blame`/`git_log` (D15): one call per round, every call uses a round, and results are cached per query (Article V.3).
+
+- **Output format.** Both tools return code in the same header format as retrieved chunks (D3): `--- path, lines X-Y (indexed at <7-char hash>) | language ---` followed by the code, so the model copies the header as its citation exactly as it does for retrieved chunks.
+- **Size.** Each result fits the existing per-result cap, `tools.max_tool_output_tokens` (768 by default, D4). No new setting: the context reserve for tool rounds is unchanged.
+- **`open_file(path, lines)`** reads the file at the indexed commit (as the git tools do, D7), with the same path and line-range validation (D6). It returns whole lines from the start of the range while they fit the cap; if the range does not fit, it ends with `[showing lines X-Y; ask for lines Y+1-Z to continue]`, and the citable range is only the lines shown.
+- **`open_file(path)` without `lines`** returns an outline instead of code: the indexed symbols (functions, classes) of that file with their line ranges, taken from the index metadata, so the model can ask for the right lines rather than guess them. The outline is not code, so it is not citable.
+- **`search_again(query)`** runs a model-written query through the existing hybrid retrieval and re-ranker (Article IV) and returns the top re-ranked chunks **not already in context**, as many as fit the cap (usually 1-2). The query must be non-empty and at most 200 characters (Article V.2, "query length bounded"); an empty result says plainly that nothing new was found.
+- **Citations (Article VI.4).** Every code block a tool shows is carried in the tool result as a chunk, collected by the harness and passed to the citation checker together with the retrieved chunks. A citation to code the model was shown passes; a citation to anything else is still flagged.
+- **Modes (D17).** `rag` and `no_retrieval` run no tools, so they are unchanged.
+
 ## 6. Optimisations
 
 | # | Optimisation | Saves | Must not break |
