@@ -164,3 +164,36 @@ After constitution 1.4.0 was merged, asked for a design for the two new v2 tools
 Asked how open_file works when the model only gets part of a file and whether it can really read the file: the harness reads the file from git at the indexed commit and returns only the requested lines; a longer range needs a second call, and each call uses a round. Asked how the model knows which lines to ask for; it often does not, so we added an outline mode. Asked what search_again does and compared its options. Read the D18 and S14 text before committing. Docs only, no code changed.
 ### What I kept or changed
 Kept: (1) open_file takes a line range limited to the existing 768-token tool cap, not the whole file as in the v2 plan, because a file like Flask's app.py is about twice our 8k context; open_file(path) with no lines returns an outline of functions with line numbers so the model does not guess. (2) search_again returns only chunks not already in context, because repeating a chunk would waste one of the 3 rounds. (3) Code shown by tools is passed to the citation checker, as Article VI.4 now requires, otherwise honest citations would be flagged. (4) Work split into three tests-first tasks T14.1-T14.3.
+
+## 2026-10-30 · T14.1 open_file tool
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/tools.py, tests/online/test_open_file_t141.py
+- **Outcome:** Kept
+### What I asked for
+T14.1 from the design (plan D18): an `open_file(path, lines)` tool that reads code at the indexed commit and returns it with the same header as retrieved chunks, cut to whole lines when it does not fit the 768-token tool limit, and `open_file(path)` without lines returning an outline of functions with line numbers.
+### How I checked it
+Reviewed the 14 tests first and ran them on Windows: all failed because `open_file` did not exist yet. After the code: 14 passed. Full required suite in WSL (Ubuntu, Python 3.14): 474 passed. Did not push the red tests, so CI stayed green. Asked whether passing means the feature is done: it does not; the agent cannot call the tool until T14.3 adds it to the allowed tools, the prompt and the citation checker.
+### What I kept or changed
+Kept. The tool reads the file from git, not the working folder, so it matches the indexed chunks; it grows the range one line at a time and stops at the first line that does not fit, so the citable range is exactly what was shown. `ToolOutput` gained a `chunks` field, so code the model was shown can reach the citation checker (Article VI.4); `cap_output` drops chunks if it ever has to cut a result, because cut code is no longer citable. The file is decoded as UTF-8 explicitly, because the Windows default is not UTF-8. The outline takes a `symbols` function so it can be tested without an index; it is connected to the index in T14.3.
+
+## 2026-10-31 · T14.2 search_again tool
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/tools.py, tests/online/test_search_again_t142.py
+- **Outcome:** Kept
+### What I asked for
+T14.2 from the design (plan D18): a `search_again(query)` tool that lets the agent write its own search query when the first search missed the right code. It runs the query through our existing hybrid retrieval and re-ranker, skips chunks the model already has, and returns as many new chunks as fit the 768-token tool limit, in the same format as retrieved chunks.
+### How I checked it
+Reviewed the 11 tests first. They build a small real index of the fixture repo with the stub embedder and re-ranker, so they test our actual search engine. Ran them in WSL because the index uses tantivy, which Windows blocks: all 11 failed because `search_again` did not exist yet. After the code: 25 passed (with the 14 open_file tests). Full required suite in WSL (Ubuntu, Python 3.14): 485 passed. Kept the red tests local and pushed only once green.
+### What I kept or changed
+Kept. It reuses `retrieve` and `rerank_chunks` instead of a new search, as our v2 plan says ("run it through the existing embedder + vector store + BM25 index"). Chunks already in context are skipped before re-ranking, so no round is wasted on code the model already has. If everything is already known it says "Nothing new found" (not an error). If even the best new chunk is too big, it tells the model which `open_file` call reads part of it, so the two tools work together. The query must be a non-empty string of at most 200 characters (constitution V.2, "query length bounded"). The agent cannot call it yet; that is T14.3.
+
+## 2026-10-31 · T14.3 Wire open_file and search_again into the agent
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/tools.py, codecompass/online/agent/harness.py, codecompass/online/__init__.py, codecompass/online/config.py, codecompass/offline/stores/vector.py, codecompass/offline/__init__.py, tests/online/test_tool_wiring_t143.py, tests/online/test_tool_allowlist_t54.py, tests/online/test_tool_settings_t05.py, tests/online/test_harness_messages_t85.py, docs/specs/002-online-retrieval/tasks.md, docs/specs/002-online-retrieval/spec.md
+- **Outcome:** Kept
+### What I asked for
+T14.3: make the two tools usable by the agent. Allow them in the config and the dispatcher, describe them in the system prompt and the malformed-call hint, take the open_file outline from the index, give search_again the index, re-ranker and the chunks already shown, and pass the code shown by tools to the citation checker (Article VI.4). Update Spec 002's tool list.
+### How I checked it
+Claude found that three approved tests check the old two-tool rules (test_tool_allowlist_t54, test_tool_settings_t05, and the D14 prompt in test_harness_messages_t85). I agreed to update only the outdated lines and record them in tasks.md as approved test changes needing reviewer sign-off, as T9.7 did, because Constitution 1.4.0 made them out of date. Ran the tests in WSL first: 16 failed for the right reasons (missing ToolContext, old prompt, two tools instead of four, and citing open_file code gave G instead of F); the "same citation without the tool is G" test already passed. After the code: 43 passed, full suite 500 passed.
+### What I kept or changed
+Kept. The key proof is a pair of end-to-end tests: citing code the model read with open_file is verified (F), and the same citation without reading it is flagged (G), so the tools add evidence without letting the model cite code it never saw. Every chunk a tool shows is added to a "seen" list, so search_again never repeats code. The outline uses a small read-only `symbols_for_path` in the offline vector store (outside my area, noted in the PR). Each tool has a one-line description of when to use it in the prompt, which should help a small model like the 14B.

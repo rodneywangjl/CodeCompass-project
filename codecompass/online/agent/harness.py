@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from codecompass.online.agent.cache import ToolCache
 from codecompass.online.agent.tool_parser import (
     malformed_blocks, parse_tool_calls, strip_tool_blocks)
-from codecompass.online.agent.tools import ToolOutput, cap_output, execute
+from codecompass.online.agent.tools import ToolContext, ToolOutput, cap_output, execute
 from codecompass.online.context import format_context
 
 _INTRO = """You are CodeCompass, a code Q&A assistant. Answer the developer's question
@@ -27,13 +27,18 @@ _RULES = [
     """If the commit history gives no reason for the code (e.g. vague commit
    messages, or no history found), say so. Do NOT invent a reason.""",
 ]
-_TOOL_RULE = """If you need commit history to explain WHY code exists, request a tool:
-   <tool>git_blame(path="file/path.py", lines="X-Y")</tool>
-   <tool>git_log(path="file/path.py", n=10)</tool>
+_TOOL_RULE = """If the code context is not enough, request ONE tool per reply:
+   <tool>search_again(query="names or words to search for")</tool> finds more code
+   <tool>open_file(path="file/path.py", lines="X-Y")</tool> reads lines of a file
+   <tool>open_file(path="file/path.py")</tool> lists a file's functions with lines
+   <tool>git_blame(path="file/path.py", lines="X-Y")</tool> shows who changed lines
+   <tool>git_log(path="file/path.py", n=10)</tool> lists recent commits of a file
    The result comes back in a <tool_result>...</tool_result> block. It is
    evidence you may cite, just like the code context."""
 
 _FORMAT_HINT = """Write one tool call on its own, with keyword arguments, exactly like:
+<tool>search_again(query="names or words to search for")</tool>
+<tool>open_file(path="file/path.py", lines="X-Y")</tool>
 <tool>git_blame(path="file/path.py", lines="X-Y")</tool>
 <tool>git_log(path="file/path.py", n=10)</tool>"""
 
@@ -81,10 +86,18 @@ def malformed_result_message(block: str) -> str:
             f"{_FORMAT_HINT}\n</tool_result>")
 
 
-def make_tool_runner(repo, commit: str, settings, count_tokens):
-    """execute() at the indexed commit, capped (D4) and cached per query (D8)."""
+def make_tool_runner(repo, commit: str, settings, count_tokens, *, handles=None,
+                     reranker=None, retrieval=None, seen=None):
+    """execute() at the indexed commit, capped (D4) and cached per query (D8).
+
+    handles, reranker and retrieval let search_again search the index; seen holds
+    the ids of chunks already in context (Plan D18).
+    """
+    context = ToolContext(count_tokens=count_tokens, handles=handles, reranker=reranker,
+                          retrieval=retrieval, seen=set(seen or ()))
+
     def run(call):
-        return cap_output(execute(repo, commit, call, settings=settings),
+        return cap_output(execute(repo, commit, call, settings=settings, context=context),
                           settings.max_tool_output_tokens, count_tokens)
     return ToolCache(run).get
 
@@ -95,6 +108,7 @@ class AgentRun:
     messages: list[dict]
     rounds: list[dict] = field(default_factory=list)
     commits: list = field(default_factory=list)
+    chunks: list = field(default_factory=list)  # code shown by tools (VI.4)
     generator_calls: int = 0
     answer_round: int = 0
     round_limit_hit: bool = False
@@ -152,5 +166,6 @@ def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: i
             entry["ignored_calls"] = len(calls) - 1
         run.rounds.append(entry)
         run.commits.extend(output.commits)
+        run.chunks.extend(output.chunks)
         messages.append({"role": "user", "content": tool_result_message(call, output)})
         tool_runs += 1

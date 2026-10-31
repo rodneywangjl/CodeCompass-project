@@ -273,7 +273,8 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 
 **T14.3 Wiring: prompt, config and citation evidence**
 - Tests first: `tools.allowed_tools` defaults to all four tools and still rejects names outside the list; the D14 tool rule describes `open_file` and `search_again` with one example each, and the malformed-call hint (T8.6) shows all four formats; chunks shown by tools are collected by the harness and passed to the citation checker, so a citation to them is F and a citation to unseen code is still G; `rag` and `no_retrieval` modes are unchanged; spec 002 tool list updated.
-- ACs: Article V.2, VI.1, VI.4; plan D14, D17, D18. | Touches: `agent/harness.py`, `config.py`, `__init__.py`, `citation/checker.py` (input only), spec 002. | Depends on: T14.1, T14.2, T8.6.
+- **Approved test changes (need reviewer sign-off, Article IX.3):** Constitution 1.4.0 makes three approved tests out of date: `test_tool_allowlist_t54.py::test_allowed_tools_constant` and `test_tool_settings_t05.py` (default allowed tools) now expect all four tools, and `test_harness_messages_t85.py` (D14 template) has the new tool rule 3. No other assertion changes.
+- ACs: Article V.2, VI.1, VI.4; plan D14, D17, D18. | Touches: `agent/harness.py`, `agent/tools.py`, `config.py`, `__init__.py`, `offline/stores/vector.py` (read-only `symbols_for_path`), spec 002, and the three approved tests above. | Depends on: T14.1, T14.2, T8.6.
 
 ---
 

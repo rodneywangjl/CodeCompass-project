@@ -1,12 +1,14 @@
-"""Verifier tools: git blame and git log, read-only and validated (Article V.2)."""
+"""Agent tools: git blame, git log, open_file, search_again; read-only, validated (V.2)."""
 
 from __future__ import annotations
 
 import posixpath
 import re
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+
+from codecompass.online.context import RetrievedChunk, format_chunk, format_context
 
 _RANGE = re.compile(r"(\d+)(?:-(\d+))?")
 _BLAME_HEADER = re.compile(r"([0-9a-f]{40}) \d+ (\d+)(?: \d+)?")
@@ -74,10 +76,15 @@ class CommitRecord:
 
 @dataclass(frozen=True)
 class ToolOutput:
-    """Rendered text for the model plus the parsed commits it mentions (Plan D7)."""
+    """Rendered text for the model plus the evidence it carries (Plan D7, D18).
+
+    commits: parsed commit records (git tools). chunks: code the model was shown
+    (open_file, search_again), so the citation checker can verify it (VI.4).
+    """
     text: str
     commits: tuple[CommitRecord, ...] = ()
     error: bool = False
+    chunks: tuple[RetrievedChunk, ...] = ()
 
 
 def _render(record: CommitRecord, suffix: str = "") -> str:
@@ -165,13 +172,143 @@ def git_log(repo, commit: str, path, n, *, limit: int, timeout: float) -> ToolOu
     return ToolOutput(text="\n".join(_render(r) for r in records), commits=records)
 
 
+_LANGUAGES = {".py": "python", ".js": "javascript", ".jsx": "javascript",
+              ".ts": "typescript", ".java": "java"}
+
+
+def _language(path: str) -> str:
+    return _LANGUAGES.get(posixpath.splitext(path)[1].lower(), "text")
+
+
+def _file_lines(repo, commit: str, path: str) -> list[str]:
+    """The file's lines at *commit*, read from git (never the working tree)."""
+    proc = subprocess.run(["git", "cat-file", "-p", f"{commit}:{path}"], cwd=repo,
+                          capture_output=True, shell=False, check=False)
+    return proc.stdout.decode("utf-8", errors="replace").splitlines()
+
+
+def _outline(commit: str, path: str, entries) -> ToolOutput:
+    """Indexed symbols with line ranges; not code, so nothing citable (Plan D18)."""
+    if not entries:
+        return ToolOutput(text=(
+            f"No outline available for {path} at {commit[:7]}. Ask for a line range "
+            f'instead, e.g. open_file(path="{path}", lines="1-60").'))
+    rows = "\n".join(f"  {name}  lines {start}-{end}" for name, start, end in entries)
+    return ToolOutput(text=(f"Outline of {path} (indexed at {commit[:7]}):\n{rows}\n"
+                            f'Read code with open_file(path="{path}", lines="X-Y").'))
+
+
+def open_file(repo, commit: str, path, lines=None, *, max_tokens: int, count_tokens,
+              symbols=None) -> ToolOutput:
+    """Lines of *path* at *commit* as a citable chunk, or an outline (Plan D18).
+
+    A range that does not fit *max_tokens* is cut to whole lines from its start,
+    with a marker saying how to continue; the chunk covers only the lines shown.
+    """
+    path = validate_path(repo, commit, path)
+    if lines is None:
+        return _outline(commit, path, symbols(path) if symbols else [])
+    text_lines = _file_lines(repo, commit, path)
+    start, end = validate_lines(lines, len(text_lines))
+
+    def shown(last: int) -> tuple[RetrievedChunk, str]:
+        chunk = RetrievedChunk(
+            chunk_id=f"open_file:{path}:{start}-{last}",
+            text="\n".join(text_lines[start - 1:last]), path=path, start_line=start,
+            end_line=last, language=_language(path), commit_sha=commit)
+        body = format_chunk(chunk)
+        if last < end:
+            body += (f"\n[showing lines {start}-{last}; "
+                     f"ask for lines {last + 1}-{end} to continue]")
+        return chunk, body
+
+    best = None
+    for last in range(start, end + 1):
+        chunk, body = shown(last)
+        if count_tokens(body) > max_tokens:
+            break
+        best = (chunk, body)
+    if best is None:
+        return ToolOutput(text=(f"error: line {start} of {path} alone does not fit the "
+                                "tool output limit"), error=True)
+    return ToolOutput(text=best[1], chunks=(best[0],))
+
+
+MAX_QUERY_CHARS = 200
+
+
+def validate_query(query) -> str:
+    """A non-empty search query of at most MAX_QUERY_CHARS characters (V.2)."""
+    if not isinstance(query, str) or not query.strip():
+        raise ToolArgumentError("query must be a non-empty string")
+    if len(query) > MAX_QUERY_CHARS:
+        raise ToolArgumentError(
+            f"query must be at most {MAX_QUERY_CHARS} characters, got {len(query)}")
+    return query.strip()
+
+
+def search_again(handles, query, *, seen, reranker, config, max_tokens: int,
+                 count_tokens) -> ToolOutput:
+    """New chunks for a model-written query, re-ranked, within the cap (Plan D18).
+
+    Uses the same hybrid retrieval and re-ranker as the first search (Article IV),
+    skips chunk ids in *seen*, and keeps chunks in re-rank order while they fit.
+    """
+    from codecompass.online.retrieval.hybrid import retrieve
+    from codecompass.online.retrieval.reranker import rerank_chunks
+
+    query = validate_query(query)
+    ids = [cid for cid, _ in retrieve(handles, query, config=config) if cid not in seen]
+    records = handles.vector.records_for_ids(ids) if ids else {}
+    chunks = [RetrievedChunk.from_record(cid, records[cid]) for cid in ids if cid in records]
+    if not chunks:
+        return ToolOutput(text=(f"Nothing new found for {query!r}: every match is already "
+                                "in the context above."))
+    ranked = [chunk for chunk, _ in rerank_chunks(reranker, query, chunks, len(chunks))]
+    kept: list[RetrievedChunk] = []
+    for chunk in ranked:
+        if count_tokens(format_context(kept + [chunk])) > max_tokens:
+            break
+        kept.append(chunk)
+    if not kept:
+        best = ranked[0]
+        return ToolOutput(text=(
+            f"The best new match, {best.path} lines {best.start_line}-{best.end_line}, "
+            "is too large to show here. Read part of it with "
+            f'open_file(path="{best.path}", lines="{best.start_line}-{best.end_line}").'))
+    return ToolOutput(text=format_context(kept), chunks=tuple(kept))
+
+
+@dataclass
+class ToolContext:
+    """What open_file and search_again need besides the repo and commit (Plan D18).
+
+    handles, reranker and retrieval are None when there is no index (search_again
+    is then unavailable). seen holds the chunk ids already in context; every chunk
+    a tool returns is added, so search_again never repeats one.
+    """
+    count_tokens: object
+    handles: object = None
+    reranker: object = None
+    retrieval: object = None
+    seen: set = field(default_factory=set)
+
+
 # The dispatch table is the allow list (Article V.2): config cannot widen it.
-_PARAMS = {"git_blame": {"path", "lines"}, "git_log": {"path", "n"}}
+_PARAMS = {"git_blame": {"path", "lines"}, "git_log": {"path", "n"},
+           "open_file": {"path", "lines"}, "search_again": {"query"}}
 ALLOWED_TOOLS = tuple(_PARAMS)
 
 
-def execute(repo, commit: str, call, *, settings) -> ToolOutput:
+def execute(repo, commit: str, call, *, settings, context: ToolContext | None = None) -> ToolOutput:
     """Run one allow-listed tool call; bad model input becomes an error output."""
+    output = _dispatch(repo, commit, call, settings, context)
+    if context is not None:
+        context.seen.update(c.chunk_id for c in output.chunks)
+    return output
+
+
+def _dispatch(repo, commit: str, call, settings, context) -> ToolOutput:
     if call.tool not in _PARAMS:
         return ToolOutput(
             text=f"error: tool {call.tool!r} is not allowed; "
@@ -192,11 +329,31 @@ def execute(repo, commit: str, call, *, settings) -> ToolOutput:
         if call.tool == "git_blame":
             return git_blame(repo, commit, args.get("path"), args.get("lines"),
                              timeout=settings.git_blame_timeout)
+        if call.tool in ("open_file", "search_again"):
+            return _code_tool(repo, commit, call, settings, context)
         return git_log(repo, commit, args.get("path"),
                        args.get("n", settings.git_log_limit),
                        limit=settings.git_log_limit, timeout=settings.git_log_timeout)
     except ToolArgumentError as exc:
         return ToolOutput(text=f"error: {exc}", error=True)
+
+
+def _code_tool(repo, commit: str, call, settings, context) -> ToolOutput:
+    if context is None:
+        return ToolOutput(text=f"error: {call.tool} is not available here", error=True)
+    handles, args = context.handles, call.args
+    if call.tool == "open_file":
+        symbols = handles.vector.symbols_for_path if handles is not None else None
+        return open_file(repo, commit, args.get("path"), args.get("lines"),
+                         max_tokens=settings.max_tool_output_tokens,
+                         count_tokens=context.count_tokens, symbols=symbols)
+    if handles is None or context.reranker is None or context.retrieval is None:
+        return ToolOutput(text="error: search_again is not available: no index is open",
+                          error=True)
+    return search_again(handles, args.get("query"), seen=context.seen,
+                        reranker=context.reranker, config=context.retrieval,
+                        max_tokens=settings.max_tool_output_tokens,
+                        count_tokens=context.count_tokens)
 
 
 def cap_output(output: ToolOutput, max_tokens: int, count_tokens) -> ToolOutput:
@@ -219,4 +376,5 @@ def cap_output(output: ToolOutput, max_tokens: int, count_tokens) -> ToolOutput:
     marker = f"[output truncated: {len(lines) - len(kept)} more lines]"
     text = "\n".join(kept + [marker])
     commits = tuple(c for c in output.commits if c.sha[:7] in text)
+    # A cut code block no longer matches its chunk, so it is not citable (VI.4).
     return ToolOutput(text=text, commits=commits, error=output.error)

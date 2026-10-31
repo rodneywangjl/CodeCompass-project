@@ -26,7 +26,7 @@ MAX_VERIFIER_ROUNDS = 3
 DEFAULT_GIT_LOG_LIMIT = 20
 DEFAULT_GIT_BLAME_TIMEOUT = 30
 DEFAULT_GIT_LOG_TIMEOUT = 30
-DEFAULT_ALLOWED_TOOLS = ("git_blame", "git_log")
+DEFAULT_ALLOWED_TOOLS = ("git_blame", "git_log", "open_file", "search_again")
 DEFAULT_MAX_TOOL_OUTPUT_TOKENS = 768
 
 # Generator & Re-ranker defaults (Article VIII.1, VIII.2, Plan §7)

@@ -1,7 +1,8 @@
 """T5.4 tool allow list tests (tests-first).
 
 Contract under test (Spec AC-3.2, AC-3.3; Plan D6):
-  - tools.ALLOWED_TOOLS == ("git_blame", "git_log"); the dispatch table is the
+  - tools.ALLOWED_TOOLS == ("git_blame", "git_log", "open_file", "search_again")
+    (Constitution 1.4.0, approved change in T14.3); the dispatch table is the
     allow list, so config cannot add a tool (Article V.2)
   - tools.execute(repo, commit, call, *, settings) -> ToolOutput, never raises
     for bad model input: unknown tools, unexpected or invalid arguments come
@@ -32,7 +33,7 @@ def run(repo, tool, **args):
 
 
 def test_allowed_tools_constant():
-    assert tools.ALLOWED_TOOLS == ("git_blame", "git_log")
+    assert tools.ALLOWED_TOOLS == ("git_blame", "git_log", "open_file", "search_again")
 
 
 def test_git_blame_and_git_log_succeed(repo):

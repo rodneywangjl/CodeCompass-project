@@ -133,6 +133,9 @@ class ReadOnlyVectorStore:
     def vectors_for_paths(self, paths) -> dict:
         return self._store.vectors_for_paths(paths)
 
+    def symbols_for_path(self, path) -> list:
+        return self._store.symbols_for_path(path)
+
     def close(self) -> None:
         self._store = None  # type: ignore[assignment]
 

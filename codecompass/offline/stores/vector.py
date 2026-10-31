@@ -90,6 +90,24 @@ class VectorStore:
         return {cid: meta["file_path"]
                 for cid, meta in zip(got["ids"], got["metadatas"])}
 
+    def symbols_for_path(self, path) -> list[tuple[str, int, int]]:
+        """(symbol, start_line, end_line) of the indexed chunks of *path*, by line.
+
+        Chunks split from one symbol are merged into one range; chunks with no
+        symbol are left out. Read-only; used by the open_file outline (Plan D18).
+        """
+        got = self._collection.get(where={"file_path": path}, limit=10_000_000,
+                                   include=["metadatas"])
+        spans: dict[str, list[int]] = {}
+        for meta in got["metadatas"]:
+            name = meta.get("symbol") or ""
+            if not name:
+                continue
+            span = spans.setdefault(name, [meta["start_line"], meta["end_line"]])
+            span[0] = min(span[0], meta["start_line"])
+            span[1] = max(span[1], meta["end_line"])
+        return sorted(((n, s, e) for n, (s, e) in spans.items()), key=lambda x: (x[1], x[0]))
+
     def records_for_ids(self, ids) -> dict[str, dict]:
         """chunk id -> {text, metadata, vector} (read path and equivalence)."""
         ids = list(ids)
