@@ -61,9 +61,9 @@ def _retrieve_and_answer(handles, repo_path, question, *, config, profile, tools
         records = handles.vector.records_for_ids([cid for cid, _ in shortlist])
         chunks = [RetrievedChunk.from_record(cid, records[cid])
                   for cid, _ in shortlist if cid in records]
+    reranker = reranker or _default_reranker(config)
     with timed(log, "reranking"):
-        ranked = rerank_chunks(reranker or _default_reranker(config), question, chunks,
-                               len(chunks))
+        ranked = rerank_chunks(reranker, question, chunks, len(chunks))
     prefix = (generator.count_tokens(system_prompt(tools_enabled=tools_on))
               + generator.count_tokens(user_message(question, [])))
     sent = fit_chunks([c for c, _ in ranked[:config.retrieval.final_k]],
@@ -78,7 +78,9 @@ def _retrieve_and_answer(handles, repo_path, question, *, config, profile, tools
         return NO_EVIDENCE, [], []
     # tools run at the indexed commit, the version the chunks came from (Plan D7)
     runner = make_tool_runner(repo_path, handles.meta.indexed_commit, config.tools,
-                              generator.count_tokens)
+                              generator.count_tokens, handles=handles, reranker=reranker,
+                              retrieval=config.retrieval,
+                              seen={c.chunk_id for c in sent})
     return _agent(generator, question, sent, runner=runner, tools=tools,
                   tools_on=tools_on, log=log)
 
@@ -92,7 +94,8 @@ def _agent(generator, question, chunks, *, runner, tools, tools_on, log):
                     max_rounds=tools.max_verifier_rounds, tools_enabled=tools_on)
     log.update(tool_calls=run.rounds, generator_calls=run.generator_calls,
                round_limit_hit=run.round_limit_hit)
-    return run.answer, chunks, run.commits
+    # the checker sees retrieved chunks plus code shown by tools (VI.1, VI.4)
+    return run.answer, chunks + run.chunks, run.commits
 
 
 def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None = None,

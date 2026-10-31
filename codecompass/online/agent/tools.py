@@ -5,7 +5,7 @@ from __future__ import annotations
 import posixpath
 import re
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 from codecompass.online.context import RetrievedChunk, format_chunk, format_context
@@ -279,13 +279,36 @@ def search_again(handles, query, *, seen, reranker, config, max_tokens: int,
     return ToolOutput(text=format_context(kept), chunks=tuple(kept))
 
 
+@dataclass
+class ToolContext:
+    """What open_file and search_again need besides the repo and commit (Plan D18).
+
+    handles, reranker and retrieval are None when there is no index (search_again
+    is then unavailable). seen holds the chunk ids already in context; every chunk
+    a tool returns is added, so search_again never repeats one.
+    """
+    count_tokens: object
+    handles: object = None
+    reranker: object = None
+    retrieval: object = None
+    seen: set = field(default_factory=set)
+
+
 # The dispatch table is the allow list (Article V.2): config cannot widen it.
-_PARAMS = {"git_blame": {"path", "lines"}, "git_log": {"path", "n"}}
+_PARAMS = {"git_blame": {"path", "lines"}, "git_log": {"path", "n"},
+           "open_file": {"path", "lines"}, "search_again": {"query"}}
 ALLOWED_TOOLS = tuple(_PARAMS)
 
 
-def execute(repo, commit: str, call, *, settings) -> ToolOutput:
+def execute(repo, commit: str, call, *, settings, context: ToolContext | None = None) -> ToolOutput:
     """Run one allow-listed tool call; bad model input becomes an error output."""
+    output = _dispatch(repo, commit, call, settings, context)
+    if context is not None:
+        context.seen.update(c.chunk_id for c in output.chunks)
+    return output
+
+
+def _dispatch(repo, commit: str, call, settings, context) -> ToolOutput:
     if call.tool not in _PARAMS:
         return ToolOutput(
             text=f"error: tool {call.tool!r} is not allowed; "
@@ -306,11 +329,31 @@ def execute(repo, commit: str, call, *, settings) -> ToolOutput:
         if call.tool == "git_blame":
             return git_blame(repo, commit, args.get("path"), args.get("lines"),
                              timeout=settings.git_blame_timeout)
+        if call.tool in ("open_file", "search_again"):
+            return _code_tool(repo, commit, call, settings, context)
         return git_log(repo, commit, args.get("path"),
                        args.get("n", settings.git_log_limit),
                        limit=settings.git_log_limit, timeout=settings.git_log_timeout)
     except ToolArgumentError as exc:
         return ToolOutput(text=f"error: {exc}", error=True)
+
+
+def _code_tool(repo, commit: str, call, settings, context) -> ToolOutput:
+    if context is None:
+        return ToolOutput(text=f"error: {call.tool} is not available here", error=True)
+    handles, args = context.handles, call.args
+    if call.tool == "open_file":
+        symbols = handles.vector.symbols_for_path if handles is not None else None
+        return open_file(repo, commit, args.get("path"), args.get("lines"),
+                         max_tokens=settings.max_tool_output_tokens,
+                         count_tokens=context.count_tokens, symbols=symbols)
+    if handles is None or context.reranker is None or context.retrieval is None:
+        return ToolOutput(text="error: search_again is not available: no index is open",
+                          error=True)
+    return search_again(handles, args.get("query"), seen=context.seen,
+                        reranker=context.reranker, config=context.retrieval,
+                        max_tokens=settings.max_tool_output_tokens,
+                        count_tokens=context.count_tokens)
 
 
 def cap_output(output: ToolOutput, max_tokens: int, count_tokens) -> ToolOutput:
