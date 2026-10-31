@@ -26,7 +26,8 @@ def load(tmp_path, body):
 def test_defaults(tmp_path):
     cfg = load_online_config(None)
     assert cfg.tools.max_verifier_rounds == 3
-    assert cfg.tools.allowed_tools == ("git_blame", "git_log")
+    assert cfg.tools.allowed_tools == ("git_blame", "git_log", "open_file",
+                                      "search_again")  # Constitution 1.4.0 (T14.3)
 
 
 @pytest.mark.parametrize("value", [0, 1, 5])

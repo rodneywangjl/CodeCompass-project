@@ -28,9 +28,12 @@ Rules:
    Sources
    [1] file/path.py, lines X-Y (indexed at <7-char hash>)
    [2] Commit <7-char hash>, "<subject>", <author>, <date>
-3. If you need commit history to explain WHY code exists, request a tool:
-   <tool>git_blame(path="file/path.py", lines="X-Y")</tool>
-   <tool>git_log(path="file/path.py", n=10)</tool>
+3. If the code context is not enough, request ONE tool per reply:
+   <tool>search_again(query="names or words to search for")</tool> finds more code
+   <tool>open_file(path="file/path.py", lines="X-Y")</tool> reads lines of a file
+   <tool>open_file(path="file/path.py")</tool> lists a file's functions with lines
+   <tool>git_blame(path="file/path.py", lines="X-Y")</tool> shows who changed lines
+   <tool>git_log(path="file/path.py", n=10)</tool> lists recent commits of a file
    The result comes back in a <tool_result>...</tool_result> block. It is
    evidence you may cite, just like the code context.
 4. If the evidence is insufficient, say what you could not determine.
