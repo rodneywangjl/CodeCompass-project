@@ -153,3 +153,14 @@ Asked for help amending the constitution to match our v2 architecture (tools box
 Because AGENTS.md says AI tools must not modify docs/constitution.md, Claude drafted each change as find/replace text and I applied all 11 edits myself, one at a time, asking why each was needed. Claude found two extra places the new tools would otherwise break: the cache key in V.3 (search_again has a query, not a path) and the citation check in VI.4 (honest citations from open_file would be flagged). Checked the tables in Markdown preview, and reviewed `git diff` to confirm only docs/constitution.md and AGENTS.md changed.
 ### What I kept or changed
 Kept all changes: V.1 (round limit covers all tools), V.2 (four tools, query length bounded), V.3 (cache key), V rationale (v1.4.0 note), VI.4 (citations checked against all code in context), VIII.5 (one 14B profile for the whole evaluation; 32B stays the production model), Appendix A rows 1 and 8, Appendix B, AGENTS.md line 85. Version bumped 1.3.0 to 1.4.0 (MINOR). Asked whether evaluation or production comes first; kept "14B for development and evaluation, 32B for production" since production is future work for this project.
+
+## 2026-10-30 · Design of open_file and search_again (plan D18, tasks S14)
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/tasks.md
+- **Outcome:** Kept
+### What I asked for
+After constitution 1.4.0 was merged, asked for a design for the two new v2 tools before writing any code, with the options and pros and cons of each decision, and how each compares with our v2 plan (the proposal itself does not mention these tools).
+### How I checked it
+Asked how open_file works when the model only gets part of a file and whether it can really read the file: the harness reads the file from git at the indexed commit and returns only the requested lines; a longer range needs a second call, and each call uses a round. Asked how the model knows which lines to ask for; it often does not, so we added an outline mode. Asked what search_again does and compared its options. Read the D18 and S14 text before committing. Docs only, no code changed.
+### What I kept or changed
+Kept: (1) open_file takes a line range limited to the existing 768-token tool cap, not the whole file as in the v2 plan, because a file like Flask's app.py is about twice our 8k context; open_file(path) with no lines returns an outline of functions with line numbers so the model does not guess. (2) search_again returns only chunks not already in context, because repeating a chunk would waste one of the 3 rounds. (3) Code shown by tools is passed to the citation checker, as Article VI.4 now requires, otherwise honest citations would be flagged. (4) Work split into three tests-first tasks T14.1-T14.3.

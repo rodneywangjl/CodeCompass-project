@@ -1,6 +1,6 @@
 # Tasks 002: Online Query Pipeline
 
-**Implements:** Plan 002 / Spec 002 | **Constitution:** v1.3.0
+**Implements:** Plan 002 / Spec 002 | **Constitution:** v1.4.0
 
 ## How to use this list
 
@@ -260,6 +260,20 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 **T13.3 End-to-end smoke test**
 - Tests first (`model`): `ask` on the fixture repo with the real generator and real re-ranker produces a grounded answer; the audit log is complete; the citation checker outcome is recorded; run with both `dev` and `prod` profiles if both are available.
 - ACs: whole spec. | Touches: tests only. | Depends on: T13.1, T13.2.
+
+## S14: Code tools (Constitution 1.4.0, plan D18)
+
+**T14.1 `open_file`**
+- Tests first: `open_file(path, lines)` at the indexed commit returns the D3 header and the requested lines; path and line validation reuse D6 (outside the repo, missing file, out-of-range lines are errors fed back to the model); a range that does not fit `max_tool_output_tokens` returns whole lines from the start of the range plus the `[showing lines X-Y; ...]` marker, and the returned chunk covers only the lines shown; `open_file(path)` without `lines` returns an outline of indexed symbols with line ranges and no citable chunk; results are cached per query.
+- ACs: Article V.2, VI.4; plan D6, D7, D18. | Touches: `agent/tools.py`. | Depends on: T5.4.
+
+**T14.2 `search_again`**
+- Tests first (stub embedder, stub re-ranker, real stores on the fixture repo): the query runs through hybrid retrieval and the re-ranker; chunks already in context are skipped; returned chunks fit `max_tool_output_tokens` and use the D3 header; an empty or over-200-character query is an error fed back to the model; no new chunks gives a plain "nothing new found" result.
+- ACs: Article IV, V.2; plan D18. | Touches: `agent/tools.py`, `retrieval/hybrid.py` (read-only use). | Depends on: T2.4, T3.2, T14.1.
+
+**T14.3 Wiring: prompt, config and citation evidence**
+- Tests first: `tools.allowed_tools` defaults to all four tools and still rejects names outside the list; the D14 tool rule describes `open_file` and `search_again` with one example each, and the malformed-call hint (T8.6) shows all four formats; chunks shown by tools are collected by the harness and passed to the citation checker, so a citation to them is F and a citation to unseen code is still G; `rag` and `no_retrieval` modes are unchanged; spec 002 tool list updated.
+- ACs: Article V.2, VI.1, VI.4; plan D14, D17, D18. | Touches: `agent/harness.py`, `config.py`, `__init__.py`, `citation/checker.py` (input only), spec 002. | Depends on: T14.1, T14.2, T8.6.
 
 ---
 
