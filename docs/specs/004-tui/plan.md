@@ -138,6 +138,22 @@ strip_escapes(text) -> str             removes every SGR sequence (used by the t
   | muted | startup details, `/tools` header | `#6272a4` | subtle `#797593` |
 
   Reference backgrounds for the contrast check: `dark` `#232136` and `#000000`; `light` `#faf4ed` and `#ffffff`. The `light` theme leaves out Dawn's gold, rose and muted, whose contrast is 2.1 to 2.7:1, and gives `danger` a custom colour (Q12): Dawn's love with the same hue (343°) and the lightness lowered from 0.55 to 0.39. Measured contrast of what it uses, on `#faf4ed` / white: iris 3.5 / 3.8, love 3.8 / 4.2, subtle 4.0 / 4.4, pine 5.6 / 6.1, custom danger 6.8 / 7.5. `dark` on `#232136` / black: iris 7.5 / 10.0, foam 9.2 / 12.3, gold 9.5 / 12.8, rose 7.1 / 9.6, love 5.4 / 7.2, pine 4.3 / 5.8, muted 3.3 / 4.5.
+- **The rest of the look (AC-5.3, T3.4).** `run_session(..., chrome=None)` takes a second `Style` for stderr (chosen from `color_level(stderr, ...)`, so stdout and stderr are coloured independently); `None` is today's output exactly. What it paints, with the text unchanged:
+
+  | Text on stderr | Role | How |
+  |---|---|---|
+  | startup lines `codecompass: repo: …`, `profile …`, `config: …` | accent, muted | the prefix `codecompass:` accent, the rest of the line muted |
+  | `Type a question. /exit or Ctrl-D to quit.` | muted | whole line |
+  | the prompt `> ` | accent | the `>` (the space stays plain) |
+  | `Thinking…` and `Preparing index and models…` | info | the text, not the clearing sequence |
+  | the AC-4.1 count line | info | whole line |
+  | the `/tools` text | see below | by part |
+  | `error:` and `warning:` prefixes | danger, warn | the prefix only; the message stays plain |
+  | the `⚠ DRAFT — NOT CHECKED…` header | warn | whole line |
+
+  `/tools` by part: the header and the "No tools…" / "No question…" lines muted; in a call block `round N` muted, the tool name accent, `cache hit` ok, `cache miss` muted, `failed` danger, arguments and the result line plain; the lines for malformed, refused and ignored requests warn. `tui_view.summary_line` and `tui_view.format_tools` take an optional `Style`; without one they return exactly what T3.1 pinned.
+
+  Draft lines keep their `draft │ ` marker and their dimming (AC-2.1); the chrome style never touches them. Startup errors are painted when the theme and the stderr colour are already known (so a bad `--theme` is reported plain). Flags: `--theme auto|dark|light` and `--no-color`; `--theme` is validated by `theme_name`, so a bad value is `error: …`, exit code 1, not argparse's exit code 2. Order of precedence is the one of AC-5.6.
 - **Prompt and banner text stay as they are** (`> `, `codecompass: repo: …`): the approved tests assert them, and the look comes from colour. Only the colour around them is new.
 - **No thread, no spinner, no new dependency** (P3 holds).
 
