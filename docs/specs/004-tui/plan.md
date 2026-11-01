@@ -62,3 +62,19 @@ Install with `pip install -e .` (add `--no-build-isolation` when offline; setupt
 | P1 | Models built once and reused (Q1) | Seconds of model load per question |
 | P2 | Lazy imports | Instant prompt; `codecompass --help` stays fast |
 | P3 | No thread, no polling, no extra dependency | Startup time, install size, test complexity |
+
+## 6. Draft streaming (US2)
+
+- `LlamaServerGenerator.generate(messages, *, on_text=None)`: with a callback, request `stream: true` on `/v1/chat/completions` and feed each text delta to `on_text`; return the full text so callers see no difference. If the stream cannot be opened, make the normal call and pass the whole text once.
+- The harness passes `on_text` through to each generator call. A small filter holds back the first characters of a round until it is clear whether the text starts with `<tool>`; tool rounds are never forwarded (AC-2.3).
+- `ask(..., on_draft=None)` hands the callback to the harness via the timed generator wrapper. The default `None` leaves every code path as it is today.
+- The TUI writes deltas to stderr only when stderr is a terminal and `--no-draft` is absent, dimmed with an ANSI style, then a `Checked answer:` line, then the answer on stdout. Cursor movement is avoided on purpose: the draft stays in the scrollback.
+- `tests/support/stub_generator.py` gains the same `on_text` keyword and streams its canned text in pieces.
+
+## 7. Warm-up and layered config (US3)
+
+- `online/config.py`: split `load_online_config(path)` into reading TOML and `online_config_from_dict(raw, anchor)`, so layers can be merged as dicts. Merge rule: section by section, keys of the upper layer win; `generator.profiles.<name>` replaces the whole profile.
+- `tui.py`: `_find_config` returns the list of files (user-level first, then repo); the banner prints each. `--config` returns just that file.
+- `online/__init__.py`: `warm_up(repo_path, *, config, index_dir=None)` calls `ensure_current`, then `open_index(...).embed_query("warm up")` to load the embedder, then the shared re-ranker once; it prints nothing and returns nothing.
+- `tui.py` runs `warm_up` in a daemon thread when stdin and stderr are terminals. Before the first `ask()` it joins the thread (status text `Preparing index and models…`). Errors are swallowed in the thread; the real `ask()` raises them again.
+- No GPU code is added: devices come from `[embedder] device` and `[reranker] device`, which already exist.
