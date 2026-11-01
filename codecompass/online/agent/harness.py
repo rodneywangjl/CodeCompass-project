@@ -122,7 +122,7 @@ def _run_safely(run_tool, call) -> tuple[ToolOutput, bool]:
 
 
 def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: int,
-              tools_enabled: bool = True) -> AgentRun:
+              tools_enabled: bool = True, on_draft=None) -> AgentRun:
     """Answer, running at most *max_rounds* tool calls, one per round (Plan D15)."""
     messages = [{"role": "system", "content": system_prompt(tools_enabled=tools_enabled)},
                 {"role": "user", "content": user_message(question, chunks)}]

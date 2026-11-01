@@ -112,7 +112,8 @@ def _agent(generator, question, chunks, *, runner, tools, tools_on, log):
 
 
 def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None = None,
-        index_dir=None, generator=None, reranker=None, embedder=None) -> QueryResult:
+        index_dir=None, generator=None, reranker=None, embedder=None,
+        on_draft=None) -> QueryResult:
     """Answer *question* about the repository at *repo_path* (Spec US1, US9).
 
     generator, reranker and embedder default to the configured models; tests

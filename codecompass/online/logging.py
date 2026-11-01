@@ -49,7 +49,7 @@ class TimedGenerator:
     def __init__(self, generator, log: dict) -> None:
         self._generator, self._log = generator, log
 
-    def generate(self, messages: list[dict]) -> str:
+    def generate(self, messages: list[dict], *, on_text=None) -> str:
         with timed(self._log, "generation"):
             return self._generator.generate(messages)
 
