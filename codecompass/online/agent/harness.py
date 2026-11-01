@@ -121,15 +121,62 @@ def _run_safely(run_tool, call) -> tuple[ToolOutput, bool]:
         return ToolOutput(text=f"error: {call.tool} failed: {exc}", error=True), False
 
 
+class _DraftFilter:
+    """Forward the model's text to *emit*, but nothing from a ``<tool>`` tag onwards.
+
+    A few characters that could be the start of a tag are held back until the next
+    piece shows whether they are (Spec 004 AC-2.3).
+    """
+
+    TAG = "<tool>"
+
+    def __init__(self, emit) -> None:
+        self._emit, self._held, self._stopped = emit, "", False
+
+    def feed(self, piece: str) -> None:
+        if self._stopped:
+            return
+        text = self._held + piece
+        at = text.find(self.TAG)
+        if at >= 0:
+            self._stopped, self._held = True, ""
+            if at:
+                self._emit(text[:at])
+            return
+        keep = next((n for n in range(min(len(self.TAG) - 1, len(text)), 0, -1)
+                     if self.TAG.startswith(text[-n:])), 0)
+        self._held = text[len(text) - keep:]
+        if len(text) > keep:
+            self._emit(text[:len(text) - keep])
+
+    def finish(self) -> None:
+        """The reply ended: a held tail that never became a tag is ordinary text."""
+        if self._held and not self._stopped:
+            self._emit(self._held)
+        self._held = ""
+
+
+def _generate(generator, messages: list[dict], on_draft) -> str:
+    if on_draft is None:
+        return generator.generate(messages)
+    shown = _DraftFilter(on_draft)
+    text = generator.generate(messages, on_text=shown.feed)
+    shown.finish()
+    return text
+
+
 def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: int,
-              tools_enabled: bool = True) -> AgentRun:
-    """Answer, running at most *max_rounds* tool calls, one per round (Plan D15)."""
+              tools_enabled: bool = True, on_draft=None) -> AgentRun:
+    """Answer, running at most *max_rounds* tool calls, one per round (Plan D15).
+
+    *on_draft*, if given, receives the model's text as it is written (Spec 004 US2).
+    """
     messages = [{"role": "system", "content": system_prompt(tools_enabled=tools_enabled)},
                 {"role": "user", "content": user_message(question, chunks)}]
     run = AgentRun(answer="", messages=messages)
     tool_runs = 0
     while True:
-        response = generator.generate(messages)
+        response = _generate(generator, messages, on_draft)
         run.generator_calls += 1
         calls = parse_tool_calls(response)
         bad = malformed_blocks(response) if tools_enabled and not calls else []
@@ -143,7 +190,7 @@ def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: i
         messages.append({"role": "assistant", "content": response})
         if tool_runs >= max_rounds:
             messages.append({"role": "user", "content": FINAL_MESSAGE})
-            final = generator.generate(messages)
+            final = _generate(generator, messages, on_draft)
             run.generator_calls += 1
             run.rounds.append({"round": tool_runs, "final_call": True,
                                "ignored_calls": len(calls) or len(bad)})

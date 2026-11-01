@@ -406,3 +406,211 @@ TODO (member)
 - `allowed_tools` can switch tools off but never add one, and the tool runner now respects it; before this it was silently ignored.
 - Validation is in the loader, not `ToolsConfig`, so the approved T5.4 test that builds a widened `ToolsConfig` still holds.
 - No approved tests changed.
+
+## 2026-11-01 · Dev environment, local models and a dev-7b profile
+- **Tool (model):** Claude Code (claude-opus-5-5, claude-sonnet-5-5)
+- **Files:** codecompass.toml
+- **Outcome:** Changed
+### What I asked for
+Get the repo running: create `.venv` and install the pinned dependencies, then download the real models (embedder, re-ranker, generator). The 14B does not fit my 8 GB GPU, so I asked for the 7B instead, a `dev-7b` profile in `codecompass.toml`, and a run of the model tests.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- `.venv` built from `requirements.txt` unchanged; `pytest -m "not model"` passed (500 passed, 8 deselected).
+- Downloaded the embedder and re-ranker at their pinned revisions, and `qwen2.5-coder-7b-instruct-q4_k_m.gguf` (SHA-256 matches the value Hugging Face records). The 14B download was started and then cancelled by me; nothing from it is on disk.
+- Added a `[generator.profiles.dev-7b]` table (16384 context, same sampling settings as the 14B profiles). The default profile stays `dev`. This is a model change under Article VII.5, so its results are development signals only.
+- `pytest -m model` on the 7B: 7 passed, 1 failed. `test_real_pipeline_end_to_end` failed 4 out of 4 runs because the 7B writes a `Sources` entry but never puts `[1]` inline in the answer, so the checker (correctly) flags it. No test or code was changed for this. The result is noted here, not fixed.
+- The installed `llama-server` is `0.6.0-dev` (build 11429), not the 0.7.0 recorded in `MODEL-SETUP.md`. The version comment in the profile is left for me to fill in. Not committed.
+
+## 2026-11-01 · Spec 004 minimal terminal UI (spec, plan, tasks)
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** docs/specs/004-tui/spec.md, docs/specs/004-tui/plan.md, docs/specs/004-tui/tasks.md
+- **Outcome:** Changed
+### What I asked for
+A lightweight terminal UI, started by typing `codecompass`, that only lets me type a question and read the model's reply, and that uses the git repo root it is run from.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Kept it to one standard-library module over `ask()`, printing the answer unchanged so a flagged answer can never look verified (Article VI.3). Left out streaming, panes, colours and conversation memory.
+- Decisions I approved: Q1 reuse the default models across questions (plan 002 O1 was not implemented for the defaults), Q2 add a setuptools build backend and a `codecompass` script entry, Q4 look for `codecompass.toml` in `--config`, then the repo root, then `~/.config/codecompass/`, then built-in defaults. Q3 (`readline` for history) is still open.
+- Repo root is found with `git rev-parse --show-toplevel`, so it works from any subdirectory.
+- Spec 003 already exists on a remote branch, so this one is 004. Not committed yet.
+
+## 2026-11-01 · T0.1 Reuse default models across questions
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** tests/online/test_model_reuse_tui_t01.py, codecompass/offline/embedding.py, codecompass/offline/__init__.py, codecompass/online/__init__.py
+- **Outcome:** Changed
+### What I asked for
+Task T0.1 of Spec 004: tests for building the default re-ranker and embedder once per process and reusing them on every later question, without weakening the embedder identity check (Article II.4).
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Six tests. Four fail for the expected reason today (the models are rebuilt on every question: 3 re-rankers and 4 embedders where 1 is expected). Two already pass and act as guards: injected stubs never enter the cache, and a cached embedder still cannot bypass the mismatch check.
+- Two of my own first drafts were wrong and were fixed before review: one stub embedder had the wrong identity, and the two "different config" tests passed trivially until I made them ask A, B, A.
+- I approved the tests, then the implementation went in: `shared_embedder()` in `offline/embedding.py` (used by `ensure_current` and `open_index`) and a small cache in `online/__init__.py` for the re-ranker. Both are keyed on class and config, at most 4 entries each.
+- The first version keyed on config only and broke the existing `test_ensure_default_embedder.py` in the full suite (an earlier test had cached a real `CodeEmbedder` for the stub config, so that test's monkeypatch never took effect). I fixed it in the code by adding the class to the key and did not touch any approved test.
+- `pytest -m "not model"`: 506 passed. The test commit comes before the implementation commit on `feat/tui-t0.1`.
+
+## 2026-11-01 · T1.1 Terminal UI session loop
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/tui.py, tests/online/test_tui_session_t11.py
+- **Outcome:** Changed
+### What I asked for
+Task T1.1 of Spec 004: the prompt loop behind `codecompass`. Read a question, print the answer, repeat; quit cleanly; survive errors and Ctrl-C.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- `run_session(answer, *, stdin, stdout, stderr)` takes the answering function and the streams as arguments, so the loop is tested with a fake and needs no model. Only the answer goes to stdout; the prompt, the "Thinking…" status line, hints and errors go to stderr, and only when the stream is a terminal.
+- Tests first: 17 tests, all failing with `NotImplementedError` from a stub `tui.py` (so the failure is missing behaviour, not an import error). I approved them, then the loop was implemented in `codecompass/online/tui.py`.
+- One bug in the first draft: the error line used `exc or type(exc).__name__`, but an exception object is always truthy, so a message-less error printed a blank. The test caught it; the code now tests `str(exc)`. No test was changed.
+- `pytest -m "not model"`: 523 passed.
+- Left for T1.2: `readline` line editing. It only works through `input()`, not through a stream I can fake, so it is not in the loop yet (Spec 004 Q3 is still open).
+
+## 2026-11-01 · T1.2 Terminal UI startup and wiring
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/tui.py, tests/online/test_tui_main_t12.py
+- **Outcome:** Changed
+### What I asked for
+Task T1.2 of Spec 004: make `codecompass` find the git repo root from wherever it is run, load the right config, check the generator, build it once, and call the real `ask()`.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Tests first: 23 tests; 22 fail with `NotImplementedError` from a stub `main`, and one passes (importing the module loads no model library, a guard). I approved them, then `main()` was implemented in `codecompass/online/tui.py`; all 23 passed on the first run.
+- Covered: repo root from the root, a subdirectory and an explicit path; not-a-repo and missing-path errors; config order (`--config`, repo root, `$XDG_CONFIG_HOME` or `~/.config`, built-in defaults); `--profile`; the banner (terminal only); the generator warning with the `llama-server` start command; one generator per session; and one end-to-end test through the real `ask()` and citation checker with stub models.
+- The generator health check is a warning, never a failure, so the session starts even with no server; the warning includes the `llama-server` start command built from the profile (reusing `launch_command`).
+- `pytest -m "not model"`: 546 passed.
+- Left out on purpose: `readline` (arrow keys and history). It only works through `input()`, which T1.1's approved stream-based loop does not use, so adding it would change that design. I will raise it separately.
+
+## 2026-11-01 · T1.3 The `codecompass` command
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** tests/online/test_tui_entry_t13.py, pyproject.toml
+- **Outcome:** Changed
+### What I asked for
+Task T1.3 of Spec 004: make typing `codecompass` in the terminal start the TUI, and put all the TUI work on one branch.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- All TUI commits now sit on a single branch, `feat/tui`. The earlier stacked branches (`feat/tui-t0.1`, `feat/tui-t1.1`, `docs/spec-004-tui`) were ancestors of it, so deleting them lost nothing.
+- Tests first: 6 tests; 4 fail because `pyproject.toml` has no `[project.scripts]`, `[build-system]` or package list, and 2 pass as guards (the help text and "no runtime dependency"). I approved them, then `pyproject.toml` got a pinned `[build-system]` (setuptools==84.2.1), a `[project.scripts]` entry and a package list limited to `codecompass*`. All 6 pass; `pytest -m "not model"`: 552 passed. `pip install -e .` has not been run yet.
+- I added a check that the build backend is pinned (`setuptools==<version>`), since the repo pins everything that affects results (Article VIII.3).
+
+## 2026-11-01 · T1.4 README for interactive mode, stub index removed, speed measurements
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** README.md
+- **Outcome:** Changed
+### What I asked for
+Task T1.4 of Spec 004 (README "Interactive mode"), deleting the old stub-built index of this repo, and finding out why the first question is slow and what would speed it up. I also asked for streaming output.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- README: a new section 7 "Interactive mode (`codecompass`)" (install, repo-root rule, config order, options, stdout/stderr split, keys, no streaming or memory), a line in Known limitations about the slow first question, and `tui.py` in the project structure.
+- Deleted `~/.local/share/codecompass/a2a4a6a635a2691a` after checking it was the only entry, built with `stub@stub-1`, and stale. No other index was touched.
+- Measured on this machine (192 repo chunks, real embedder): CPU 2.6 chunks/s, CUDA 72.3 chunks/s (27x faster); the vectors agree to 12 decimal places. Setting `[embedder] device = "cuda"` does not change the index identity or config fingerprint, so it needs no re-index.
+- Found that the installed `llama-server` (Arch `llama-cpp` 0.6.0) has no GPU backend (`--list-devices` shows none), so generation runs on CPU. `-ngl 99` has no effect.
+- Not done: streaming. It conflicts with Article VI.1 (nothing is shown before the citation check) and is out of scope in Specs 002 and 004, so it needs a decision and a spec change first.
+
+## 2026-11-01 · Spec 004 phase 2: draft streaming, warm-up and layered config (spec only)
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** docs/specs/004-tui/spec.md, docs/specs/004-tui/plan.md, docs/specs/004-tui/tasks.md, ~/.config/codecompass/codecompass.toml (outside the repo)
+- **Outcome:** Changed
+### What I asked for
+Streaming output, a way to speed up the slow first question, and to know whether putting the re-ranker on the GPU is worthwhile.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Measured per stage (`queries/*.json`): first question 352 s = index 193 s + re-rank 65 s + generation 94 s; after moving the embedder and re-ranker to CUDA the same question took 97 s = index 1 s + re-rank 4 s + generation 85 s. The re-ranker alone was 52 s on CPU and 2 s on the GPU (same top-8, score difference 4e-8, peak 3.2 GiB VRAM). Generation is now the main cost because the installed `llama-server` has no GPU backend.
+- I chose the stderr draft for streaming, so the checked answer is still the only thing on stdout. Whether this fits Article VI.1 is open question Q5 in the spec for the reviewer.
+- Found that a repo's own `codecompass.toml` hides the user-level file, so personal GPU and profile settings would not reach this repo. The spec proposes layering (Q6), which changes what I approved in Q4.
+- Created `~/.config/codecompass/codecompass.toml` (profile `dev-7b`, embedder and re-ranker on `cuda`). It applies in repos without their own config, or with `--config`.
+- Phase 2 is spec and tasks only; no tests or code yet. Nothing is committed for `codecompass.toml`.
+
+## 2026-11-01 · T2.1 Layered config
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/config.py, tests/online/test_tui_layers_t21.py
+- **Outcome:** Changed
+### What I asked for
+Task T2.1 of Spec 004 (Q6 approved): make my personal settings (profile, GPU devices) apply in a repo that has its own `codecompass.toml`, by layering the user-level file under the repo file.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- New `load_online_config_layers(paths)` (lowest priority first), kept separate from `load_online_config` so the approved T0.1 loader tests are untouched.
+- Tests first: 14 tests; 12 fail (8 with `NotImplementedError` from a stub loader, 4 on the old behaviour of the TUI) and 2 pass as guards (the repo still wins a conflict, and `--config` still uses only its own file). I approved them, then `load_online_config_layers` and the TUI wiring were implemented; all 14 pass.
+- Banner format chosen so the approved T1.2 test still holds: `config: <repo file>, <user file>`, highest priority first.
+- Implementation: `load_online_config` was split into reading the file and `_build_online_config(raw, anchor)` (behaviour unchanged, the approved T0.1 tests still pass); the layers function merges parsed tables, makes each file's relative `index.dir` absolute first, and names the file in a TOML syntax error.
+- One decision to review: an unknown top-level section (for example a mistyped `[embeder]`) is rejected by the new layered loader but was silently ignored by the old one. I kept the old loader as it was to avoid changing what teammates' files do; the TUI always uses the layered one.
+- `pytest -m "not model"`: all passing.
+
+## 2026-11-01 · T2.2 Streaming in the generator
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/generator/llama.py, tests/support/fake_http.py, tests/online/test_stream_generator_t22.py
+- **Outcome:** Changed
+### What I asked for
+Task T2.2 of Spec 004: let the generator wrapper stream the model's text to a callback, so the terminal can show a clearly labelled unchecked draft (Q5), with all `llama-server` streaming kept inside the one wrapper (Article VIII.2).
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Tests first: 12 tests in the new file; 10 fail (the callback is never called, there is no `stream` flag in the request, and a lost stream does not raise) and the 5 existing T7.2 generator tests plus 2 new guards pass. A stub `on_text=None` parameter, which is ignored, was added to `generate()` so the tests fail on assertions rather than on an unexpected-argument error. I approved them, then `post_stream` (in `generator/http.py`) and the streaming branch of `generate()` were added; all 12 pass.
+- `tests/support/fake_http.py` gained streaming modes (text deltas, hand-written event bytes, a dropped stream, an open error, a stream-only error).
+- My first version of the connection and timeout tests failed for the wrong reason: the readiness check runs first and reports "not ready" for an unreachable server, so those tests now fail only the streaming request, as a real mid-session loss would.
+- Implementation: `post_stream` parses the event stream (ignores comments, blank lines and `event:` lines, stops at `[DONE]`, raises if the stream ends without it) and yields a plain-JSON reply as one event when the server ignores `stream`. An HTTP error on opening raises the new `StreamRefused`, which `generate()` answers with one normal call.
+- Checked against the real `llama-server` (7B): the streamed pieces joined equal the returned text, which equals the non-streamed reply, and pieces arrived about 0.08 s apart.
+- `pytest -m "not model"`: 578 passed.
+
+## 2026-11-01 · T2.3 Draft through the harness and ask()
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/agent/harness.py, codecompass/online/logging.py, codecompass/online/__init__.py, tests/support/stub_generator.py, tests/online/test_draft_t23.py
+- **Outcome:** Changed
+### What I asked for
+Task T2.3 of Spec 004: pass the model's text, as it is written, from the generator up to an optional `on_draft` callback in `ask()`, without ever forwarding tool-call text, and without changing any result or audit log when no callback is given.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Tests first: 15 tests; 10 fail on assertions (nothing is forwarded yet) and 5 pass as guards (no callback means no streaming, and the same run). The full suite still has no other failures.
+- Inert `on_draft` / `on_text` parameters were added to `run_agent`, `ask` and `TimedGenerator` (ignored for now) so the tests fail on assertions rather than on unexpected arguments. `StubGenerator` can now stream its canned text in small pieces.
+- Design choice to review: the filter forwards everything before a `<tool>` tag and nothing from it onwards, holding back at most five characters that might be the start of a tag. Prose written before a tool request is therefore shown.
+- Two of my own tests had bugs (a path type and a fake profile missing a field) and were fixed before review. I approved them, then the filter and the plumbing were implemented; all 15 pass.
+- Implementation: a small `_DraftFilter` in `agent/harness.py` (forward text up to a `<tool>` tag, hold back at most five characters that could start one, flush a held tail that never became a tag), `_generate()` that gives the generator a callback only when `on_draft` is set, and the callback passed down through `ask()`, `_agent()`, `_retrieve_and_answer()` and `TimedGenerator`. `pytest -m "not model"`: 593 passed.
+- From here on I told the assistant to treat test approval as given and finish the remaining tasks without stopping at each gate; tests are still written and committed before the code.
+
+## 2026-11-01 · T2.4 The draft in the terminal
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/tui.py, tests/online/test_tui_draft_t24.py, docs/specs/004-tui/spec.md, docs/specs/004-tui/plan.md, docs/specs/004-tui/tasks.md
+- **Outcome:** Changed
+### What I asked for
+Task T2.4 of Spec 004: show the model's text live on stderr as an unmistakable, unchecked draft (Q5), with only the checked answer on stdout, and a `--no-draft` option.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Spec change before the tests: I dropped the live "Drafting… N s" counter (it would need a timer thread rewriting a line that is already receiving text) and used closing lines instead: `Draft finished after N s.` and `── Checked answer (replaces the draft above) ──`. Also added: control characters from the model are removed so a draft cannot restyle or overwrite the screen.
+- Tests first: 21 tests, 13 failing on assertions at first. Two of my own assertions were wrong (they ignored the next `> ` prompt and the status-line clear sequence), so I corrected them in a separate `test(T2.4)` commit before the implementation commit. The behaviour under test did not change.
+- `run_session` takes a `draft` flag and calls `answer(question, on_draft=...)` only when it is set and stderr is a terminal, so the approved T1.1 tests, whose fake answers take only a question, still pass unchanged.
+- `pytest -m "not model"`: 614 passed.
+
+## 2026-11-01 · T2.5 Background warm-up
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/__init__.py, codecompass/online/tui.py, tests/online/test_warmup_t25.py
+- **Outcome:** Changed
+### What I asked for
+Task T2.5 of Spec 004: bring the index current and load the models in the background while I type my first question.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- New `online.warm_up(repo, config=...)`: runs `ensure_current`, opens the index and embeds one query (loads the embedder), and runs the re-ranker once, on the shared models from T0.1, printing nothing. The TUI runs it in a daemon thread on a terminal only, after a good start-up.
+- A question asked while it runs shows `Preparing index and models…` and waits; a warm-up error is dropped in the thread and the question reports its own; `/exit` never waits (daemon thread); piped input and failed start-ups start nothing.
+- Tests first: 11 tests, 7 failing on the missing behaviour and 4 guards. I tightened one test that passed vacuously because `pytest.raises(Exception)` also caught the stub's `NotImplementedError`. The threaded tests passed 8 runs out of 8.
+- Risk to know about: a daemon thread that is still loading a model when the process exits could in principle misbehave at interpreter shutdown. I did not see it, and a clean `/exit` normally comes after the warm-up has finished.
+- `pytest -m "not model"`: 625 passed.
+
+## 2026-11-01 · T2.6 Docs for draft, warm-up, layered config and GPU settings; real terminal check
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** README.md, docs/specs/004-tui/spec.md
+- **Outcome:** Changed
+### What I asked for
+Finish the TUI: document draft streaming, warm-up and layered config, and check the whole thing in a real terminal.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- README section 7 now describes layered config, the warm-up, the unchecked draft (and `--no-draft`), and a GPU table with the measurements and the VRAM and CPU-only `llama-server` caveats. Known limitations were corrected where they said there was no streaming.
+- Spec 004: Q6 marked resolved, AC-1.13 marked as amended by AC-3.1, status set to implemented.
+- Real run through a pseudo-terminal against the 7B server with this repo's config layered over my user-level file: the banner listed both files, the warm-up ran while I "typed" for 12 s, the question showed the `⚠ DRAFT — NOT CHECKED` header and 32 marked, dimmed lines over 34 s, then `Draft finished after 34 s.`, `── Checked answer (replaces the draft above) ──` and the checked answer. The 7B again wrote no inline `[N]` markers, so the checked answer carried the uncited-answer note, which is the checker doing its job.
+- `pytest -m "not model"`: 625 passed.

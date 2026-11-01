@@ -22,16 +22,23 @@ def answer_citing(path: str, start: int, end: int, commit: str) -> str:
 class StubGenerator:
     """Returns canned responses in order, then repeats the last one."""
 
-    def __init__(self, responses: list[str]) -> None:
+    def __init__(self, responses: list[str], piece_size: int = 4) -> None:
         if not responses:
             raise ValueError("StubGenerator needs at least one response")
         self._responses = list(responses)
+        self.piece_size = piece_size
         self.calls: list[list[dict]] = []
+        self.streamed: list[bool] = []  # per call: was a text callback given?
 
-    def generate(self, messages: list[dict]) -> str:
+    def generate(self, messages: list[dict], *, on_text=None) -> str:
         self.calls.append(copy.deepcopy(messages))
+        self.streamed.append(on_text is not None)
         index = min(len(self.calls), len(self._responses)) - 1
-        return self._responses[index]
+        text = self._responses[index]
+        if on_text is not None:  # stream the canned text in small pieces
+            for i in range(0, len(text), self.piece_size):
+                on_text(text[i:i + self.piece_size])
+        return text
 
     def count_tokens(self, text: str) -> int:
         return len(text.split())

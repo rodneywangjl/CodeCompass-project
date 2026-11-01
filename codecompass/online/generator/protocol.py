@@ -22,3 +22,7 @@ class GeneratorError(RuntimeError):
 
 class ServerMismatchError(GeneratorError):
     """The running llama-server cannot serve the active profile (AC-5.12)."""
+
+
+class StreamRefused(GeneratorError):
+    """The server refused a streaming request; a normal request may still work."""

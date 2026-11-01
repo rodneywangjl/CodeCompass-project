@@ -98,7 +98,7 @@ def ensure_current(repo_path, *, config, index_dir=None, embedder=None,
     if embedder is None and embedder_factory is None:
         def embedder_factory():  # the configured embedder, as open_index uses
             from . import embedding
-            return embedding.CodeEmbedder(config.embedder)
+            return embedding.shared_embedder(config.embedder)
     try:
         report = run(repo_path, config=config, index_dir=index_dir,
                      embedder=embedder, embedder_factory=embedder_factory)
@@ -185,7 +185,7 @@ def open_index(repo_path, *, config, index_dir=None,
     The query embedder (default: the pinned one from config, loaded lazily) is
     attached to the handles; config and embedder must both match the index.
     """
-    from .embedding import CodeEmbedder
+    from .embedding import shared_embedder
     from .stores.keyword import KeywordIndex
     from .stores.vector import VectorStore
     idx = index_path_for(repo_path, _base_dir(config, index_dir))
@@ -194,7 +194,7 @@ def open_index(repo_path, *, config, index_dir=None,
         model=config.embedder.model, revision=config.embedder.revision,
         dimension=config.embedder.dimension))
     if embedder is None:
-        embedder = CodeEmbedder(config.embedder)
+        embedder = shared_embedder(config.embedder)
     check_compatible(meta, embedder.identity)
     return IndexHandles(
         vector=ReadOnlyVectorStore(VectorStore(

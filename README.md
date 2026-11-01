@@ -21,6 +21,7 @@ This repository implements both pipelines. The **offline indexing pipeline** (Sp
   - [4. Use the Python API](#4-use-the-python-api)
   - [5. Configure CodeCompass](#5-configure-codecompass)
   - [6. Ask a question](#6-ask-a-question)
+  - [7. Interactive mode (`codecompass`)](#7-interactive-mode-codecompass)
 - [How indexing works](#how-indexing-works)
 - [Project structure](#project-structure)
 - [Testing](#testing)
@@ -291,6 +292,54 @@ result = ask("/path/to/repo", "Why does login retry?", config=load_online_config
 print(result.answer, result.citation_outcome, result.audit_log["log_file"])
 ```
 
+### 7. Interactive mode (`codecompass`)
+
+A small prompt loop over the same pipeline, so you do not retype a long command for each question. Install the command once (needs network to fetch the pinned build backend), then run it inside any git repository:
+
+```bash
+.venv/bin/pip install -e .      # once; adds `codecompass` to the venv
+cd /path/to/repo                # the repo root or any folder inside it
+codecompass                     # or: codecompass /path/to/repo
+```
+
+```
+> Why does authenticate retry on timeout?
+...answer, then a Sources section...
+> /exit
+```
+
+- **Repo root:** found with `git rev-parse --show-toplevel`, so it is the same from the root or a subfolder. Every index, retrieval and git-tool call uses that root.
+- **Config files are layered.** Built-in defaults, then your user-level file `~/.config/codecompass/codecompass.toml` (or `$XDG_CONFIG_HOME/codecompass/`), then `<repo root>/codecompass.toml` on top. A key the repo file sets wins; keys it leaves out keep your value; a `[generator.profiles.NAME]` table replaces the whole profile of that name. `--config PATH` uses only that file, and a path that does not exist is an error. The startup banner lists every file used, repo file first. Put personal choices (for example `default_profile = "dev-7b"` and the GPU settings below) in the user-level file and they apply in every repo; a repo's own `default_profile` still wins where it sets one.
+- **Options:** `--profile NAME` (else `GENERATOR_PROFILE`, else the config default), `--config PATH`, `--index-dir DIR`, `--no-draft`.
+- **Output:** only the answer goes to stdout, exactly as `ask()` returns it, so a flagged answer always shows its banner and `[UNVERIFIED]` marks. The prompt, a "Thinking…" line, the startup banner, warnings and errors go to stderr, and only on a terminal. Piped input works: `codecompass < questions.txt > answers.txt`.
+- **Keys:** `/exit`, `/quit` or Ctrl-D to leave. Ctrl-C at the prompt prints a hint; Ctrl-C during a question abandons it and returns to the prompt. A failed question prints `error: ...` and the session carries on.
+- **Generator:** the command never starts `llama-server`. If it is not running, or does not match the profile, you get a warning with the start command and the session still opens.
+- **Models:** the generator, re-ranker and embedder are created once per session and reused. Each question is independent (there is no conversation memory).
+- **Warm-up:** on a terminal, as soon as the session opens, a background thread brings the index current and loads the models while you type. A question asked before it finishes shows `Preparing index and models…` and waits; one asked afterwards starts at once. Piped input does not warm up, and `/exit` never waits for it.
+- **Watching the model write (unchecked draft):** on a terminal, the model's text appears on stderr as it is written, under `⚠ DRAFT — NOT CHECKED. The model is still writing. Do not rely on this text.`, every line starting with `draft │ ` and dimmed. When the answer is ready you see `Draft finished after N s.` and `── Checked answer (replaces the draft above) ──`, and only then does the **checked** answer go to stdout. The draft is never on stdout, has not been through the citation check, and may contain citations that the check will flag. Turn it off with `--no-draft`; it is also off when stderr is not a terminal. Control characters in the draft are removed.
+
+#### Speeding it up on a GPU
+
+Measured on an RTX 3070 Ti (8 GB), with this repository and the 7B profile:
+
+| Step | CPU | GPU (`device = "cuda"`) |
+|---|---|---|
+| Embedding 192 chunks | 73 s | 2.7 s (27x faster; vectors match to 12 decimals) |
+| Re-ranking one shortlist (50 chunks) | 52 s | 2 s (same top-8 order; peak 3.2 GiB of GPU memory) |
+
+Put this in your user-level config (not in the shared repo file: a teammate without CUDA would fail):
+
+```toml
+[embedder]
+device = "cuda"
+
+[reranker]
+device = "cuda"
+```
+
+The device is not part of the index identity or config fingerprint, so changing it does not force a re-index. Two limits to know: the generator is the next cost, and Arch's `llama-cpp` package is a CPU-only build (`llama-server --list-devices` shows none), so `-ngl` has no effect until you install a CUDA or Vulkan build; and a 7B model (about 5.5 GB with its cache) plus the re-ranker (3.2 GiB) does not fit in 8 GB, so with a GPU `llama-server` you must offload fewer layers or keep one of the two models on the CPU.
+
+
 ## How indexing works
 
 1. **Fast path:** read HEAD and `meta.json`; if equal (and config unchanged), return `up-to-date` with no lock, no file reads, no writes.
@@ -308,6 +357,8 @@ Chunk identity is `sha256(path | symbol | occurrence | text_hash)` — determini
 ## Project structure
 
 ```
+codecompass/online/
+  tui.py             `codecompass` interactive mode (prompt loop, repo root, layered config, draft, warm-up)
 codecompass/offline/
   __init__.py        public API: ensure_current, status, open_index, check_consistency
   config.py          codecompass.toml loader (all tunables live here)
@@ -367,6 +418,9 @@ Hard rules: never edit, weaken, skip, or xfail an approved test to pass; stay in
 - No numeric performance target yet; run reports and query audit logs record timings so one can be set from measurements.
 - Answers describe the code committed at HEAD. Uncommitted changes in the working tree are not indexed.
 - A 14B model on a 16 GB laptop takes about a minute per generator call (`MODEL-SETUP.md` §5).
+- The first question in a repository with no index builds the index first. With the real embedder on CPU that took about 6 minutes for this repository (3 minutes of it indexing, 1 minute re-ranking, 1.5 minutes generating). On a terminal the warm-up does this while you type; the GPU settings above shrink the embedding and re-ranking parts. Run `python -m codecompass.offline.cli index <repo>` ahead of time to pay it separately.
+- Interactive mode has no conversation memory and no arrow-key history. The text streamed while the model writes is an unchecked draft, not an answer (see section 7).
+- A daemon warm-up thread that is still loading a model when you exit is abandoned, not waited for.
 
 ---
 

@@ -1,0 +1,263 @@
+"""Minimal terminal UI (Spec 004): `codecompass` prompt loop over ask()."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import re
+import shlex
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+from urllib.parse import urlsplit
+
+PROMPT = "> "
+STATUS = "Thinking…"
+CLEAR_LINE = "\r\x1b[K"
+DRAFT_HEADER = "⚠ DRAFT — NOT CHECKED. The model is still writing. Do not rely on this text."
+DRAFT_MARK = "draft │ "
+CHECKED_MARK = "── Checked answer (replaces the draft above) ──"
+DIM, RESET = "\x1b[2m", "\x1b[0m"
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")  # all but \n and \t
+EXIT_COMMANDS = ("/exit", "/quit")
+CONFIG_NAME = "codecompass.toml"
+DEFAULT_PORT = 8080  # llama-server port when the configured URL names none
+
+
+def _say(stream, text: str) -> None:
+    stream.write(text)
+    stream.flush()
+
+
+class _DraftPrinter:
+    """Show the model's unchecked text on stderr so it cannot be taken for the answer.
+
+    A header first, every line marked and dimmed, control characters removed
+    (Spec 004 AC-2.1, AC-2.2).
+    """
+
+    def __init__(self, stderr, status: bool) -> None:
+        self._stderr, self._status = stderr, status
+        self.started, self._at_line_start, self._t0 = False, True, 0.0
+
+    def write(self, piece: str) -> None:
+        piece = _CONTROL.sub("", piece)
+        if not piece:
+            return
+        if not self.started:
+            self.started, self._t0 = True, time.monotonic()
+            _clear(self._stderr, self._status)
+            _say(self._stderr, DRAFT_HEADER + "\n")
+        for part in re.split("(\n)", piece):
+            if part == "\n":
+                if self._at_line_start:  # a blank line is still a marked line
+                    _say(self._stderr, f"{DIM}{DRAFT_MARK}{RESET}")
+                _say(self._stderr, "\n")
+                self._at_line_start = True
+            elif part:
+                prefix = DRAFT_MARK if self._at_line_start else ""
+                _say(self._stderr, f"{DIM}{prefix}{part}{RESET}")
+                self._at_line_start = False
+
+    def _end_line(self) -> None:
+        if not self._at_line_start:
+            _say(self._stderr, "\n")
+            self._at_line_start = True
+
+    def finish(self) -> None:
+        """The checked answer is ready: close the draft."""
+        self._end_line()
+        _say(self._stderr, f"Draft finished after {int(time.monotonic() - self._t0)} s.\n"
+                           f"{CHECKED_MARK}\n")
+
+    def discard(self) -> None:
+        """The question failed or was interrupted after some draft was shown."""
+        self._end_line()
+        _say(self._stderr, "(draft discarded)\n")
+
+
+def _end_question(printer, stderr, status: bool, *, failed: bool) -> None:
+    """Close what the question showed on stderr: the status line, or the draft."""
+    if printer is not None and printer.started:
+        printer.discard() if failed else printer.finish()
+    else:
+        _clear(stderr, status)
+
+
+def run_session(answer, *, stdin, stdout, stderr, draft: bool = False) -> int:
+    """Read questions from *stdin*, print ``answer(question)`` to *stdout* (Spec 004).
+
+    Only answers go to stdout. The prompt, status line, hints and errors go to
+    stderr, and only when both streams are terminals (AC-1.5, AC-1.11). With *draft*
+    and a terminal on stderr, ``answer(question, on_draft=...)`` is used and the
+    model's unchecked text is shown on stderr as it is written (AC-2.1). Returns 0
+    on /exit, /quit or end of input; nothing a question does ends the session
+    (AC-1.7, AC-1.8).
+    """
+    prompting = stdin.isatty() and stderr.isatty()
+    status = stderr.isatty()
+    while True:
+        if prompting:
+            _say(stderr, PROMPT)
+        try:
+            line = stdin.readline()
+        except KeyboardInterrupt:
+            _say(stderr, "\n(type /exit or press Ctrl-D to quit)\n")
+            continue
+        if line == "":  # end of input
+            if prompting:
+                _say(stderr, "\n")
+            return 0
+        question = line.strip()
+        if not question:
+            continue
+        if question in EXIT_COMMANDS:
+            return 0
+        printer = _DraftPrinter(stderr, status) if draft and status else None
+        if status:
+            _say(stderr, STATUS)
+        try:
+            text = answer(question, on_draft=printer.write) if printer else answer(question)
+        except KeyboardInterrupt:
+            _end_question(printer, stderr, status, failed=True)
+            _say(stderr, "Interrupted.\n")
+            continue
+        except Exception as exc:  # noqa: BLE001 (one failed question must not end the session)
+            _end_question(printer, stderr, status, failed=True)
+            _say(stderr, f"error: {str(exc) or type(exc).__name__}\n")
+            continue
+        _end_question(printer, stderr, status, failed=False)
+        _say(stdout, text if text.endswith("\n") else text + "\n")
+
+
+def _clear(stderr, status: bool) -> None:
+    if status:
+        _say(stderr, CLEAR_LINE)
+
+
+def _repo_root(path) -> Path:
+    """The git repository root containing *path* (AC-1.1)."""
+    p = Path(path).expanduser()
+    if not p.exists():
+        raise ValueError(f"path does not exist: {p}")
+    if p.is_file():
+        p = p.parent
+    try:
+        run = subprocess.run(["git", "-C", str(p), "rev-parse", "--show-toplevel"],
+                             capture_output=True, text=True)
+    except FileNotFoundError:
+        raise ValueError("git is not installed or not on PATH") from None
+    if run.returncode != 0:
+        raise ValueError(f"{p} is not a git repository")
+    return Path(run.stdout.strip())
+
+
+def _find_configs(root: Path, explicit: str | None) -> list[Path]:
+    """The config files in force, highest priority first (AC-1.13, AC-3.1).
+
+    --config alone, else the repo file over the user-level file; either may be absent.
+    """
+    if explicit:
+        path = Path(explicit).expanduser()
+        if not path.is_file():
+            raise ValueError(f"config file not found: {path}")
+        return [path]
+    user_dir = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+    candidates = (root / CONFIG_NAME, user_dir / "codecompass" / CONFIG_NAME)
+    return [path for path in candidates if path.is_file()]
+
+
+def _start_warm_up(warm_up, root: Path, config, index_dir) -> threading.Thread:
+    """Run *warm_up* in the background while the user types (Spec 004 AC-3.2).
+
+    A daemon thread, so /exit never waits for it. Its errors are dropped here: the
+    first real question hits the same problem and reports it (AC-3.3).
+    """
+    def run() -> None:
+        try:
+            warm_up(root, config=config, index_dir=index_dir)
+        except Exception:  # noqa: BLE001
+            pass
+
+    thread = threading.Thread(target=run, name="codecompass-warm-up", daemon=True)
+    thread.start()
+    return thread
+
+
+def _start_command(profile, server_url: str) -> str:
+    from codecompass.online.generator.server import launch_command
+    model = f"/path/to/{profile.gguf_file or '<model>.gguf'}"
+    port = urlsplit(server_url).port or DEFAULT_PORT
+    return shlex.join(launch_command(profile, model, port=port))
+
+
+def _check_generator(generator, profile, server_url: str, stderr) -> None:
+    """Warn (never fail) when the generator is down or does not match the profile (AC-1.10)."""
+    try:
+        if generator.health_check():
+            return
+        message = (f"llama-server is not reachable at {server_url}. Start it with:\n"
+                   f"  {_start_command(profile, server_url)}")
+    except Exception as exc:  # noqa: BLE001 (a mismatched server explains itself)
+        message = str(exc) or type(exc).__name__
+    _say(stderr, f"warning: {message}\n")
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="codecompass",
+        description="Ask questions about a git repository, answered with checked citations.")
+    parser.add_argument("repo", nargs="?", default=".",
+                        help="path inside the git repository (default: current directory)")
+    parser.add_argument("--profile", help="generator profile (default: GENERATOR_PROFILE "
+                                          "or the config default)")
+    parser.add_argument("--config", help="codecompass.toml (default: <repo root>/"
+                                         "codecompass.toml, then ~/.config/codecompass/)")
+    parser.add_argument("--index-dir", help="override the index directory")
+    parser.add_argument("--no-draft", action="store_true",
+                        help="do not show the model's unchecked draft while it writes")
+    return parser
+
+
+def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
+    """`codecompass [REPO]`: start an interactive session (Spec 004)."""
+    stdin, stdout, stderr = stdin or sys.stdin, stdout or sys.stdout, stderr or sys.stderr
+    args = _parser().parse_args(argv)
+    try:
+        root = _repo_root(args.repo)
+        config_files = _find_configs(root, args.config)
+        # heavy model libraries are not imported here: they load on the first question
+        import codecompass.online as online
+        from codecompass.online.config import load_online_config_layers
+        from codecompass.online.generator.llama import LlamaServerGenerator
+        from codecompass.online.generator.profiles import resolve_profile
+        config = load_online_config_layers(reversed(config_files))
+        name, profile = resolve_profile(config, args.profile)
+        generator = LlamaServerGenerator(profile, server_url=config.generator.server_url,
+                                         timeout_seconds=config.generator.timeout_seconds)
+    except Exception as exc:  # noqa: BLE001 (startup problems are reported, not traced)
+        _say(stderr, f"error: {exc}\n")
+        return 1
+    if stdin.isatty() and stderr.isatty():
+        _say(stderr, f"codecompass: repo: {root}\n"
+                     f"codecompass: profile {name} ({profile.model_id})\n"
+                     f"codecompass: config: {', '.join(map(str, config_files)) or 'built-in defaults'}\n"
+                     "Type a question. /exit or Ctrl-D to quit.\n")
+    _check_generator(generator, profile, config.generator.server_url, stderr)
+
+    warm = (_start_warm_up(online.warm_up, root, config, args.index_dir)
+            if stdin.isatty() and stderr.isatty() else None)
+
+    def answer(question: str, on_draft=None) -> str:
+        if warm is not None and warm.is_alive():  # only the first question can find it so
+            _say(stderr, f"{CLEAR_LINE}Preparing index and models…")
+            warm.join()
+            _say(stderr, f"{CLEAR_LINE}{STATUS}")
+        return online.ask(root, question, config=config, profile=name,
+                          index_dir=args.index_dir, generator=generator,
+                          on_draft=on_draft).answer
+
+    return run_session(answer, stdin=stdin, stdout=stdout, stderr=stderr,
+                       draft=not args.no_draft)
