@@ -659,3 +659,18 @@ TODO (member)
 - What I could NOT do: run anything on a real Windows or macOS machine. The README marks those rows "not tested". The GPU numbers are still from one Linux NVIDIA laptop.
 - `pytest -m "not model"`: 676 passed (Linux).
 - First CI run on all three systems: Ubuntu and macOS passed; Windows had 6 failures out of 676, all one cause that I introduced: on Windows my new code read the runner's real `%APPDATA%` and ignored a deliberately set `XDG_CONFIG_HOME`, and `Path.home()` ignores `HOME` there, so the older tests that point the user config at a temp folder could not find it. Fix: an explicit `XDG_CONFIG_HOME` wins on every platform (spec amended first), and the shared `world` test fixture now also isolates `USERPROFILE` and `APPDATA`. That edits a fixture from an earlier approved test file; it is isolation only and changes nothing on Linux, and it is in its own commit.
+
+## 2026-11-02 · Say what is wrong when a real source is listed but not referenced
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/citation/checker.py, codecompass/online/citation/formatter.py, codecompass/online/models.py, codecompass/online/__init__.py, tests/online/test_unreferenced_t161.py, docs/specs/002-online-retrieval/spec.md, plan.md, tasks.md
+- **Outcome:** Changed
+### What I asked for
+Checking the app by hand, Claude found answers shown as "citations could not be verified" with `[UNVERIFIED]` on a source that did match a chunk the model was sent (`backend/registration_policy.py`, lines 31-74). The 7B model had listed the source under `Sources` but never wrote `[1]` in the answer. I asked for the wording to describe what is actually wrong.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- The rule stays: an entry no marker refers to is outcome G and stays in `unverified` (plan D9.3, approved `test_entry_without_marker_is_g`). What changes is how it is shown: a new `CitationResult.unreferenced` list; entries that matched the evidence but are not referenced get `[NOT REFERENCED IN ANSWER]` and, when they are the only problem, a banner saying the answer does not say which statement each source supports. Any failed or missing citation keeps the old banner and `[UNVERIFIED]`.
+- Spec first: AC-4.10, AC-7.5, an edge case, clarification C14, plan D20, task T16.1. On a separate branch from `main` (`feat/online-retrieval-t16.1`), so its spec text will meet the evidence-gate branch's at the same places (AC/C/D numbers are different; expect easy doc conflicts, and in `ai-log`).
+- The log gets `unreferenced` only when it is non-empty, because the approved `test_full_pipeline_t122` pins the whole citation record of an ordinary answer.
+- Not changed: the prompt (the 7B ignores the marker instruction, but prompt work is deferred until the evaluation set exists), and what counts as G.
+- Tests first: 17 tests, red first (7 failed on behaviour with the field and banner constant stubbed in, 10 were guards), then green. No approved test needed editing. `pytest -m "not model"`: 694 passed.

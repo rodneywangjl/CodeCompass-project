@@ -43,6 +43,9 @@ class CitationResult:
     outcome: str  # "F" (cited) or "G" (flagged)
     sources: list[SourceEntry] = field(default_factory=list)
     unverified: list[int] = field(default_factory=list)
+    # Markers of entries that match the context but that no inline [N] uses (AC-4.10).
+    # Always a subset of `unverified`.
+    unreferenced: list[int] = field(default_factory=list)
     answer_text: str = ""
     banner: str | None = None
 
