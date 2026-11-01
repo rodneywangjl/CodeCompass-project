@@ -77,8 +77,12 @@ stop_tokens = ["<|im_end|>", "<|endoftext|>"]
 # A different model from dev: results are development signals only and must not be
 # mixed with 14B results (Articles VII.5, VIII.5). Same GGUF as dev-7b.
 # Smaller than dev-7b so the server and an fp16 re-ranker fit together: an 8192
-# context, a 1024-token answer cap (leaves about 4400 tokens for chunks) and a q8
-# key/value cache. Measured: server about 4.6 GiB, fp16 re-ranker 1.6 GiB peak.
+# context, a 1024-token answer cap (leaves about 4400 tokens for chunks), a q8
+# key/value cache, 26 of 29 layers on the GPU and a 256 micro-batch. Measured on an
+# RTX 3070 Ti (8 GB) with the fp16 re-ranker on the GPU and the embedder on the CPU:
+# all layers, or -ub 512, ran out of memory on the second question; this leaves about
+# 400 MiB free and does a question in about 5 s (generation 54 tok/s). Use -ngl 24 on
+# a tighter card.
 # llama.cpp (Article VIII.2): official build b11960 (`llama-server --version`:
 # 0.8.0-dev, commit 8642541b2), ubuntu-cuda-13.4-x64, from
 # https://github.com/ggml-org/llama.cpp/releases/tag/b11960
@@ -97,4 +101,4 @@ context_window = 8192
 temperature = 0.1
 max_tokens = 1024
 stop_tokens = ["<|im_end|>", "<|endoftext|>"]
-server_args = ["-ngl", "99", "--cache-type-k", "q8_0", "--cache-type-v", "q8_0"]
+server_args = ["-ngl", "26", "-ub", "256", "--cache-type-k", "q8_0", "--cache-type-v", "q8_0"]
