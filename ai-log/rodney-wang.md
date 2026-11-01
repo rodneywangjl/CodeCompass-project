@@ -643,3 +643,18 @@ TODO (member)
 - Final run through a real terminal with the server started from the TUI's own printed command: three questions took 8.6 s, 5.1 s and 11.6 s (re-rank 0.7 s, generation 4 to 11 s, fp16 recorded in the log), no errors, peak GPU memory 7,754 of 8,192 MiB. Before the GPU work the same kind of question took about 100 s.
 - Mistakes worth noting: I once ran `pkill -f` with a pattern that also matched my own shell (it killed the command), and my first pseudo-terminal harness waited 388 s on a failed question because it only watched for a success marker.
 - `pytest -m "not model"`: 648 passed.
+
+## 2026-11-01 · T3.4 to T3.6 Make it work on Linux, Windows and macOS
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/config.py, codecompass/online/tui.py, tests/online/test_reranker_devices_t34.py, tests/online/test_tui_platform_t35.py, .github/workflows/ci.yml, README.md, docs/specs/005-gpu-inference/*
+- **Outcome:** Changed
+### What I asked for
+I pointed out that the project has to work for NVIDIA, Mac and Windows, not just my Linux NVIDIA laptop (constitution Article VIII.2).
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Found what assumed one platform: `float16` was only allowed on a `cuda` device (blocking Apple's `mps`), the start command used POSIX quoting, the dimmed/ANSI output could break an old Windows console or an encoding that cannot show `⚠ │ ─`, and the personal config was only looked for in `~/.config`. CI ran on Ubuntu only, so nothing ever tested Windows or macOS.
+- Fixed these tests-first (Spec 005 US4): `float16` is rejected only on the CPU; the start command is quoted per platform with a platform-style placeholder path; Windows turns ANSI on once at start; both output streams replace unencodable characters; Windows reads its config from `%APPDATA%` (falling back to `~/.config`). The platform is faked by patching `sys.platform`, so the tests run anywhere.
+- CI now runs the required suite on Ubuntu, Windows and macOS. README has a per-platform table (build to download, device, status) with official checksums for the Windows and macOS builds.
+- What I could NOT do: run anything on a real Windows or macOS machine. The README marks those rows "not tested". The GPU numbers are still from one Linux NVIDIA laptop.
+- `pytest -m "not model"`: 676 passed (Linux).
