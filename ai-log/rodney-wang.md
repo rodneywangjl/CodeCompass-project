@@ -450,3 +450,18 @@ TODO (member)
 - I approved the tests, then the implementation went in: `shared_embedder()` in `offline/embedding.py` (used by `ensure_current` and `open_index`) and a small cache in `online/__init__.py` for the re-ranker. Both are keyed on class and config, at most 4 entries each.
 - The first version keyed on config only and broke the existing `test_ensure_default_embedder.py` in the full suite (an earlier test had cached a real `CodeEmbedder` for the stub config, so that test's monkeypatch never took effect). I fixed it in the code by adding the class to the key and did not touch any approved test.
 - `pytest -m "not model"`: 506 passed. The test commit comes before the implementation commit on `feat/tui-t0.1`.
+
+## 2026-11-01 · T1.1 Terminal UI session loop
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/tui.py, tests/online/test_tui_session_t11.py
+- **Outcome:** Changed
+### What I asked for
+Task T1.1 of Spec 004: the prompt loop behind `codecompass`. Read a question, print the answer, repeat; quit cleanly; survive errors and Ctrl-C.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- `run_session(answer, *, stdin, stdout, stderr)` takes the answering function and the streams as arguments, so the loop is tested with a fake and needs no model. Only the answer goes to stdout; the prompt, the "Thinking…" status line, hints and errors go to stderr, and only when the stream is a terminal.
+- Tests first: 17 tests, all failing with `NotImplementedError` from a stub `tui.py` (so the failure is missing behaviour, not an import error). I approved them, then the loop was implemented in `codecompass/online/tui.py`.
+- One bug in the first draft: the error line used `exc or type(exc).__name__`, but an exception object is always truthy, so a message-less error printed a blank. The test caught it; the code now tests `str(exc)`. No test was changed.
+- `pytest -m "not model"`: 523 passed.
+- Left for T1.2: `readline` line editing. It only works through `input()`, not through a stream I can fake, so it is not in the loop yet (Spec 004 Q3 is still open).
