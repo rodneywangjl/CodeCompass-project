@@ -100,7 +100,7 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
                 tool_rounds=None, style=None, chrome=None, theme=None,
                 live_tools: bool = False, spinner: bool = False,
                 spinner_interval: float = 1.0, boxed: bool = False, box_width=None,
-                status_info=None) -> int:
+                status_info=None, markdown: bool = False) -> int:
     """Read questions from *stdin*, print ``answer(question)`` to *stdout* (Spec 004).
 
     Only answers go to stdout. The prompt, status line, hints and errors go to
@@ -127,7 +127,8 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
     stderr the status line is a spinner with the elapsed time, redrawn by one thread;
     every stderr write during a question then goes through one lock (AC-6.3). With
     *boxed* the prompt is a rounded box with *status_info* (repo, profile, model)
-    under it, *box_width* columns wide or the terminal's width (AC-6.4).
+    under it, *box_width* columns wide or the terminal's width (AC-6.4). With
+    *markdown* the answer's markdown is styled (AC-6.5).
     """
     prompting = stdin.isatty() and stderr.isatty()
     status = stderr.isatty()
@@ -205,7 +206,10 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
             _say(stderr, f"{_paint(chrome, 'error:', 'danger')} {str(exc) or type(exc).__name__}\n")
             continue
         _end_question(printer, stderr, status, failed=False)
-        shown = style.answer(text) if style is not None else text
+        if style is None:
+            shown = text
+        else:
+            shown = tui_view.render_markdown(text, style) if markdown else style.answer(text)
         _say(stdout, shown if text.endswith("\n") else shown + "\n")
         answered = True
         if tool_rounds is not None:
@@ -414,4 +418,4 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
                        style=style, chrome=chrome,
                        theme=tui_view.ThemeSwitch(theme, [s for s in (style, chrome) if s]),
                        live_tools=live, spinner=live, boxed=live,
-                       status_info=(root.name, name, profile.model_id))
+                       status_info=(root.name, name, profile.model_id), markdown=live)

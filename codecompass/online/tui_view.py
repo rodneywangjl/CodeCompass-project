@@ -158,6 +158,14 @@ _HEADING = re.compile(r"\s*(?:#+\s*)?\**\s*sources\s*\**\s*:?\s*\**\s*", re.IGNO
 _WHOLE_LINE = {formatter.BANNER: "danger", formatter.UNCITED_NOTE: "warn",
                formatter.PARTIAL_NOTE: "warn", STALE_WARNING: "warn"}
 
+# markdown in the model-written body (Spec 004 AC-6.5); underscores are never emphasis
+_MD_HEADING = re.compile(r"^#{1,6}\s+(.*\S)\s*$")
+_MD_BULLET = re.compile(r"^(\s*)[-*]\s+(?=\S)")
+_MD_CODE = re.compile(r"`([^`\n]+)`")
+_MD_BOLD = re.compile(r"\*\*(?=\S)(.+?)(?<=\S)\*\*")
+_MD_ITALIC = re.compile(r"(?<![*\w])\*(?=[^\s*])(.+?)(?<=[^\s*])\*(?![*\w])")
+BOLD_ON, BOLD_OFF, ITALIC_ON, ITALIC_OFF = "\x1b[1m", "\x1b[22m", "\x1b[3m", "\x1b[23m"
+
 
 class Style:
     """Paint text in the colour of a role, for one colour level and theme (AC-5.1)."""
@@ -179,31 +187,62 @@ class Style:
         return f"\x1b[{'1;' if bold else ''}{params}m{text}\x1b[0m"
 
 
-    def answer(self, text: str) -> str:
+    def answer(self, text: str, markdown: bool = False) -> str:
         """*text* with colour added around the flagged-answer parts, and nothing else.
 
         Only escape sequences are inserted: with them removed the result is *text*
         (AC-5.4). Marks, tags and banners are recognised only where the formatter puts
         them, so a lookalike in the middle of a line is not touched, nor is a code fence.
+        With *markdown*, the model-written body (before the last Sources heading, and
+        not a banner, note or mark line) is also styled and its markdown punctuation
+        consumed (AC-6.5); nothing the checker produced is changed.
         """
         if self.level == "none":
             return text
         lines = text.split("\n")
         heading = max((i for i, line in enumerate(lines) if _HEADING.fullmatch(line)),
                       default=None)
-        in_fence = False
+        out, in_fence = [], False
         for i, line in enumerate(lines):
+            body = markdown and (heading is None or i < heading)
             if line.strip().startswith("```"):
                 in_fence = not in_fence
+                if not body:
+                    out.append(line)  # kept as it is; dropped from a styled body
             elif in_fence:
-                continue
+                out.append(self.paint(line, "info") if body else line)
             elif line in _WHOLE_LINE:
-                lines[i] = self.paint(line, _WHOLE_LINE[line])
+                out.append(self.paint(line, _WHOLE_LINE[line]))
             elif i == heading:
-                lines[i] = self.paint(line, "info")
+                out.append(self.paint(line, "info"))
+            elif body and not line.startswith(formatter.MARK):
+                out.append(self._inline(self._markdown_line(line)))
             else:
-                lines[i] = self._inline(line)
-        return "\n".join(lines)
+                out.append(self._inline(line))
+        return "\n".join(out)
+
+    def _markdown_line(self, line: str) -> str:
+        if m := _MD_HEADING.match(line):
+            return BOLD_ON + self.paint(self._markdown_inline(m.group(1)), "accent")
+        if m := _MD_BULLET.match(line):
+            return m.group(1) + "• " + self._markdown_inline(line[m.end():])
+        return self._markdown_inline(line)
+
+    def _markdown_inline(self, line: str) -> str:
+        """Code spans, then bold and italic outside them; an unbalanced line stays as it is."""
+        if line.count("`") % 2:
+            return line
+        parts = _MD_CODE.split(line)  # text, code, text, code, ...
+        if sum(part.count("**") for part in parts[0::2]) % 2:
+            return line
+        out = []
+        for index, part in enumerate(parts):
+            if index % 2:
+                out.append(self.paint(part, "info"))
+            else:
+                part = _MD_BOLD.sub(lambda m: BOLD_ON + m.group(1) + BOLD_OFF, part)
+                out.append(_MD_ITALIC.sub(lambda m: ITALIC_ON + m.group(1) + ITALIC_OFF, part))
+        return "".join(out)
 
     def _inline(self, line: str) -> str:
         head = tail = ""
@@ -250,4 +289,11 @@ class ThemeSwitch:
                 style.level = style.capability
             return f"Theme: {self.state()}."
         return f"Unknown theme {argument!r}. Choices: none, rose-pine."
+
+
+def render_markdown(text: str, style) -> str:
+    """The checked answer as shown in live mode: markdown styled (AC-6.5), then AC-5.4."""
+    if style is None or style.level == "none":
+        return text
+    return style.answer(text, markdown=True)
 
