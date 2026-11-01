@@ -21,7 +21,7 @@ from codecompass.offline.models import EmbedderIdentity
 from tests.support.fixture_repo import build_fixture_repo
 from tests.support.stub_embedder import StubEmbedder
 
-BUDGET = 32 * 1024 ** 2  # the default: batches of up to 1,024 tokens are unaffected
+BUDGET = 32 * 512 ** 2  # the default: batches of chunks up to the 512-token target are unaffected
 
 
 class WordEmbedder:
@@ -72,7 +72,7 @@ def test_the_reported_case_is_split():
     emb = WordEmbedder()
     texts = [_words(2800, f"c{i}") for i in range(32)]
     embed_in_batches(emb, texts, 32, BUDGET)
-    assert max(len(b) for b in emb.batches) <= 4  # 4 * 2800**2 is under 32 * 1024**2
+    assert max(len(b) for b in emb.batches) <= 1  # 2 * 2800**2 is over 32 * 512**2
     assert len(emb.batches) >= 8
 
 
