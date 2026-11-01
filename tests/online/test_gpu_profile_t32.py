@@ -2,7 +2,8 @@
 
 Contract under test (Spec 005 AC-2.1 to AC-2.4):
   - dev-7b-gpu uses the same GGUF file and SHA-256 as dev-7b, an 8192 context, a
-    1024-token answer cap and the llama-server flags that keep it small on the GPU
+    1024-token answer cap and the llama-server flags that keep it small enough to share
+    the GPU with the re-ranker (26 layers, -ub 256, q8 cache: Spec 005 section 1)
   - it passes the start-up budget check and leaves room for at least 5 chunks of 512 tokens
   - the warning printed when the server is down gives a start command with all of it
   - the file records the llama.cpp build and that this is a development profile
@@ -44,9 +45,10 @@ def test_the_context_and_answer_cap_are_the_small_gpu_values(gpu):
     assert (gpu.context_window, gpu.max_tokens) == (8192, 1024)
 
 
-def test_the_server_flags_put_everything_on_the_gpu_with_a_compressed_cache(gpu):
+def test_the_server_flags_keep_it_small_enough_to_share_the_gpu(gpu):
     args = list(gpu.server_args)
-    assert args[args.index("-ngl") + 1] == "99"
+    assert args[args.index("-ngl") + 1] == "26"  # all layers ran out of memory (Spec 005)
+    assert args[args.index("-ub") + 1] == "256"
     assert args[args.index("--cache-type-k") + 1] == "q8_0"
     assert args[args.index("--cache-type-v") + 1] == "q8_0"
 
@@ -61,7 +63,7 @@ def test_the_warning_for_a_server_that_is_down_prints_the_full_start_command(cfg
     command = _start_command(gpu, cfg.generator.server_url)
     assert command.startswith("llama-server -m ")
     assert "qwen2.5-coder-7b-instruct-q4_k_m.gguf" in command
-    for part in ("--host 127.0.0.1", "--port 8080", "-c 8192", "-ngl 99",
+    for part in ("--host 127.0.0.1", "--port 8080", "-c 8192", "-ngl 26", "-ub 256",
                  "--cache-type-k q8_0", "--cache-type-v q8_0"):
         assert part in command
 
