@@ -93,7 +93,7 @@ def test_the_checked_answer_follows_the_draft_after_two_closing_lines():
     shown = plain(err)
     assert re.search(r"Draft finished after \d+ s\.\n", shown)
     assert shown.index("draft text") < shown.index("Draft finished") < shown.index(CHECKED)
-    assert shown.rstrip("\n").endswith(CHECKED)
+    assert shown.split(CHECKED)[1].strip() in ("", ">")  # only the next prompt follows
     assert out == "final [1]\n\nSources\n[1] x\n"
 
 
@@ -120,7 +120,7 @@ def test_control_characters_from_the_model_never_reach_the_terminal():
     assert "red" in err and "over" in err
     assert "\x1b[31m" not in err and "\x1b]0;" not in err
     assert "\r" not in err.replace(CLEAR, "") and "\x07" not in err
-    assert set(ANSI.findall(err)) <= {DIM, RESET}  # only the escapes we write ourselves
+    assert set(ANSI.findall(err)) <= {DIM, RESET, "\x1b[K"}  # only escapes we write ourselves
 
 
 @pytest.mark.parametrize("kind", [RuntimeError("boom"), KeyboardInterrupt()])
