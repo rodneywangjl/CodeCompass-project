@@ -112,7 +112,19 @@ strip_escapes(text) -> str             removes every SGR sequence (used by the t
 - **Where it prints.** The AC-4.1 line and `/tools` go to stderr, so stdout stays "the answer, nothing else" (AC-1.2, AC-1.11). The line is printed after the answer, only when `prompting` is true.
 - **Sanitising (AC-4.3).** Arguments and the result line pass through the same `_CONTROL` filter as the draft, and values over 100 characters are cut with `…`.
 - **Colour (AC-5.2).** `color_level` requires `os.isatty(stream.fileno())`, so the fake terminals in the approved tests (which only define `isatty()`) never get colour, whatever the environment of the machine running the tests. 256-colour output maps each RGB value to the nearest entry of the xterm cube and grey ramp. No colour is used on `dumb` terminals.
-- **Answer colouring (AC-5.4).** `Style.answer(text)` works line by line on text that is already final: it wraps whole lines equal to the known banner and note constants (`formatter.BANNER`, `UNREFERENCED_BANNER`, `UNCITED_NOTE`, `PARTIAL_NOTE`, the stale-index warning), the line-start marks, the trailing ` (not cited)` tag, `[N]` markers and the `Sources` heading. It never inserts, removes or reorders characters other than escape sequences; the tests assert `strip_escapes(Style.answer(t)) == t` over a property-style set of answers.
+- **Answer colouring (AC-5.4).** `Style.answer(text)` works line by line on text that is already final and never inserts, removes or reorders anything except escape sequences. What it paints, by role:
+
+  | Text | Role | How |
+  |---|---|---|
+  | a whole line equal to `formatter.BANNER` | danger | whole line |
+  | a whole line equal to `formatter.UNCITED_NOTE`, `PARTIAL_NOTE` or `online.STALE_WARNING` | warn | whole line |
+  | `[UNVERIFIED]` at the start of a line (its trailing space stays plain) | danger | the bracket text |
+  | a trailing ` (not cited)` (the space stays plain) | tag | `(not cited)` |
+  | an inline marker `[N]`, found as the checker finds it (`(?<![\w\]])\[(\d+)\]`), in the body and in `Sources` entries | accent | the marker |
+  | the last line that is a `Sources` heading, by the checker's own pattern | info | whole line |
+
+  Follow-up, after Spec 002 AC-4.10 is in `main`: `formatter.UNREFERENCED_BANNER` (whole line) and the `[NOT REFERENCED IN ANSWER]` mark, both `warn`, using the formatter's own constants. Lines inside a fenced code block are left alone. Marks, tags and banners are recognised only where the formatter puts them (line start, line end, whole line), so a lookalike in the middle of a line is untouched. The `ok` role is never used on an answer: a test replaces its colour with a sentinel and checks that the sentinel never appears. The tests assert `strip_escapes(Style.answer(t)) == t` over real `formatter.render` output, and `Style("none", theme).answer(t) == t`.
+- **Wiring (T3.3).** `run_session(..., style=None)`: with a `Style`, each answer is written as `style.answer(text)`; without one, as before. `main` makes the style from the colour level of `stdout` itself (`color_level(stdout, os.environ)`) and `theme_name(None, os.environ)`, inside its startup `try`, so an unknown `CODECOMPASS_THEME` is the usual `error: ...` with exit code 1. The `--theme` and `--no-color` flags come in T3.4. Colour on stdout is decided by stdout alone: piped stdout is never coloured, even if stderr is a terminal.
 - **Themes (AC-5.1, AC-5.6).** `Style(level, theme)`; `theme_name(flag, environ)` resolves `--theme`, then `CODECOMPASS_THEME`, then `auto` (`COLORFGBG` last field `7` or `15` means `light`). The palettes, by role:
 
   | Role | Used for | `dark` (Rosé Pine Moon) | `light` (Rosé Pine Dawn) |
