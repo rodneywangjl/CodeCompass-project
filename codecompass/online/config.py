@@ -170,7 +170,11 @@ def load_online_config(path: str | pathlib.Path | None) -> OnlineConfig:
         if p.exists():
             with p.open("rb") as fh:
                 raw = tomllib.load(fh)
+    return _build_online_config(raw, anchor)
 
+
+def _build_online_config(raw: dict[str, Any], anchor: pathlib.Path | None) -> OnlineConfig:
+    """Validate parsed TOML *raw* into an :class:`OnlineConfig` (relative paths use *anchor*)."""
     # 1. Retrieval
     retrieval_raw = raw.get("retrieval", {})
     retrieval = RetrievalConfig(**retrieval_raw)
@@ -234,6 +238,55 @@ def load_online_config(path: str | pathlib.Path | None) -> OnlineConfig:
     )
 
 
+def _anchor_paths(raw: dict[str, Any], anchor: pathlib.Path) -> dict[str, Any]:
+    """Make a file's relative ``index.dir`` absolute against that file's directory."""
+    index = raw.get("index")
+    if isinstance(index, dict) and isinstance(index.get("dir"), str) \
+            and not os.path.isabs(index["dir"]):
+        raw = {**raw, "index": {**index, "dir": str(anchor / index["dir"])}}
+    return raw
+
+
+def _merge_layers(layers: list[dict[str, Any]]) -> dict[str, Any]:
+    """Section by section, later keys win; a profile table replaces the whole profile."""
+    merged: dict[str, Any] = {}
+    for layer in layers:
+        for section, values in layer.items():
+            if not isinstance(values, dict):
+                merged[section] = values  # the validator reports a non-table section
+                continue
+            if section == "generator":
+                profiles = {**merged.get("generator", {}).get("profiles", {}),
+                            **values.get("profiles", {})}
+                merged["generator"] = {**merged.get("generator", {}),
+                                       **{k: v for k, v in values.items() if k != "profiles"}}
+                if profiles:
+                    merged["generator"]["profiles"] = profiles
+            else:
+                merged[section] = {**merged.get(section, {}), **values}
+    return merged
+
+
 def load_online_config_layers(paths) -> OnlineConfig:
-    """Merge several `codecompass.toml` files, lowest priority first (Spec 004 AC-3.1)."""
-    raise NotImplementedError
+    """Merge several `codecompass.toml` files, lowest priority first (Spec 004 AC-3.1).
+
+    Keys of a later file win section by section, a ``[generator.profiles.X]``
+    table replaces the whole profile of that name, and a relative ``index.dir``
+    resolves against the file that set it. The merged result is validated as one
+    config, and an unknown section in any file is rejected.
+    """
+    layers = []
+    for path in paths:
+        p = pathlib.Path(path)
+        if not p.exists():
+            continue
+        try:
+            with p.open("rb") as fh:
+                raw = tomllib.load(fh)
+        except tomllib.TOMLDecodeError as exc:
+            raise ValueError(f"{p}: {exc}") from exc
+        unknown = sorted(set(raw) - _ONLINE_SECTIONS - _OFFLINE_SECTIONS)
+        if unknown:
+            raise ValueError(f"{p}: unknown config section: {', '.join(unknown)}")
+        layers.append(_anchor_paths(raw, p.parent))
+    return _build_online_config(_merge_layers(layers), None)

@@ -88,18 +88,19 @@ def _repo_root(path) -> Path:
     return Path(run.stdout.strip())
 
 
-def _find_config(root: Path, explicit: str | None) -> Path | None:
-    """--config, else <root>/codecompass.toml, else the user-level file (AC-1.13)."""
+def _find_configs(root: Path, explicit: str | None) -> list[Path]:
+    """The config files in force, highest priority first (AC-1.13, AC-3.1).
+
+    --config alone, else the repo file over the user-level file; either may be absent.
+    """
     if explicit:
         path = Path(explicit).expanduser()
         if not path.is_file():
             raise ValueError(f"config file not found: {path}")
-        return path
+        return [path]
     user_dir = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
-    for path in (root / CONFIG_NAME, user_dir / "codecompass" / CONFIG_NAME):
-        if path.is_file():
-            return path
-    return None
+    candidates = (root / CONFIG_NAME, user_dir / "codecompass" / CONFIG_NAME)
+    return [path for path in candidates if path.is_file()]
 
 
 def _start_command(profile, server_url: str) -> str:
@@ -141,13 +142,13 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
     args = _parser().parse_args(argv)
     try:
         root = _repo_root(args.repo)
-        config_path = _find_config(root, args.config)
+        config_files = _find_configs(root, args.config)
         # heavy model libraries are not imported here: they load on the first question
         import codecompass.online as online
-        from codecompass.online.config import load_online_config
+        from codecompass.online.config import load_online_config_layers
         from codecompass.online.generator.llama import LlamaServerGenerator
         from codecompass.online.generator.profiles import resolve_profile
-        config = load_online_config(config_path)
+        config = load_online_config_layers(reversed(config_files))
         name, profile = resolve_profile(config, args.profile)
         generator = LlamaServerGenerator(profile, server_url=config.generator.server_url,
                                          timeout_seconds=config.generator.timeout_seconds)
@@ -157,7 +158,7 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
     if stdin.isatty() and stderr.isatty():
         _say(stderr, f"codecompass: repo: {root}\n"
                      f"codecompass: profile {name} ({profile.model_id})\n"
-                     f"codecompass: config: {config_path or 'built-in defaults'}\n"
+                     f"codecompass: config: {', '.join(map(str, config_files)) or 'built-in defaults'}\n"
                      "Type a question. /exit or Ctrl-D to quit.\n")
     _check_generator(generator, profile, config.generator.server_url, stderr)
 

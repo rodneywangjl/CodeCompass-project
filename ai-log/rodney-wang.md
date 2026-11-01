@@ -523,3 +523,19 @@ TODO (member)
 - Found that a repo's own `codecompass.toml` hides the user-level file, so personal GPU and profile settings would not reach this repo. The spec proposes layering (Q6), which changes what I approved in Q4.
 - Created `~/.config/codecompass/codecompass.toml` (profile `dev-7b`, embedder and re-ranker on `cuda`). It applies in repos without their own config, or with `--config`.
 - Phase 2 is spec and tasks only; no tests or code yet. Nothing is committed for `codecompass.toml`.
+
+## 2026-11-01 · T2.1 Layered config
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/config.py, tests/online/test_tui_layers_t21.py
+- **Outcome:** Changed
+### What I asked for
+Task T2.1 of Spec 004 (Q6 approved): make my personal settings (profile, GPU devices) apply in a repo that has its own `codecompass.toml`, by layering the user-level file under the repo file.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- New `load_online_config_layers(paths)` (lowest priority first), kept separate from `load_online_config` so the approved T0.1 loader tests are untouched.
+- Tests first: 14 tests; 12 fail (8 with `NotImplementedError` from a stub loader, 4 on the old behaviour of the TUI) and 2 pass as guards (the repo still wins a conflict, and `--config` still uses only its own file). I approved them, then `load_online_config_layers` and the TUI wiring were implemented; all 14 pass.
+- Banner format chosen so the approved T1.2 test still holds: `config: <repo file>, <user file>`, highest priority first.
+- Implementation: `load_online_config` was split into reading the file and `_build_online_config(raw, anchor)` (behaviour unchanged, the approved T0.1 tests still pass); the layers function merges parsed tables, makes each file's relative `index.dir` absolute first, and names the file in a TOML syntax error.
+- One decision to review: an unknown top-level section (for example a mistyped `[embeder]`) is rejected by the new layered loader but was silently ignored by the old one. I kept the old loader as it was to avoid changing what teammates' files do; the TUI always uses the layered one.
+- `pytest -m "not model"`: all passing.
