@@ -614,3 +614,17 @@ TODO (member)
 - Spec 004: Q6 marked resolved, AC-1.13 marked as amended by AC-3.1, status set to implemented.
 - Real run through a pseudo-terminal against the 7B server with this repo's config layered over my user-level file: the banner listed both files, the warm-up ran while I "typed" for 12 s, the question showed the `⚠ DRAFT — NOT CHECKED` header and 32 marked, dimmed lines over 34 s, then `Draft finished after 34 s.`, `── Checked answer (replaces the draft above) ──` and the checked answer. The 7B again wrote no inline `[N]` markers, so the checked answer carried the uncited-answer note, which is the checker doing its job.
 - `pytest -m "not model"`: 625 passed.
+
+## 2026-11-01 · GPU build, measurements, and Spec 005 / T3.1 re-ranker precision
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** docs/specs/005-gpu-inference/*, codecompass/online/config.py, codecompass/online/retrieval/reranker.py, codecompass/online/__init__.py, tests/online/test_reranker_dtype_t31.py
+- **Outcome:** Changed
+### What I asked for
+Get the 7B generator and the re-ranker running together on my 8 GB GPU so a question takes seconds, not minutes.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Installed the official llama.cpp build b11960 (CUDA 13.4) under `~/.local/opt/llama.cpp/`, after the first download came up short (127 MB of 164 MB and 127 MB of 440 MB, yet reported as success). I resumed with curl and checked both SHA-256 values against GitHub's published digests before extracting. The Arch package is untouched.
+- Measured: the 7B on the GPU does a 3,278-token prompt plus 120 tokens in 2.0 s (3,951 tok/s prompt, 102 tok/s generation), against 85 to 99 s on the CPU build. The fp32 re-ranker ran out of memory next to it; fp16 peaks at 1.6 GiB and takes 0.64 s, with the same top-8 set on 3 of 3 questions and the same order on 2 of 3.
+- New `[reranker] dtype` (`float32` default, `float16`), rejected for unknown values and for float16 on a CPU device. The default load is unchanged; the audit log now records the re-ranker model, revision, device and dtype. This is a pipeline change under Article VII.5 (nothing to re-run yet: no evaluation set).
+- Tests first: 17 tests, 16 failing because the field did not exist and 1 guard. The real CUDA test (`-m model`) passes, so the string dtype loads the pinned model in half precision. `pytest -m "not model"`: 641 passed.

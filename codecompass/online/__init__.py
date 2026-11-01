@@ -130,6 +130,7 @@ def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None =
              else dataclasses.replace(config.tools, max_verifier_rounds=0))
     log = new_log(question, profile_name=profile_name, profile=model, mode=mode,
                   tools=config.tools)
+    log["reranker"] = dataclasses.asdict(config.reranker)  # model, revision, device, dtype
     gen = TimedGenerator(generator or _default_generator(config, model), log)
     check_round_reserve(model, tools, gen.count_tokens(system_prompt(tools_enabled=tools_on)))
 
