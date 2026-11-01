@@ -614,3 +614,48 @@ TODO (member)
 - Spec 004: Q6 marked resolved, AC-1.13 marked as amended by AC-3.1, status set to implemented.
 - Real run through a pseudo-terminal against the 7B server with this repo's config layered over my user-level file: the banner listed both files, the warm-up ran while I "typed" for 12 s, the question showed the `⚠ DRAFT — NOT CHECKED` header and 32 marked, dimmed lines over 34 s, then `Draft finished after 34 s.`, `── Checked answer (replaces the draft above) ──` and the checked answer. The 7B again wrote no inline `[N]` markers, so the checked answer carried the uncited-answer note, which is the checker doing its job.
 - `pytest -m "not model"`: 625 passed.
+
+## 2026-11-01 · GPU build, measurements, and Spec 005 / T3.1 re-ranker precision
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** docs/specs/005-gpu-inference/*, codecompass/online/config.py, codecompass/online/retrieval/reranker.py, codecompass/online/__init__.py, tests/online/test_reranker_dtype_t31.py
+- **Outcome:** Changed
+### What I asked for
+Get the 7B generator and the re-ranker running together on my 8 GB GPU so a question takes seconds, not minutes.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Installed the official llama.cpp build b11960 (CUDA 13.4) under `~/.local/opt/llama.cpp/`, after the first download came up short (127 MB of 164 MB and 127 MB of 440 MB, yet reported as success). I resumed with curl and checked both SHA-256 values against GitHub's published digests before extracting. The Arch package is untouched.
+- Measured: the 7B on the GPU does a 3,278-token prompt plus 120 tokens in 2.0 s (3,951 tok/s prompt, 102 tok/s generation), against 85 to 99 s on the CPU build. The fp32 re-ranker ran out of memory next to it; fp16 peaks at 1.6 GiB and takes 0.64 s, with the same top-8 set on 3 of 3 questions and the same order on 2 of 3.
+- New `[reranker] dtype` (`float32` default, `float16`), rejected for unknown values and for float16 on a CPU device. The default load is unchanged; the audit log now records the re-ranker model, revision, device and dtype. This is a pipeline change under Article VII.5 (nothing to re-run yet: no evaluation set).
+- Tests first: 17 tests, 16 failing because the field did not exist and 1 guard. The real CUDA test (`-m model`) passes, so the string dtype loads the pinned model in half precision. `pytest -m "not model"`: 641 passed.
+
+## 2026-11-01 · T3.2 dev-7b-gpu profile and T3.3 GPU docs, with end-to-end measurements
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass.toml, tests/online/test_gpu_profile_t32.py, docs/specs/005-gpu-inference/*, README.md, ~/.config/codecompass/codecompass.toml (outside the repo)
+- **Outcome:** Changed
+### What I asked for
+Finish the GPU work: a profile that lets the 7B server and the re-ranker share my 8 GB card, the docs for it, and a real test that proves it.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- First draft of the profile used all layers on the GPU (`-ngl 99`). Running it for real showed it fails: the fp16 re-ranker and the server together left about 180 MiB free and the second question ran out of memory; moving the embedder to the CPU was not enough, and `-ub 256` alone passed once by luck and failed the next time.
+- Measured four server settings with six repeated re-ranks each. `-ngl 26 -ub 256` passed every time with about 400 MiB to spare (prompt 2,500 tok/s, generation 54 tok/s); `-ngl 24` is safer and slower (43 tok/s). I changed Spec 005 first, then updated my own T3.2 test to the measured flags in a separate `test(T3.2)` commit, then the profile. That test edit follows a spec change, not a failing result.
+- Final run through a real terminal with the server started from the TUI's own printed command: three questions took 8.6 s, 5.1 s and 11.6 s (re-rank 0.7 s, generation 4 to 11 s, fp16 recorded in the log), no errors, peak GPU memory 7,754 of 8,192 MiB. Before the GPU work the same kind of question took about 100 s.
+- Mistakes worth noting: I once ran `pkill -f` with a pattern that also matched my own shell (it killed the command), and my first pseudo-terminal harness waited 388 s on a failed question because it only watched for a success marker.
+- `pytest -m "not model"`: 648 passed.
+
+## 2026-11-01 · T3.4 to T3.6 Make it work on Linux, Windows and macOS
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/config.py, codecompass/online/tui.py, tests/online/test_reranker_devices_t34.py, tests/online/test_tui_platform_t35.py, .github/workflows/ci.yml, README.md, docs/specs/005-gpu-inference/*
+- **Outcome:** Changed
+### What I asked for
+I pointed out that the project has to work for NVIDIA, Mac and Windows, not just my Linux NVIDIA laptop (constitution Article VIII.2).
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Found what assumed one platform: `float16` was only allowed on a `cuda` device (blocking Apple's `mps`), the start command used POSIX quoting, the dimmed/ANSI output could break an old Windows console or an encoding that cannot show `⚠ │ ─`, and the personal config was only looked for in `~/.config`. CI ran on Ubuntu only, so nothing ever tested Windows or macOS.
+- Fixed these tests-first (Spec 005 US4): `float16` is rejected only on the CPU; the start command is quoted per platform with a platform-style placeholder path; Windows turns ANSI on once at start; both output streams replace unencodable characters; Windows reads its config from `%APPDATA%` (falling back to `~/.config`). The platform is faked by patching `sys.platform`, so the tests run anywhere.
+- CI now runs the required suite on Ubuntu, Windows and macOS. README has a per-platform table (build to download, device, status) with official checksums for the Windows and macOS builds.
+- What I could NOT do: run anything on a real Windows or macOS machine. The README marks those rows "not tested". The GPU numbers are still from one Linux NVIDIA laptop.
+- `pytest -m "not model"`: 676 passed (Linux).
+- First CI run on all three systems: Ubuntu and macOS passed; Windows had 6 failures out of 676, all one cause that I introduced: on Windows my new code read the runner's real `%APPDATA%` and ignored a deliberately set `XDG_CONFIG_HOME`, and `Path.home()` ignores `HOME` there, so the older tests that point the user config at a temp folder could not find it. Fix: an explicit `XDG_CONFIG_HOME` wins on every platform (spec amended first), and the shared `world` test fixture now also isolates `USERPROFILE` and `APPDATA`. That edits a fixture from an earlier approved test file; it is isolation only and changes nothing on Linux, and it is in its own commit.

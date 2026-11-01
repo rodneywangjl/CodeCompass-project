@@ -26,9 +26,11 @@ class BgeReranker:
     def _load(self):
         if self._model is None:
             from sentence_transformers import CrossEncoder
+            extra = ({} if self._config.dtype == "float32"
+                     else {"model_kwargs": {"dtype": self._config.dtype}})
             self._model = CrossEncoder(self._config.model,
                                        revision=self._config.revision,
-                                       device=self._config.device)
+                                       device=self._config.device, **extra)
         return self._model
 
     def rerank(self, query: str, texts: list[str]) -> list[float]:

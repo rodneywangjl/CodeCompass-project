@@ -4,7 +4,13 @@ on: [push, pull_request]
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # The constitution requires Linux, Windows and macOS (Article VIII.2). The required
+    # suite is model-free, so this proves the Python code, not GPU speed (Spec 005 AC-4.6).
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

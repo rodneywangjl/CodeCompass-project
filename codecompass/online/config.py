@@ -51,12 +51,29 @@ class RetrievalConfig:
     final_k: int = DEFAULT_FINAL_K
 
 
+RERANKER_DTYPES = ("float32", "float16")
+
+
 @dataclass(frozen=True)
 class RerankerConfig:
-    """Cross-encoder re-ranking configuration."""
+    """Cross-encoder re-ranking configuration.
+
+    *dtype* is the precision the weights are loaded in. float16 halves the GPU memory
+    (3.2 GiB to 1.6 GiB peak, Spec 005) and is a pipeline change under Article VII.5.
+    """
     model: str = DEFAULT_RERANKER_MODEL
     revision: str = DEFAULT_RERANKER_REVISION
     device: str = "cpu"
+    dtype: str = "float32"
+
+    def __post_init__(self) -> None:
+        if self.dtype not in RERANKER_DTYPES:
+            raise ValueError(f"reranker.dtype must be one of {', '.join(RERANKER_DTYPES)}; "
+                             f"got {self.dtype!r}")
+        if self.dtype == "float16" and self.device.lower().split(":")[0] == "cpu":
+            raise ValueError("reranker.dtype 'float16' needs a GPU device, for example "
+                             "reranker.device = \"cuda\" (NVIDIA) or \"mps\" (Apple); "
+                             f"got device {self.device!r}")
 
 
 @dataclass(frozen=True)

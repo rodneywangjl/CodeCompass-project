@@ -154,6 +154,38 @@ def _repo_root(path) -> Path:
     return Path(run.stdout.strip())
 
 
+def _is_windows() -> bool:
+    return sys.platform == "win32"
+
+
+def _user_config_dir() -> Path:
+    """$XDG_CONFIG_HOME if set (an explicit choice, any platform), else %APPDATA% on
+    Windows, else ~/.config (Spec 005 AC-4.5)."""
+    if os.environ.get("XDG_CONFIG_HOME"):
+        return Path(os.environ["XDG_CONFIG_HOME"])
+    if _is_windows() and os.environ.get("APPDATA"):
+        return Path(os.environ["APPDATA"])
+    return Path.home() / ".config"
+
+
+def _prepare_terminal(*streams) -> None:
+    """Make the terminal safe for what we print (Spec 005 AC-4.3, AC-4.4).
+
+    Windows consoles need ANSI escape handling switched on (running an empty command
+    does it); on every platform, characters the terminal's encoding cannot show are
+    replaced rather than raising.
+    """
+    if _is_windows():
+        os.system("")
+    for stream in streams:
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(errors="replace")
+            except (OSError, ValueError):  # a closed or unusual stream: leave it
+                pass
+
+
 def _find_configs(root: Path, explicit: str | None) -> list[Path]:
     """The config files in force, highest priority first (AC-1.13, AC-3.1).
 
@@ -164,8 +196,7 @@ def _find_configs(root: Path, explicit: str | None) -> list[Path]:
         if not path.is_file():
             raise ValueError(f"config file not found: {path}")
         return [path]
-    user_dir = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
-    candidates = (root / CONFIG_NAME, user_dir / "codecompass" / CONFIG_NAME)
+    candidates = (root / CONFIG_NAME, _user_config_dir() / "codecompass" / CONFIG_NAME)
     return [path for path in candidates if path.is_file()]
 
 
@@ -188,9 +219,11 @@ def _start_warm_up(warm_up, root: Path, config, index_dir) -> threading.Thread:
 
 def _start_command(profile, server_url: str) -> str:
     from codecompass.online.generator.server import launch_command
-    model = f"/path/to/{profile.gguf_file or '<model>.gguf'}"
+    folder = "C:\\path\\to\\" if _is_windows() else "/path/to/"
+    model = folder + (profile.gguf_file or "<model>.gguf")
     port = urlsplit(server_url).port or DEFAULT_PORT
-    return shlex.join(launch_command(profile, model, port=port))
+    command = launch_command(profile, model, port=port)
+    return subprocess.list2cmdline(command) if _is_windows() else shlex.join(command)
 
 
 def _check_generator(generator, profile, server_url: str, stderr) -> None:
@@ -214,7 +247,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--profile", help="generator profile (default: GENERATOR_PROFILE "
                                           "or the config default)")
     parser.add_argument("--config", help="codecompass.toml (default: <repo root>/"
-                                         "codecompass.toml, then ~/.config/codecompass/)")
+                                         "codecompass.toml, then your user-level codecompass.toml)")
     parser.add_argument("--index-dir", help="override the index directory")
     parser.add_argument("--no-draft", action="store_true",
                         help="do not show the model's unchecked draft while it writes")
@@ -224,6 +257,7 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
     """`codecompass [REPO]`: start an interactive session (Spec 004)."""
     stdin, stdout, stderr = stdin or sys.stdin, stdout or sys.stdout, stderr or sys.stderr
+    _prepare_terminal(stdout, stderr)
     args = _parser().parse_args(argv)
     try:
         root = _repo_root(args.repo)

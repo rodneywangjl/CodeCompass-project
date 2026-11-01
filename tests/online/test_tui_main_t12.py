@@ -71,6 +71,8 @@ def world(tmp_path, monkeypatch):
     """Isolated home and config dirs, a fake generator class, and an ask() spy."""
     tmp = tmp_path.resolve()
     monkeypatch.setenv("HOME", str(tmp / "home"))
+    monkeypatch.setenv("USERPROFILE", str(tmp / "home"))  # Windows: Path.home() ignores HOME
+    monkeypatch.delenv("APPDATA", raising=False)  # Windows: the runner's real one would be read
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp / "xdg"))
     monkeypatch.delenv("GENERATOR_PROFILE", raising=False)
     w = SimpleNamespace(tmp=tmp, asks=[], generators=[], healthy=True, health_error=None,
