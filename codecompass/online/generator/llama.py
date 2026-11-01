@@ -37,7 +37,7 @@ class LlamaServerGenerator:
     def health_check(self) -> bool:
         return health_check(self.server_url, self.profile, timeout=self.timeout)
 
-    def generate(self, messages: list[dict]) -> str:
+    def generate(self, messages: list[dict], *, on_text=None) -> str:
         if not self._ready:
             if not self.health_check():
                 raise GeneratorError(
