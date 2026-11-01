@@ -50,8 +50,9 @@ class TimedGenerator:
         self._generator, self._log = generator, log
 
     def generate(self, messages: list[dict], *, on_text=None) -> str:
+        extra = {} if on_text is None else {"on_text": on_text}
         with timed(self._log, "generation"):
-            return self._generator.generate(messages)
+            return self._generator.generate(messages, **extra)
 
     def count_tokens(self, text: str) -> int:
         return self._generator.count_tokens(text)

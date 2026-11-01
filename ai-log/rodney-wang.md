@@ -555,3 +555,19 @@ TODO (member)
 - Implementation: `post_stream` parses the event stream (ignores comments, blank lines and `event:` lines, stops at `[DONE]`, raises if the stream ends without it) and yields a plain-JSON reply as one event when the server ignores `stream`. An HTTP error on opening raises the new `StreamRefused`, which `generate()` answers with one normal call.
 - Checked against the real `llama-server` (7B): the streamed pieces joined equal the returned text, which equals the non-streamed reply, and pieces arrived about 0.08 s apart.
 - `pytest -m "not model"`: 578 passed.
+
+## 2026-11-01 · T2.3 Draft through the harness and ask()
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/agent/harness.py, codecompass/online/logging.py, codecompass/online/__init__.py, tests/support/stub_generator.py, tests/online/test_draft_t23.py
+- **Outcome:** Changed
+### What I asked for
+Task T2.3 of Spec 004: pass the model's text, as it is written, from the generator up to an optional `on_draft` callback in `ask()`, without ever forwarding tool-call text, and without changing any result or audit log when no callback is given.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Tests first: 15 tests; 10 fail on assertions (nothing is forwarded yet) and 5 pass as guards (no callback means no streaming, and the same run). The full suite still has no other failures.
+- Inert `on_draft` / `on_text` parameters were added to `run_agent`, `ask` and `TimedGenerator` (ignored for now) so the tests fail on assertions rather than on unexpected arguments. `StubGenerator` can now stream its canned text in small pieces.
+- Design choice to review: the filter forwards everything before a `<tool>` tag and nothing from it onwards, holding back at most five characters that might be the start of a tag. Prose written before a tool request is therefore shown.
+- Two of my own tests had bugs (a path type and a fake profile missing a field) and were fixed before review. I approved them, then the filter and the plumbing were implemented; all 15 pass.
+- Implementation: a small `_DraftFilter` in `agent/harness.py` (forward text up to a `<tool>` tag, hold back at most five characters that could start one, flush a held tail that never became a tag), `_generate()` that gives the generator a callback only when `on_draft` is set, and the callback passed down through `ask()`, `_agent()`, `_retrieve_and_answer()` and `TimedGenerator`. `pytest -m "not model"`: 593 passed.
+- From here on I told the assistant to treat test approval as given and finish the remaining tasks without stopping at each gate; tests are still written and committed before the code.
