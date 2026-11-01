@@ -70,9 +70,10 @@ class RerankerConfig:
         if self.dtype not in RERANKER_DTYPES:
             raise ValueError(f"reranker.dtype must be one of {', '.join(RERANKER_DTYPES)}; "
                              f"got {self.dtype!r}")
-        if self.dtype == "float16" and not self.device.startswith("cuda"):
-            raise ValueError("reranker.dtype 'float16' needs a CUDA device "
-                             f"(reranker.device = \"cuda\"); got device {self.device!r}")
+        if self.dtype == "float16" and self.device.lower().split(":")[0] == "cpu":
+            raise ValueError("reranker.dtype 'float16' needs a GPU device, for example "
+                             "reranker.device = \"cuda\" (NVIDIA) or \"mps\" (Apple); "
+                             f"got device {self.device!r}")
 
 
 @dataclass(frozen=True)
