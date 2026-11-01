@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from codecompass.online import tui_view
+from codecompass.online import tui_live, tui_view
 
 PROMPT = "> "
 STATUS = "Thinking…"
@@ -96,7 +96,8 @@ def _end_question(printer, stderr, status: bool, *, failed: bool) -> None:
 
 
 def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
-                tool_rounds=None, style=None, chrome=None, theme=None) -> int:
+                tool_rounds=None, style=None, chrome=None, theme=None,
+                live_tools: bool = False) -> int:
     """Read questions from *stdin*, print ``answer(question)`` to *stdout* (Spec 004).
 
     Only answers go to stdout. The prompt, status line, hints and errors go to
@@ -117,7 +118,9 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
     object for stderr: it colours the prompt, status, tool line, ``/tools``, ``error:``
     and the draft header, and never changes a word (AC-5.3). *theme*, a
     ``tui_view.ThemeSwitch``, makes ``/theme`` and ``/theme X`` commands that change
-    the colour of what follows (AC-5.7); without one they are ordinary lines.
+    the colour of what follows (AC-5.7); without one they are ordinary lines. With
+    *live_tools* and a terminal on stderr, ``answer`` is also given ``on_tool`` and
+    each tool call is shown as it finishes (AC-6.2).
     """
     prompting = stdin.isatty() and stderr.isatty()
     status = stderr.isatty()
@@ -151,8 +154,16 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
         printer = _DraftPrinter(stderr, status, chrome) if draft and status else None
         if status:
             _say(stderr, _paint(chrome, STATUS, "info"))
+        options = {}
+        if printer:
+            options["on_draft"] = printer.write
+        if live_tools and status:
+            def show_tool(entry):
+                _say(stderr, CLEAR_LINE + "\n".join(tui_live.tool_lines(entry, chrome)) + "\n"
+                     + _paint(chrome, STATUS, "info"))
+            options["on_tool"] = show_tool
         try:
-            text = answer(question, on_draft=printer.write) if printer else answer(question)
+            text = answer(question, **options)
         except KeyboardInterrupt:
             _end_question(printer, stderr, status, failed=True)
             _say(stderr, "Interrupted.\n")
@@ -294,6 +305,9 @@ def _parser() -> argparse.ArgumentParser:
                                          "says its background is light), dark (Rose Pine Moon) or "
                                          "light (Rose Pine Dawn); the CODECOMPASS_THEME "
                                          "environment variable does the same")
+    parser.add_argument("--plain", action="store_true",
+                        help="no live interface (tool lines as they run, spinner, boxed prompt, "
+                             "styled markdown); plain output")
     parser.add_argument("--no-color", action="store_true",
                         help="use no colour (the NO_COLOR environment variable does the same)")
     return parser
@@ -346,18 +360,23 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
 
     last = {"rounds": []}  # the audit log's tool records of the last answered question
 
-    def answer(question: str, on_draft=None) -> str:
+    live = (stdin.isatty() and tui_live.is_terminal(stderr, os.environ)
+            and not args.plain)  # a real terminal, and not --plain (AC-6.1)
+
+    def answer(question: str, on_draft=None, on_tool=None) -> str:
         if warm is not None and warm.is_alive():  # only the first question can find it so
             _say(stderr, f"{CLEAR_LINE}{_paint(chrome, 'Preparing index and models…', 'info')}")
             warm.join()
             _say(stderr, f"{CLEAR_LINE}{_paint(chrome, STATUS, 'info')}")
+        extra = {"on_tool": on_tool} if on_tool is not None else {}
         result = online.ask(root, question, config=config, profile=name,
                             index_dir=args.index_dir, generator=generator,
-                            on_draft=on_draft)
+                            on_draft=on_draft, **extra)
         last["rounds"] = (getattr(result, "audit_log", None) or {}).get("tool_calls", [])
         return result.answer
 
     return run_session(answer, stdin=stdin, stdout=stdout, stderr=stderr,
                        draft=not args.no_draft, tool_rounds=lambda: last["rounds"],
                        style=style, chrome=chrome,
-                       theme=tui_view.ThemeSwitch(theme, [s for s in (style, chrome) if s]))
+                       theme=tui_view.ThemeSwitch(theme, [s for s in (style, chrome) if s]),
+                       live_tools=live)

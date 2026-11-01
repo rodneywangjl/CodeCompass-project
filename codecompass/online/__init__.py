@@ -65,7 +65,7 @@ def _log_dir(config: OnlineConfig, index_dir) -> Path:
 
 
 def _retrieve_and_answer(handles, repo_path, question, *, config, profile, tools, tools_on,
-                         generator, reranker, log, on_draft=None):
+                         generator, reranker, log, on_draft=None, on_tool=None):
     """Hybrid retrieval, re-rank, budget, then the agent loop (Plan §1)."""
     if handles.vector.count() == 0:
         return NO_EVIDENCE, [], []
@@ -95,17 +95,18 @@ def _retrieve_and_answer(handles, repo_path, question, *, config, profile, tools
                               retrieval=config.retrieval,
                               seen={c.chunk_id for c in sent})
     return _agent(generator, question, sent, runner=runner, tools=tools,
-                  tools_on=tools_on, log=log, on_draft=on_draft)
+                  tools_on=tools_on, log=log, on_draft=on_draft, on_tool=on_tool)
 
 
-def _agent(generator, question, chunks, *, runner, tools, tools_on, log, on_draft=None):
+def _agent(generator, question, chunks, *, runner, tools, tools_on, log, on_draft=None,
+           on_tool=None):
     def run_tool(call):
         with timed(log, "tool_execution"):
             return runner(call)
 
     run = run_agent(generator, question, chunks, run_tool=run_tool,
                     max_rounds=tools.max_verifier_rounds, tools_enabled=tools_on,
-                    on_draft=on_draft)
+                    on_draft=on_draft, on_tool=on_tool)
     log.update(tool_calls=run.rounds, generator_calls=run.generator_calls,
                round_limit_hit=run.round_limit_hit)
     # the checker sees retrieved chunks plus code shown by tools (VI.1, VI.4)
@@ -114,13 +115,15 @@ def _agent(generator, question, chunks, *, runner, tools, tools_on, log, on_draf
 
 def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None = None,
         index_dir=None, generator=None, reranker=None, embedder=None,
-        on_draft=None) -> QueryResult:
+        on_draft=None, on_tool=None) -> QueryResult:
     """Answer *question* about the repository at *repo_path* (Spec US1, US9).
 
     generator, reranker and embedder default to the configured models; tests
     pass stubs. Nothing is printed; everything is in the returned result.
     *on_draft*, if given, receives the model's text as it is written; it is an
     unchecked draft, and only the returned answer has been through the citation check.
+    *on_tool*, if given, receives a copy of the audit record of each tool call as it
+    finishes; it only observes, and with None nothing changes (Spec 004 US6).
     """
     started = time.perf_counter()
     mode = check_mode(config.pipeline.mode)
@@ -155,7 +158,7 @@ def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None =
             answer, chunks, commits = _retrieve_and_answer(
                 handles, repo_path, question, config=config, profile=model, tools=tools,
                 tools_on=tools_on, generator=gen, reranker=reranker, log=log,
-                on_draft=on_draft)
+                on_draft=on_draft, on_tool=on_tool)
         finally:
             handles.close()
 
