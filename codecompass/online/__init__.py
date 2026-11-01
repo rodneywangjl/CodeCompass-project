@@ -25,7 +25,7 @@ from codecompass.online.retrieval.hybrid import retrieve
 from codecompass.online.retrieval.reranker import rerank_chunks
 
 __version__ = "0.1.0"
-__all__ = ["ask"]
+__all__ = ["ask", "warm_up"]
 
 STALE_WARNING = ("⚠ WARNING: The index may be out of date. The answer below is based "
                  "on an older version of the codebase.")
@@ -169,3 +169,9 @@ def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None =
     return QueryResult(answer=rendered, sources=list(result.sources),
                        citation_outcome=result.outcome, stale_index=stale,
                        stale_message=reason, audit_log={**log, "log_file": str(path)})
+
+
+def warm_up(repo_path, *, config: OnlineConfig, index_dir=None, embedder=None,
+            reranker=None) -> None:
+    """Bring the index current and load the models, so the first question does not wait."""
+    raise NotImplementedError
