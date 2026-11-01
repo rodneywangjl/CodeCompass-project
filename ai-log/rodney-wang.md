@@ -493,3 +493,18 @@ TODO (member)
 - All TUI commits now sit on a single branch, `feat/tui`. The earlier stacked branches (`feat/tui-t0.1`, `feat/tui-t1.1`, `docs/spec-004-tui`) were ancestors of it, so deleting them lost nothing.
 - Tests first: 6 tests; 4 fail because `pyproject.toml` has no `[project.scripts]`, `[build-system]` or package list, and 2 pass as guards (the help text and "no runtime dependency"). I approved them, then `pyproject.toml` got a pinned `[build-system]` (setuptools==84.2.1), a `[project.scripts]` entry and a package list limited to `codecompass*`. All 6 pass; `pytest -m "not model"`: 552 passed. `pip install -e .` has not been run yet.
 - I added a check that the build backend is pinned (`setuptools==<version>`), since the repo pins everything that affects results (Article VIII.3).
+
+## 2026-11-01 · T1.4 README for interactive mode, stub index removed, speed measurements
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** README.md
+- **Outcome:** Changed
+### What I asked for
+Task T1.4 of Spec 004 (README "Interactive mode"), deleting the old stub-built index of this repo, and finding out why the first question is slow and what would speed it up. I also asked for streaming output.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- README: a new section 7 "Interactive mode (`codecompass`)" (install, repo-root rule, config order, options, stdout/stderr split, keys, no streaming or memory), a line in Known limitations about the slow first question, and `tui.py` in the project structure.
+- Deleted `~/.local/share/codecompass/a2a4a6a635a2691a` after checking it was the only entry, built with `stub@stub-1`, and stale. No other index was touched.
+- Measured on this machine (192 repo chunks, real embedder): CPU 2.6 chunks/s, CUDA 72.3 chunks/s (27x faster); the vectors agree to 12 decimal places. Setting `[embedder] device = "cuda"` does not change the index identity or config fingerprint, so it needs no re-index.
+- Found that the installed `llama-server` (Arch `llama-cpp` 0.6.0) has no GPU backend (`--list-devices` shows none), so generation runs on CPU. `-ngl 99` has no effect.
+- Not done: streaming. It conflicts with Article VI.1 (nothing is shown before the citation check) and is out of scope in Specs 002 and 004, so it needs a decision and a spec change first.

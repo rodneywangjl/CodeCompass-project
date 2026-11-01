@@ -21,6 +21,7 @@ This repository implements both pipelines. The **offline indexing pipeline** (Sp
   - [4. Use the Python API](#4-use-the-python-api)
   - [5. Configure CodeCompass](#5-configure-codecompass)
   - [6. Ask a question](#6-ask-a-question)
+  - [7. Interactive mode (`codecompass`)](#7-interactive-mode-codecompass)
 - [How indexing works](#how-indexing-works)
 - [Project structure](#project-structure)
 - [Testing](#testing)
@@ -291,6 +292,31 @@ result = ask("/path/to/repo", "Why does login retry?", config=load_online_config
 print(result.answer, result.citation_outcome, result.audit_log["log_file"])
 ```
 
+### 7. Interactive mode (`codecompass`)
+
+A small prompt loop over the same pipeline, so you do not retype a long command for each question. Install the command once (needs network to fetch the pinned build backend), then run it inside any git repository:
+
+```bash
+.venv/bin/pip install -e .      # once; adds `codecompass` to the venv
+cd /path/to/repo                # the repo root or any folder inside it
+codecompass                     # or: codecompass /path/to/repo
+```
+
+```
+> Why does authenticate retry on timeout?
+...answer, then a Sources section...
+> /exit
+```
+
+- **Repo root:** found with `git rev-parse --show-toplevel`, so it is the same from the root or a subfolder. Every index, retrieval and git-tool call uses that root.
+- **Config file:** the first that exists of `--config PATH`, `<repo root>/codecompass.toml`, `~/.config/codecompass/codecompass.toml` (or `$XDG_CONFIG_HOME/codecompass/`), then built-in defaults. A `--config` path that does not exist is an error. The startup banner names the file used. Put your personal profile choice (for example `default_profile = "dev-7b"`) in the user-level file and it follows you into every repo.
+- **Options:** `--profile NAME` (else `GENERATOR_PROFILE`, else the config default), `--config PATH`, `--index-dir DIR`.
+- **Output:** only the answer goes to stdout, exactly as `ask()` returns it, so a flagged answer always shows its banner and `[UNVERIFIED]` marks. The prompt, a "Thinking…" line, the startup banner, warnings and errors go to stderr, and only on a terminal. Piped input works: `codecompass < questions.txt > answers.txt`.
+- **Keys:** `/exit`, `/quit` or Ctrl-D to leave. Ctrl-C at the prompt prints a hint; Ctrl-C during a question abandons it and returns to the prompt. A failed question prints `error: ...` and the session carries on.
+- **Generator:** the command never starts `llama-server`. If it is not running, or does not match the profile, you get a warning with the start command and the session still opens.
+- **Models:** the generator, re-ranker and embedder are created once per session and reused; weights load on the first question. Each question is independent (there is no conversation memory), and answers appear all at once, not token by token.
+- **First question:** if the repository has no index yet, the first question builds it, which is slow on CPU. See [Known limitations](#known-limitations).
+
 ## How indexing works
 
 1. **Fast path:** read HEAD and `meta.json`; if equal (and config unchanged), return `up-to-date` with no lock, no file reads, no writes.
@@ -308,6 +334,8 @@ Chunk identity is `sha256(path | symbol | occurrence | text_hash)` — determini
 ## Project structure
 
 ```
+codecompass/online/
+  tui.py             `codecompass` interactive mode (prompt loop, repo root, config lookup)
 codecompass/offline/
   __init__.py        public API: ensure_current, status, open_index, check_consistency
   config.py          codecompass.toml loader (all tunables live here)
@@ -367,6 +395,8 @@ Hard rules: never edit, weaken, skip, or xfail an approved test to pass; stay in
 - No numeric performance target yet; run reports and query audit logs record timings so one can be set from measurements.
 - Answers describe the code committed at HEAD. Uncommitted changes in the working tree are not indexed.
 - A 14B model on a 16 GB laptop takes about a minute per generator call (`MODEL-SETUP.md` §5).
+- The first question in a repository with no index builds the index first. With the real embedder on CPU that took about 6 minutes for this repository. Run `python -m codecompass.offline.cli index <repo>` ahead of time to pay that cost separately.
+- Interactive mode has no streaming, no conversation memory, and no arrow-key history.
 
 ---
 
