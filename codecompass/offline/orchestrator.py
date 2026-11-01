@@ -140,12 +140,16 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
         policy = SizePolicy(target_tokens=config.chunking.target_tokens,
                             hard_max_tokens=config.chunking.hard_max_tokens)
         from .models import ChunkMode
+        # Size chunks with the embedder's own tokenizer when it has one (spec C7,
+        # AC-3.3); without one the chunkers count whitespace words.
+        tokenizer = getattr(embedder, "tokenize", None)
         new_chunks = []
         files_fallback = 0
         t_chunk = perf_counter()
         for path in included:
             text = blobs[path].decode("utf-8", "replace")
-            chunks, m = chunk_file(path, text, head, policy=policy)
+            chunks, m = chunk_file(path, text, head, policy=policy,
+                                   tokenizer=tokenizer)
             if m is ChunkMode.FALLBACK:
                 files_fallback += 1
             new_chunks.extend(chunks)

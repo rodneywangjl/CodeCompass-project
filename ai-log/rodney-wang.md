@@ -675,3 +675,19 @@ TODO (member)
 - With 32 x 512^2 a 6 GB capped run lasted 17m49s instead of 7m25s but was still killed. Computing the batch plan with the measured numbers shows why: one batch is left over the cap, the single 9,297-token chunk (about 14 GB if it ran; extrapolated, never run). Batching cannot fix that, so it is the next entry (the chunker never uses the embedder's tokenizer).
 - Problem file in spm_proj: `backend/tests/verify_attendee_registrations.py`, lines 59-546, one 488-line function (2,790 words but 9,297 tokens). Next largest: `tests/confirmation.spec.ts:65-345` (4,448), `tests/coordinatorLead.spec.ts:379-677` (3,823), `frontend/src/Coordinator.jsx:679-854` (3,823).
 - Not verified end to end: no capped real run has finished yet, because of that one chunk. `pytest -m "not model"`: 690 passed.
+
+## 2026-11-02 · Chunker sized chunks by words, not the embedder's tokens
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/offline/orchestrator.py, tests/offline/test_chunk_embedder_tokens.py
+- **Outcome:** Changed
+### What I asked for
+After the batching fix still ran out of memory on one chunk, I asked Claude to fix that cause too and to note which file in `spm_proj` causes it.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Cause: both chunkers take an injected `tokenizer` and default to whitespace words; the orchestrator called `chunk_file(path, text, head, policy=policy)` with no tokenizer, so `CodeEmbedder.tokenize` (documented for "C7, AC-3.3") was never used. Spec 001 C7 and AC-3.3 already require the embedder's own tokens and "no emitted chunk exceeds the embedder's input limit", so this is a bug against the spec, not a spec change.
+- Problem file in spm_proj: `backend/tests/verify_attendee_registrations.py`, lines 59-546: one function, 2,790 words, 9,297 tokens (about 3.3 tokens per word), kept whole as a STRUCTURED chunk, over the 8,192-token limit.
+- Fix: the orchestrator passes `embedder.tokenize` (when the embedder has one) to `chunk_file`. Embedders without it (the stub) keep word counts. 4 tests written first and approved by me (2 failed first: a dense Python file and a dense Go file each came out as one oversized chunk; 2 are guards). I dropped a fifth test I had drafted because it passed before the fix.
+- Effect on spm_proj, chunked with the real tokenizer (no embedding): 5,047 chunks instead of 3,217, none over 8,192 (the 9,297 one is split), largest now 4,448 (`tests/confirmation.spec.ts:65-345`), 18 over 2,048. Chunking took 13 s.
+- Not done, my decision: lowering the default `hard_max_tokens` (for example to 2,048). Chunks up to 8,192 tokens are still allowed and one that size is estimated at about 14 GB to embed (extrapolated, not run). Spec C7 makes the ceiling the embedder's limit and a change rebuilds every index, so it needs a spec decision. It is a config value, so a lower one can be set per machine in the meantime.
+- `pytest -m "not model"`: 694 passed. The first line of the diff touched the 6 GB capped run of `spm_proj`: see the next step in this log if it finished.
