@@ -692,3 +692,16 @@ TODO (member)
 - Not done, my decision: lowering the default `hard_max_tokens` (for example to 2,048). Chunks up to 8,192 tokens are still allowed and one that size is estimated at about 14 GB to embed (extrapolated, not run). Spec C7 makes the ceiling the embedder's limit and a change rebuilds every index, so it needs a spec decision. It is a config value, so a lower one can be set per machine in the meantime.
 - `pytest -m "not model"`: 694 passed.
 - End to end, with both fixes (batching and tokenizer), `spm_proj` indexed on the CPU embedder under a 6 GB memory cap with no swap: exit 0, 5,047 chunks, embed 807 s, total 821 s, peak RSS 5,587 MB, and `check` reports both stores consistent (5,047 chunks agree). It passed with only about 0.4 GB to spare, and the 6 GB cap covered the indexing process only (not `llama-server` or the re-ranker). Before the fixes the same run was killed three times (after 8m47s, 7m25s and 17m49s).
+
+## 2026-11-01 · Hide the jina "optimum is not installed" warning
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/offline/embedding.py, tests/offline/test_optimum_warning.py
+- **Outcome:** Changed
+### What I asked for
+The embedder's remote code prints a harmless `optimum is not installed` warning on every start. I asked to hide it, but only that message.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Wrapped the `SentenceTransformer(...)` load in `CodeEmbedder._load()` in `warnings.catch_warnings()` with an `ignore` filter for that one message. Other warnings still show and the filter is gone after the load. Three tests use a fake `sentence_transformers` (no model download); two failed first, the third guards against a global filter.
+- Not a spec task, so it is a `fix:` on branch `fix/hide-optimum-warning`; the test commit came first.
+- Known gap: in the full suite the warning still appeared in 1 of 3 runs, in a warm-up test that loads the real model on a background thread. `warnings.catch_warnings` is not thread-safe, so overlapping threads can drop the filter. With the real model alone, and with the warm-up test file alone, it never appeared. `pytest -m "not model"`: 680 passed.

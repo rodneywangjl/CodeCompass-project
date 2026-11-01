@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Protocol
 
 from codecompass.offline.models import EmbedderIdentity
@@ -88,12 +89,17 @@ class CodeEmbedder:
     def _load(self):
         if self._model is None:
             from sentence_transformers import SentenceTransformer
-            self._model = SentenceTransformer(
-                self._config.model,
-                revision=self._config.revision or None,
-                trust_remote_code=True,
-                device=self._config.device,
-            )
+            with warnings.catch_warnings():
+                # The model's remote code warns that the optional `optimum`
+                # package is missing. It is only for ONNX export, which we do
+                # not use. Hide just that message, just during this load.
+                warnings.filterwarnings("ignore", message="optimum is not installed")
+                self._model = SentenceTransformer(
+                    self._config.model,
+                    revision=self._config.revision or None,
+                    trust_remote_code=True,
+                    device=self._config.device,
+                )
         return self._model
 
     def embed(self, texts: list[str]) -> list[list[float]]:
