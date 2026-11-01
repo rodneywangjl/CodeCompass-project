@@ -106,8 +106,18 @@ def test_windows_reads_the_user_config_from_appdata(world, monkeypatch):  # noqa
     appdata = world.tmp / "AppData" / "Roaming"
     user = write_toml(appdata / "codecompass" / "codecompass.toml", "win")
     monkeypatch.setenv("APPDATA", str(appdata))
+    monkeypatch.delenv("XDG_CONFIG_HOME")  # an explicit XDG_CONFIG_HOME would win (below)
     err = banner_files(world, monkeypatch, "win32")
     assert f"config: {user}" in err and "profile p-win" in err
+
+
+def test_an_explicit_xdg_config_home_wins_on_windows_too(world, monkeypatch):  # noqa: F811
+    appdata = world.tmp / "AppData" / "Roaming"
+    write_toml(appdata / "codecompass" / "codecompass.toml", "win")
+    monkeypatch.setenv("APPDATA", str(appdata))
+    xdg = write_toml(world.tmp / "xdg" / "codecompass" / "codecompass.toml", "xdg")
+    err = banner_files(world, monkeypatch, "win32")  # the fixture sets XDG_CONFIG_HOME
+    assert f"config: {xdg}" in err and "p-win" not in err
 
 
 def test_windows_falls_back_to_dot_config_without_appdata(world, monkeypatch):  # noqa: F811
