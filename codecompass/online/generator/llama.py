@@ -10,8 +10,8 @@ from __future__ import annotations
 import logging
 from urllib.parse import urlsplit
 
-from codecompass.online.generator.http import request_json
-from codecompass.online.generator.protocol import GeneratorError
+from codecompass.online.generator.http import post_stream, request_json
+from codecompass.online.generator.protocol import GeneratorError, StreamRefused
 from codecompass.online.generator.server import health_check
 
 _LOG = logging.getLogger(__name__)
@@ -38,6 +38,8 @@ class LlamaServerGenerator:
         return health_check(self.server_url, self.profile, timeout=self.timeout)
 
     def generate(self, messages: list[dict], *, on_text=None) -> str:
+        """The assistant's reply. With *on_text*, each piece of text is passed to it as
+        the server writes it (Spec 004 US2); the full text is still returned."""
         if not self._ready:
             if not self.health_check():
                 raise GeneratorError(
@@ -45,12 +47,29 @@ class LlamaServerGenerator:
                     "described in MODEL-SETUP.md")
             self._ready = True
         p = self.profile
-        data = self._post("/v1/chat/completions", {
+        payload = {
             "messages": messages, "temperature": p.temperature,
             "max_tokens": p.max_tokens, "stop": list(p.stop_tokens),
             "seed": p.seed, "cache_prompt": p.cache_prompt,
-        })
-        return data["choices"][0]["message"]["content"]
+        }
+        if on_text is None:
+            return self._post("/v1/chat/completions", payload)["choices"][0]["message"]["content"]
+        try:
+            parts = []
+            for event in post_stream(self.server_url + "/v1/chat/completions",
+                                     {**payload, "stream": True}, timeout=self.timeout):
+                for choice in event.get("choices", []):
+                    piece = ((choice.get("delta") or {}).get("content")
+                             or (choice.get("message") or {}).get("content"))
+                    if piece:
+                        parts.append(piece)
+                        on_text(piece)
+            return "".join(parts)
+        except StreamRefused:  # the server will not stream: one normal call instead
+            text = self._post("/v1/chat/completions", payload)["choices"][0]["message"]["content"]
+            if text:
+                on_text(text)
+            return text
 
     def count_tokens(self, text: str) -> int:
         return len(self._post("/tokenize", {"content": text})["tokens"])

@@ -539,3 +539,19 @@ TODO (member)
 - Implementation: `load_online_config` was split into reading the file and `_build_online_config(raw, anchor)` (behaviour unchanged, the approved T0.1 tests still pass); the layers function merges parsed tables, makes each file's relative `index.dir` absolute first, and names the file in a TOML syntax error.
 - One decision to review: an unknown top-level section (for example a mistyped `[embeder]`) is rejected by the new layered loader but was silently ignored by the old one. I kept the old loader as it was to avoid changing what teammates' files do; the TUI always uses the layered one.
 - `pytest -m "not model"`: all passing.
+
+## 2026-11-01 · T2.2 Streaming in the generator
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/generator/llama.py, tests/support/fake_http.py, tests/online/test_stream_generator_t22.py
+- **Outcome:** Changed
+### What I asked for
+Task T2.2 of Spec 004: let the generator wrapper stream the model's text to a callback, so the terminal can show a clearly labelled unchecked draft (Q5), with all `llama-server` streaming kept inside the one wrapper (Article VIII.2).
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Tests first: 12 tests in the new file; 10 fail (the callback is never called, there is no `stream` flag in the request, and a lost stream does not raise) and the 5 existing T7.2 generator tests plus 2 new guards pass. A stub `on_text=None` parameter, which is ignored, was added to `generate()` so the tests fail on assertions rather than on an unexpected-argument error. I approved them, then `post_stream` (in `generator/http.py`) and the streaming branch of `generate()` were added; all 12 pass.
+- `tests/support/fake_http.py` gained streaming modes (text deltas, hand-written event bytes, a dropped stream, an open error, a stream-only error).
+- My first version of the connection and timeout tests failed for the wrong reason: the readiness check runs first and reports "not ready" for an unreachable server, so those tests now fail only the streaming request, as a real mid-session loss would.
+- Implementation: `post_stream` parses the event stream (ignores comments, blank lines and `event:` lines, stops at `[DONE]`, raises if the stream ends without it) and yields a plain-JSON reply as one event when the server ignores `stream`. An HTTP error on opening raises the new `StreamRefused`, which `generate()` answers with one normal call.
+- Checked against the real `llama-server` (7B): the streamed pieces joined equal the returned text, which equals the non-streamed reply, and pieces arrived about 0.08 s apart.
+- `pytest -m "not model"`: 578 passed.
