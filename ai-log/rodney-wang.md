@@ -465,3 +465,18 @@ TODO (member)
 - One bug in the first draft: the error line used `exc or type(exc).__name__`, but an exception object is always truthy, so a message-less error printed a blank. The test caught it; the code now tests `str(exc)`. No test was changed.
 - `pytest -m "not model"`: 523 passed.
 - Left for T1.2: `readline` line editing. It only works through `input()`, not through a stream I can fake, so it is not in the loop yet (Spec 004 Q3 is still open).
+
+## 2026-11-01 · T1.2 Terminal UI startup and wiring
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/tui.py, tests/online/test_tui_main_t12.py
+- **Outcome:** Changed
+### What I asked for
+Task T1.2 of Spec 004: make `codecompass` find the git repo root from wherever it is run, load the right config, check the generator, build it once, and call the real `ask()`.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Tests first: 23 tests; 22 fail with `NotImplementedError` from a stub `main`, and one passes (importing the module loads no model library, a guard). I approved them, then `main()` was implemented in `codecompass/online/tui.py`; all 23 passed on the first run.
+- Covered: repo root from the root, a subdirectory and an explicit path; not-a-repo and missing-path errors; config order (`--config`, repo root, `$XDG_CONFIG_HOME` or `~/.config`, built-in defaults); `--profile`; the banner (terminal only); the generator warning with the `llama-server` start command; one generator per session; and one end-to-end test through the real `ask()` and citation checker with stub models.
+- The generator health check is a warning, never a failure, so the session starts even with no server; the warning includes the `llama-server` start command built from the profile (reusing `launch_command`).
+- `pytest -m "not model"`: 546 passed.
+- Left out on purpose: `readline` (arrow keys and history). It only works through `input()`, which T1.1's approved stream-based loop does not use, so adding it would change that design. I will raise it separately.
