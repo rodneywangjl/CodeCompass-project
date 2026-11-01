@@ -508,3 +508,18 @@ TODO (member)
 - Measured on this machine (192 repo chunks, real embedder): CPU 2.6 chunks/s, CUDA 72.3 chunks/s (27x faster); the vectors agree to 12 decimal places. Setting `[embedder] device = "cuda"` does not change the index identity or config fingerprint, so it needs no re-index.
 - Found that the installed `llama-server` (Arch `llama-cpp` 0.6.0) has no GPU backend (`--list-devices` shows none), so generation runs on CPU. `-ngl 99` has no effect.
 - Not done: streaming. It conflicts with Article VI.1 (nothing is shown before the citation check) and is out of scope in Specs 002 and 004, so it needs a decision and a spec change first.
+
+## 2026-11-01 · Spec 004 phase 2: draft streaming, warm-up and layered config (spec only)
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** docs/specs/004-tui/spec.md, docs/specs/004-tui/plan.md, docs/specs/004-tui/tasks.md, ~/.config/codecompass/codecompass.toml (outside the repo)
+- **Outcome:** Changed
+### What I asked for
+Streaming output, a way to speed up the slow first question, and to know whether putting the re-ranker on the GPU is worthwhile.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Measured per stage (`queries/*.json`): first question 352 s = index 193 s + re-rank 65 s + generation 94 s; after moving the embedder and re-ranker to CUDA the same question took 97 s = index 1 s + re-rank 4 s + generation 85 s. The re-ranker alone was 52 s on CPU and 2 s on the GPU (same top-8, score difference 4e-8, peak 3.2 GiB VRAM). Generation is now the main cost because the installed `llama-server` has no GPU backend.
+- I chose the stderr draft for streaming, so the checked answer is still the only thing on stdout. Whether this fits Article VI.1 is open question Q5 in the spec for the reviewer.
+- Found that a repo's own `codecompass.toml` hides the user-level file, so personal GPU and profile settings would not reach this repo. The spec proposes layering (Q6), which changes what I approved in Q4.
+- Created `~/.config/codecompass/codecompass.toml` (profile `dev-7b`, embedder and re-ranker on `cuda`). It applies in repos without their own config, or with `--config`.
+- Phase 2 is spec and tasks only; no tests or code yet. Nothing is committed for `codecompass.toml`.
