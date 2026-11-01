@@ -45,7 +45,7 @@ Paths are under `codecompass/online/` and `tests/online/` unless stated.
 - ACs: AC-2.3, AC-2.5, AC-2.6. | Touches: `online/__init__.py`, `online/agent/harness.py`, `online/logging.py`, `tests/support/stub_generator.py`, `tests/online/test_draft_t23.py`. | Depends on: T2.2.
 
 **T2.4 Draft in the terminal**
-- Tests first: on a terminal the draft goes to stderr under the `⚠ DRAFT — NOT CHECKED` header with every line prefixed `draft │ ` and dimmed, and only the checked answer reaches stdout; a draft line split across two chunks is still prefixed once; `Draft finished. Checking citations…` and `── Checked answer ──` follow the draft; `--no-draft` and non-terminals stream nothing; Ctrl-C mid-draft returns to the prompt with the status cleared; a flagged answer still shows the banner on stdout.
+- Tests first: on a terminal the draft goes to stderr under the `⚠ DRAFT — NOT CHECKED` header with every line prefixed `draft │ ` and dimmed, and only the checked answer reaches stdout; a draft line split across two chunks is still prefixed once; `Draft finished after N s.` and `── Checked answer (replaces the draft above) ──` follow the draft; control characters in the draft are removed; a failure or Ctrl-C after some draft prints `(draft discarded)`; no chrome when no draft text arrived; `--no-draft` and non-terminals stream nothing; Ctrl-C mid-draft returns to the prompt with the status cleared; a flagged answer still shows the banner on stdout.
 - ACs: AC-2.1, AC-2.2, AC-2.4. | Touches: `tui.py`, `tests/online/test_tui_draft_t24.py`. | Depends on: T2.3.
 
 **T2.5 Warm-up**

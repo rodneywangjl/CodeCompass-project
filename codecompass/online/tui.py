@@ -23,7 +23,7 @@ def _say(stream, text: str) -> None:
     stream.flush()
 
 
-def run_session(answer, *, stdin, stdout, stderr) -> int:
+def run_session(answer, *, stdin, stdout, stderr, draft: bool = False) -> int:
     """Read questions from *stdin*, print ``answer(question)`` to *stdout* (Spec 004).
 
     Only answers go to stdout. The prompt, status line, hints and errors go to
@@ -133,6 +133,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", help="codecompass.toml (default: <repo root>/"
                                          "codecompass.toml, then ~/.config/codecompass/)")
     parser.add_argument("--index-dir", help="override the index directory")
+    parser.add_argument("--no-draft", action="store_true",
+                        help="do not show the model's unchecked draft while it writes")
     return parser
 
 
