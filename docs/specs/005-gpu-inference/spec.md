@@ -1,6 +1,6 @@
 # Spec 005: Running the 7B generator and the re-ranker together on one 8 GB GPU
 
-**Project:** CodeCompass (SE201 G1-T1) | **Status:** Draft, building (author approved on 2026-11-01)
+**Project:** CodeCompass (SE201 G1-T1) | **Status:** Building; measurements in section 1 (author approved on 2026-11-01)
 **Constitution version:** 1.4.0 | **Constitution articles touched:** VII.3, VII.5, VIII.1, VIII.2, VIII.4, VIII.5, IX, XI
 
 ## 1. Purpose
@@ -12,7 +12,8 @@ On a development laptop with an 8 GB GPU, the 7B generator on `llama-server` and
 | CPU-only `llama-server`, re-ranker on GPU (fp32) | about 100 s (generation 85 to 99 s) |
 | GPU `llama-server`, re-ranker on CPU | about 55 s (re-rank 52 s) |
 | GPU `llama-server` (8192 context, q8 cache) + fp32 re-ranker on GPU | does not fit: out of memory |
-| GPU `llama-server` (8192 context, q8 cache) + **fp16** re-ranker on GPU | under 10 s expected (generation about 3 s, re-rank 0.6 s) |
+| GPU `llama-server` (8192 context, q8 cache, all 29 layers) + fp16 re-ranker | works for one question, then **out of memory** on the second (about 180 MiB free) |
+| the same with **26 layers** on the GPU and `-ub 256`, fp16 re-ranker on GPU, embedder on CPU | **about 5 s per question** (re-rank 0.7 s, generation about 4 s); six repeated re-ranks pass with about 400 MiB to spare |
 
 The generator alone is 27x to 40x faster on the GPU build (prompt 3,951 tok/s, generation 102 tok/s). The fp16 re-ranker peaks at 1.6 GiB against 3.2 GiB for fp32, and on three test questions it kept the same top-8 set, with the same order on two and a swap of near-ties on the third (score difference under 0.0005).
 
@@ -45,7 +46,7 @@ This spec adds the two things that make the last row possible and nothing else.
 
 ### US2 (P1): A profile that fits next to the re-ranker
 
-- **AC-2.1** `codecompass.toml` defines `dev-7b-gpu`: the same model id family, GGUF file and SHA-256 as `dev-7b`, `context_window = 8192`, `max_tokens = 1024`, and `server_args` for `-ngl 99` and the q8 key/value cache.
+- **AC-2.1** `codecompass.toml` defines `dev-7b-gpu`: the same model id family, GGUF file and SHA-256 as `dev-7b`, `context_window = 8192`, `max_tokens = 1024`, and `server_args` for `-ngl 26`, `-ub 256` and the q8 key/value cache. (First written as `-ngl 99`; measurement showed that runs out of memory, see section 1.)
 - **AC-2.2** The profile passes the start-up budget check (Article V.1) with the default tool settings and leaves room for at least 5 retrieved chunks of 512 tokens.
 - **AC-2.3** The warning shown when `llama-server` is down prints a start command for this profile that includes `-c 8192` and all of its `server_args`.
 - **AC-2.4** The profile comment records the `llama.cpp` build used (b11960, `0.8.0-dev`, commit `8642541b2`) and marks results from this profile as development signals only (Article VIII.5).
@@ -69,4 +70,4 @@ This spec adds the two things that make the last row possible and nothing else.
 | # | Question | Notes |
 |---|---|---|
 | Q1 | Is a swap of near-tied chunks in the top 8 acceptable for the fp16 re-ranker? | It happened on one of three questions with a score difference under 0.0005. It is opt-in (`float32` stays the default) and recorded in the log. |
-| Q2 | Where should the embedder run? | At query time it embeds one short text; on the GPU it holds about 0.7 GiB. The full combination's measured peak decides the recommendation (see the plan). It is a setting, not code. |
+| Q2 | **RESOLVED.** Where should the embedder run? | On the CPU at query time. With it on the GPU too the total peaked at 7.8 GiB and a question ran out of memory. To index a new repository quickly, run once with the embedder on `cuda` and the server stopped. It is a setting, not code. |
