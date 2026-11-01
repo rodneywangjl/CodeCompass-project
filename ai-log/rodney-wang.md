@@ -659,3 +659,19 @@ TODO (member)
 - What I could NOT do: run anything on a real Windows or macOS machine. The README marks those rows "not tested". The GPU numbers are still from one Linux NVIDIA laptop.
 - `pytest -m "not model"`: 676 passed (Linux).
 - First CI run on all three systems: Ubuntu and macOS passed; Windows had 6 failures out of 676, all one cause that I introduced: on Windows my new code read the runner's real `%APPDATA%` and ignored a deliberately set `XDG_CONFIG_HOME`, and `Path.home()` ignores `HOME` there, so the older tests that point the user config at a temp folder could not find it. Fix: an explicit `XDG_CONFIG_HOME` wins on every platform (spec amended first), and the shared `world` test fixture now also isolates `USERPROFILE` and `APPDATA`. That edits a fixture from an earlier approved test file; it is isolation only and changes nothing on Linux, and it is in its own commit.
+
+## 2026-11-01 · Indexing a new repo ran out of memory (embedding batches)
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/offline/embedding.py, codecompass/offline/config.py, codecompass/offline/orchestrator.py, tests/offline/test_embed_budget.py, README.md, docs/specs/001-offline-indexing/plan.md
+- **Outcome:** Changed
+### What I asked for
+Running `codecompass` in `spm_proj` sat on "Preparing index and models…" for 36 minutes. I asked Claude to find out why, then to fix the cause properly ("make it optimal").
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Diagnosis (Claude): the machine was swapping (about 20 GB of the process in swap), and `systemd-oomd` killed the terminal at 23:10. spm_proj had no index, so the "ensure current" step was indexing 491 files (3,217 chunks) with the embedder on the CPU. `embed_in_batches` sorted chunks by length and took 32 at a time, so the longest chunks (571 over 512 tokens, 21 over 2,048, one of 9,297) arrived together in the last batches. Reproduced under a 6 GB memory cap with no swap: killed after 8m47s.
+- Fix: a batch is cut when `count * longest_tokens^2` would pass a new config value `embedder.max_batch_cost`. Lengths are the embedder's own token counts (character counts if it cannot count). A lone over-budget text still goes through alone. 13 tests, written first; I approved them before any code.
+- First default (32 x 1024^2) was a guess from attention size, and Claude's first fix still ran out of memory under the 6 GB cap (killed after 7m25s). So Claude measured the real model: about 0.16-0.19 GB per million of `texts * longest^2` above the 1.8 GB loaded model (e.g. 32 x 512 tokens: +1.4 GB; 1 x 4096: +3.1 GB). The default became 32 x 512^2. Changing it meant editing my own approved test (one constant, plus one assertion made stricter); I signed that off and it is its own commit with the numbers in the message.
+- With 32 x 512^2 a 6 GB capped run lasted 17m49s instead of 7m25s but was still killed. Computing the batch plan with the measured numbers shows why: one batch is left over the cap, the single 9,297-token chunk (about 14 GB if it ran; extrapolated, never run). Batching cannot fix that, so it is the next entry (the chunker never uses the embedder's tokenizer).
+- Problem file in spm_proj: `backend/tests/verify_attendee_registrations.py`, lines 59-546, one 488-line function (2,790 words but 9,297 tokens). Next largest: `tests/confirmation.spec.ts:65-345` (4,448), `tests/coordinatorLead.spec.ts:379-677` (3,823), `frontend/src/Coordinator.jsx:679-854` (3,823).
+- Not verified end to end: no capped real run has finished yet, because of that one chunk. `pytest -m "not model"`: 690 passed.

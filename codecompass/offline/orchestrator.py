@@ -160,7 +160,8 @@ def run(repo_path, *, config, index_dir=None, embedder=None,
             from .embedding import embed_in_batches
             for chunk, vector in zip(pending, embed_in_batches(
                     embedder, [c.text for c in pending],
-                    config.embedder.batch_size)):
+                    config.embedder.batch_size,
+                    config.embedder.max_batch_cost)):
                 reuse.setdefault(text_hash(chunk.text), vector)
         timings["embed"] = perf_counter() - t_embed
         vectors = [reuse[text_hash(c.text)] for c in new_chunks]
