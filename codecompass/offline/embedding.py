@@ -69,3 +69,24 @@ class CodeEmbedder:
     def tokenize(self, text: str) -> list[int]:
         """Token ids from the embedder's own tokenizer (C7, AC-3.3)."""
         return self._load().tokenizer.encode(text, add_special_tokens=False)
+
+
+_SHARED: dict = {}
+_SHARED_MAX = 4
+
+
+def shared_embedder(embedder_config) -> CodeEmbedder:
+    """The process-wide default embedder for *embedder_config* (plan 002 O1, O2).
+
+    ensure_current and open_index share one instance per configuration, so the
+    model loads once per process, not once per question. The key includes the
+    embedder class as looked up now, so a substituted class never receives an
+    instance built by another. The identity check against the index
+    (Article II.4) is unchanged: it runs on every open_index.
+    """
+    key = (CodeEmbedder, embedder_config)
+    if key not in _SHARED:
+        if len(_SHARED) >= _SHARED_MAX:
+            _SHARED.pop(next(iter(_SHARED)))  # drop the oldest
+        _SHARED[key] = CodeEmbedder(embedder_config)
+    return _SHARED[key]

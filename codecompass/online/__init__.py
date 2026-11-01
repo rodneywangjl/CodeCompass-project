@@ -40,9 +40,22 @@ def _default_generator(config: OnlineConfig, profile):
                                 timeout_seconds=config.generator.timeout_seconds)
 
 
+_RERANKERS: dict = {}
+_RERANKERS_MAX = 4
+
+
 def _default_reranker(config: OnlineConfig):
+    """One re-ranker per configuration per process (plan 002 O1).
+
+    Keyed by the class as looked up now, like the shared embedder.
+    """
     from codecompass.online.retrieval.reranker import BgeReranker
-    return BgeReranker(config.reranker)
+    key = (BgeReranker, config.reranker)
+    if key not in _RERANKERS:
+        if len(_RERANKERS) >= _RERANKERS_MAX:
+            _RERANKERS.pop(next(iter(_RERANKERS)))
+        _RERANKERS[key] = BgeReranker(config.reranker)
+    return _RERANKERS[key]
 
 
 def _log_dir(config: OnlineConfig, index_dir) -> Path:

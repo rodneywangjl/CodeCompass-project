@@ -406,3 +406,45 @@ TODO (member)
 - `allowed_tools` can switch tools off but never add one, and the tool runner now respects it; before this it was silently ignored.
 - Validation is in the loader, not `ToolsConfig`, so the approved T5.4 test that builds a widened `ToolsConfig` still holds.
 - No approved tests changed.
+
+## 2026-11-01 · Dev environment, local models and a dev-7b profile
+- **Tool (model):** Claude Code (claude-opus-5-5, claude-sonnet-5-5)
+- **Files:** codecompass.toml
+- **Outcome:** Changed
+### What I asked for
+Get the repo running: create `.venv` and install the pinned dependencies, then download the real models (embedder, re-ranker, generator). The 14B does not fit my 8 GB GPU, so I asked for the 7B instead, a `dev-7b` profile in `codecompass.toml`, and a run of the model tests.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- `.venv` built from `requirements.txt` unchanged; `pytest -m "not model"` passed (500 passed, 8 deselected).
+- Downloaded the embedder and re-ranker at their pinned revisions, and `qwen2.5-coder-7b-instruct-q4_k_m.gguf` (SHA-256 matches the value Hugging Face records). The 14B download was started and then cancelled by me; nothing from it is on disk.
+- Added a `[generator.profiles.dev-7b]` table (16384 context, same sampling settings as the 14B profiles). The default profile stays `dev`. This is a model change under Article VII.5, so its results are development signals only.
+- `pytest -m model` on the 7B: 7 passed, 1 failed. `test_real_pipeline_end_to_end` failed 4 out of 4 runs because the 7B writes a `Sources` entry but never puts `[1]` inline in the answer, so the checker (correctly) flags it. No test or code was changed for this. The result is noted here, not fixed.
+- The installed `llama-server` is `0.6.0-dev` (build 11429), not the 0.7.0 recorded in `MODEL-SETUP.md`. The version comment in the profile is left for me to fill in. Not committed.
+
+## 2026-11-01 · Spec 004 minimal terminal UI (spec, plan, tasks)
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** docs/specs/004-tui/spec.md, docs/specs/004-tui/plan.md, docs/specs/004-tui/tasks.md
+- **Outcome:** Changed
+### What I asked for
+A lightweight terminal UI, started by typing `codecompass`, that only lets me type a question and read the model's reply, and that uses the git repo root it is run from.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Kept it to one standard-library module over `ask()`, printing the answer unchanged so a flagged answer can never look verified (Article VI.3). Left out streaming, panes, colours and conversation memory.
+- Decisions I approved: Q1 reuse the default models across questions (plan 002 O1 was not implemented for the defaults), Q2 add a setuptools build backend and a `codecompass` script entry, Q4 look for `codecompass.toml` in `--config`, then the repo root, then `~/.config/codecompass/`, then built-in defaults. Q3 (`readline` for history) is still open.
+- Repo root is found with `git rev-parse --show-toplevel`, so it works from any subdirectory.
+- Spec 003 already exists on a remote branch, so this one is 004. Not committed yet.
+
+## 2026-11-01 · T0.1 Reuse default models across questions (tests)
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** tests/online/test_model_reuse_tui_t01.py
+- **Outcome:** Changed
+### What I asked for
+Task T0.1 of Spec 004: tests for building the default re-ranker and embedder once per process and reusing them on every later question, without weakening the embedder identity check (Article II.4).
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Six tests. Four fail for the expected reason today (the models are rebuilt on every question: 3 re-rankers and 4 embedders where 1 is expected). Two already pass and act as guards: injected stubs never enter the cache, and a cached embedder still cannot bypass the mismatch check.
+- Two of my own first drafts were wrong and were fixed before review: one stub embedder had the wrong identity, and the two "different config" tests passed trivially until I made them ask A, B, A.
+- Waiting for approval of these tests. No implementation written yet.
