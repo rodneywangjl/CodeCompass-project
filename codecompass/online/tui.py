@@ -13,6 +13,8 @@ import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from codecompass.online import tui_view
+
 PROMPT = "> "
 STATUS = "Thinking…"
 CLEAR_LINE = "\r\x1b[K"
@@ -22,6 +24,7 @@ CHECKED_MARK = "── Checked answer (replaces the draft above) ──"
 DIM, RESET = "\x1b[2m", "\x1b[0m"
 _CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")  # all but \n and \t
 EXIT_COMMANDS = ("/exit", "/quit")
+TOOLS_COMMAND = "/tools"
 CONFIG_NAME = "codecompass.toml"
 DEFAULT_PORT = 8080  # llama-server port when the configured URL names none
 
@@ -86,7 +89,8 @@ def _end_question(printer, stderr, status: bool, *, failed: bool) -> None:
         _clear(stderr, status)
 
 
-def run_session(answer, *, stdin, stdout, stderr, draft: bool = False) -> int:
+def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
+                tool_rounds=None) -> int:
     """Read questions from *stdin*, print ``answer(question)`` to *stdout* (Spec 004).
 
     Only answers go to stdout. The prompt, status line, hints and errors go to
@@ -95,9 +99,16 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False) -> int:
     model's unchecked text is shown on stderr as it is written (AC-2.1). Returns 0
     on /exit, /quit or end of input; nothing a question does ends the session
     (AC-1.7, AC-1.8).
+
+    *tool_rounds*, if given, is called after each answered question and returns that
+    question's tool records (the audit log's ``tool_calls``). On a terminal a line on
+    stderr then gives the count, and the line ``/tools`` lists the calls of the last
+    answered question (AC-4.1, AC-4.2); a failed or interrupted question leaves the
+    previous list in place (AC-4.4).
     """
     prompting = stdin.isatty() and stderr.isatty()
     status = stderr.isatty()
+    answered, last_rounds = False, []
     while True:
         if prompting:
             _say(stderr, PROMPT)
@@ -115,6 +126,10 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False) -> int:
             continue
         if question in EXIT_COMMANDS:
             return 0
+        if question == TOOLS_COMMAND:
+            _say(stderr, (tui_view.format_tools(last_rounds) if answered
+                          else "No question has been answered yet.") + "\n")
+            continue
         printer = _DraftPrinter(stderr, status) if draft and status else None
         if status:
             _say(stderr, STATUS)
@@ -130,6 +145,11 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False) -> int:
             continue
         _end_question(printer, stderr, status, failed=False)
         _say(stdout, text if text.endswith("\n") else text + "\n")
+        answered = True
+        if tool_rounds is not None:
+            last_rounds = list(tool_rounds() or [])
+            if prompting:
+                _say(stderr, tui_view.summary_line(last_rounds) + "\n")
 
 
 def _clear(stderr, status: bool) -> None:
@@ -284,14 +304,18 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
     warm = (_start_warm_up(online.warm_up, root, config, args.index_dir)
             if stdin.isatty() and stderr.isatty() else None)
 
+    last = {"rounds": []}  # the audit log's tool records of the last answered question
+
     def answer(question: str, on_draft=None) -> str:
         if warm is not None and warm.is_alive():  # only the first question can find it so
             _say(stderr, f"{CLEAR_LINE}Preparing index and models…")
             warm.join()
             _say(stderr, f"{CLEAR_LINE}{STATUS}")
-        return online.ask(root, question, config=config, profile=name,
-                          index_dir=args.index_dir, generator=generator,
-                          on_draft=on_draft).answer
+        result = online.ask(root, question, config=config, profile=name,
+                            index_dir=args.index_dir, generator=generator,
+                            on_draft=on_draft)
+        last["rounds"] = (getattr(result, "audit_log", None) or {}).get("tool_calls", [])
+        return result.answer
 
     return run_session(answer, stdin=stdin, stdout=stdout, stderr=stderr,
-                       draft=not args.no_draft)
+                       draft=not args.no_draft, tool_rounds=lambda: last["rounds"])
