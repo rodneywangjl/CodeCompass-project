@@ -173,3 +173,23 @@ strip_escapes(text) -> str             removes every SGR sequence (used by the t
 | Session | `run_session` with a fake `answer` and a fake `tool_rounds`: the count line, `/tools`, failed and interrupted questions, piped mode |
 | Integration | `main` on the fixture repo with the stubs and a generator that requests `git_log`: the real audit log reaches the count line and `/tools` |
 
+## 9. The live interface (US6)
+
+New module `codecompass/online/tui_live.py` (standard library only). Pure helpers are unit-tested; the few that touch a stream take it as an argument.
+
+```
+is_terminal(stream, environ) -> bool        a real tty file descriptor and TERM != "dumb"       AC-6.1
+tool_lines(entry, style=None) -> list[str]  the "●" and "⎿" lines of one executed tool call    AC-6.2
+status_text(seconds, style=None) -> str     "✻ Thinking… (12s · ctrl-c to cancel)"             AC-6.3
+Spinner(write, clock, interval)             start / pause / resume / stop, one daemon thread   AC-6.3
+box_lines(width, style=None), status_line(repo, profile, model, style=None)                   AC-6.4
+render_markdown(text, style)                                                                   AC-6.5
+```
+
+- **Live mode.** `main` computes `live = stdin.isatty() and is_terminal(stderr, os.environ) and not args.plain`. The stand-in terminals of the approved tests have no file descriptor, so they are never live and every earlier test sees exactly the old output. The new tests use stand-ins that have a descriptor and patch `os.isatty`, as the colour tests do.
+- **`on_tool` (T4.1).** `run_agent(..., on_tool=None)` calls `on_tool(copy.deepcopy(entry))` right after it appends the record of an executed tool call (a deep copy, because the arguments inside the record are a nested dictionary and a callback must not be able to change the audit log); `ask(..., on_tool=None)` passes it through `_retrieve_and_answer` and `_agent`. Nothing else changes, and with `None` the audit log is identical. `run_session(..., live_tools=False)`: when true and stderr is a terminal it calls `answer(question, on_draft=..., on_tool=...)`, so the fakes of the approved tests (which take no `on_tool`) are untouched. The callback clears the status line, writes the tool lines, and shows the status line again.
+- **One writer (T4.2).** In live mode all stderr writes during a question go through one `threading.Lock`. The spinner thread takes it to rewrite the status line and releases it; a tool line, the draft header, an error or the end of the question first stop (or pause) the spinner. The clock and the interval are injected, so the tests drive `tick()` directly and only one test starts a real thread.
+- **The box (T4.3).** Print top, middle and bottom rows and the status line, then move the cursor up two rows and right four columns (`ESC[2A`, `ESC[4C`) onto the middle row, read the line, and after the newline the cursor is on the bottom border row, so print one more newline to leave the box. Width comes from `shutil.get_terminal_size()`.
+- **Markdown (T4.4, Q16 resolved).** A separate `tui_view.render_markdown(text, style)` applied before `Style.answer`, so `Style.answer` and its approved tests are unchanged. It rewrites only lines before the last `Sources` heading that are not whole-line banners, notes or the stale warning and do not start with a mark. It consumes `#`, `**`, `*`, backticks, fence lines and the bullet `-`/`*` (shown as `•`); underscores are not emphasis; an unclosed or lone delimiter leaves its line as it is. Test invariant: `strip_escapes(render_markdown(t, style))` equals `t` with that punctuation removed, and equals `t` exactly when `t` has none.
+- **Limits, stated openly.** No pop-up `/` menu, no multi-line editing in the box, no mouse; a very long question overwrites the right border. A terminal that mishandles cursor movement can use `--plain`.
+
