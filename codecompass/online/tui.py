@@ -6,6 +6,7 @@ import argparse
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import threading
@@ -98,7 +99,8 @@ def _end_question(printer, stderr, status: bool, *, failed: bool) -> None:
 def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
                 tool_rounds=None, style=None, chrome=None, theme=None,
                 live_tools: bool = False, spinner: bool = False,
-                spinner_interval: float = 1.0) -> int:
+                spinner_interval: float = 1.0, boxed: bool = False, box_width=None,
+                status_info=None) -> int:
     """Read questions from *stdin*, print ``answer(question)`` to *stdout* (Spec 004).
 
     Only answers go to stdout. The prompt, status line, hints and errors go to
@@ -123,23 +125,32 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
     *live_tools* and a terminal on stderr, ``answer`` is also given ``on_tool`` and
     each tool call is shown as it finishes (AC-6.2). With *spinner* and a terminal on
     stderr the status line is a spinner with the elapsed time, redrawn by one thread;
-    every stderr write during a question then goes through one lock (AC-6.3).
+    every stderr write during a question then goes through one lock (AC-6.3). With
+    *boxed* the prompt is a rounded box with *status_info* (repo, profile, model)
+    under it, *box_width* columns wide or the terminal's width (AC-6.4).
     """
     prompting = stdin.isatty() and stderr.isatty()
     status = stderr.isatty()
     answered, last_rounds = False, []
+    in_box = boxed and prompting
     while True:
-        if prompting:
+        if in_box:
+            width = box_width or shutil.get_terminal_size((80, 24)).columns
+            _say(stderr, tui_live.prompt_box(width, status_info or ("", "", ""), chrome))
+        elif prompting:
             _say(stderr, _paint(chrome, PROMPT.rstrip(), "accent") + PROMPT[len(PROMPT.rstrip()):])
         try:
             line = stdin.readline()
         except KeyboardInterrupt:
-            _say(stderr, "\n(type /exit or press Ctrl-D to quit)\n")
+            _say(stderr, (tui_live.LEAVE_BOX_UNREAD if in_box else "\n")
+                 + "(type /exit or press Ctrl-D to quit)\n")
             continue
         if line == "":  # end of input
             if prompting:
-                _say(stderr, "\n")
+                _say(stderr, tui_live.LEAVE_BOX_UNREAD if in_box else "\n")
             return 0
+        if in_box:
+            _say(stderr, tui_live.LEAVE_BOX)
         question = line.strip()
         if not question:
             continue
@@ -402,4 +413,5 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
                        draft=not args.no_draft, tool_rounds=lambda: last["rounds"],
                        style=style, chrome=chrome,
                        theme=tui_view.ThemeSwitch(theme, [s for s in (style, chrome) if s]),
-                       live_tools=live, spinner=live)
+                       live_tools=live, spinner=live, boxed=live,
+                       status_info=(root.name, name, profile.model_id))

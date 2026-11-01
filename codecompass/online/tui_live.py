@@ -109,3 +109,36 @@ class Spinner:
         if self.thread is not None and self.thread is not threading.current_thread():
             self.thread.join()
 
+
+# --- the boxed prompt (AC-6.4) ---------------------------------------------------------
+
+MIN_WIDTH = 20
+CURSOR_INTO_BOX = "\x1b[2A\r\x1b[4C"  # from the status line up to the box's middle row, after "> "
+LEAVE_BOX = "\n\n"  # after Enter the cursor is on the bottom border: past it and the status line
+LEAVE_BOX_UNREAD = "\n\n\n"  # still on the middle row (end of input, Ctrl-C): past all three
+
+
+def box_lines(width: int, style=None) -> tuple[str, str, str]:
+    """The top, middle and bottom rows of the prompt box, each *width* columns wide."""
+    width = max(width, MIN_WIDTH)
+    top = _paint(style, "╭" + "─" * (width - 2) + "╮", "muted")
+    bar = _paint(style, "│", "muted")
+    middle = f"{bar} {_paint(style, '>', 'accent')} " + " " * (width - 5) + bar
+    bottom = _paint(style, "╰" + "─" * (width - 2) + "╯", "muted")
+    return top, middle, bottom
+
+
+def status_line(repo: str, profile: str, model: str, width: int, style=None) -> str:
+    """"  <repo folder> · <profile> · <model>", cut to *width* (AC-6.4)."""
+    text = f"  {repo} · {profile} · {model}"
+    if len(text) > width:
+        text = text[:max(width - 1, 0)] + "…"
+    return _paint(style, text, "muted")
+
+
+def prompt_box(width: int, info, style=None) -> str:
+    """Everything written for one boxed prompt, ending with the cursor inside the box."""
+    width = max(width, MIN_WIDTH)
+    return "\n".join([*box_lines(width, style), status_line(*info, width=width, style=style)]
+                     ) + CURSOR_INTO_BOX
+
