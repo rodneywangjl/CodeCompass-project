@@ -78,3 +78,60 @@ Install with `pip install -e .` (add `--no-build-isolation` when offline; setupt
 - `online/__init__.py`: `warm_up(repo_path, *, config, index_dir=None)` calls `ensure_current`, then `open_index(...).embed_query("warm up")` to load the embedder, then the shared re-ranker once; it prints nothing and returns nothing.
 - `tui.py` runs `warm_up` in a daemon thread when stdin and stderr are terminals. Before the first `ask()` it joins the thread (status text `Preparing index and models…`). Errors are swallowed in the thread; the real `ask()` raises them again.
 - No GPU code is added: devices come from `[embedder] device` and `[reranker] device`, which already exist.
+
+## 8. Tools view and look (US4, US5)
+
+One new module, `codecompass/online/tui_view.py`: pure functions, no I/O, standard library only, so every rule below is unit-tested without a terminal.
+
+```
+tool_calls(rounds) -> list[dict]       executed entries (a `tool` name), in order        AC-4.1
+summary_line(rounds) -> str            "▸ 3 tools called — type /tools to see them" etc.  AC-4.1
+format_tools(rounds) -> str            the /tools text                                    AC-4.2, 4.3
+color_level(stream, environ, no_color) -> "truecolor" | "256" | "none"                    AC-5.2
+Style(level).paint(text, name) / .answer(text)                                            AC-5.1, 5.3, 5.4
+strip_escapes(text) -> str             removes every SGR sequence (used by the tests)
+```
+
+- **Rounds, not recomputed (AC-4.4).** `main` keeps the last answered question's `result.audit_log["tool_calls"]` (`getattr(result, "audit_log", None) or {}`) and passes `run_session` a zero-argument `tool_rounds` callable. `run_session` stays backward compatible: with no `tool_rounds`, nothing changes, so the approved session tests are untouched. A failed or interrupted question never calls it, so the previous list stays.
+- **Counting.** An entry counts as a tool call when `entry.get("tool")` is not None. The other record kinds in the harness (`malformed`, `final_call`, `ignored_calls` with `reason`) are listed by `/tools` as one explanatory line each and are not counted.
+- **The `/tools` text (AC-4.2).** A header line `Tools called for the last question:` and then, per round in order, two lines (the second indented by nine spaces):
+
+  ```
+  round 0  git_log  path=src/auth.py n=5
+           cache miss · f00dbab 2024-03-14 Alice "fix"
+  round 1  open_file  path=src/auth.py lines=1-20
+           cache hit · --- src/auth.py, lines 1-20 | python ---
+  round 2  open_file  path=../x
+           cache miss · failed · error: path outside the repository
+  round 0  malformed request, no tool ran
+  round 3  request refused: the round limit was reached
+  round 0  request ignored: tools are off in this mode
+  ```
+
+  Arguments are `key=value` pairs in the order the call gave them; the result line is the record's `result_summary` (omitted when empty). With nothing to list: `No tools were called for the last question.` (or `No question has been answered yet.` before the first answer).
+- **Where it prints.** The AC-4.1 line and `/tools` go to stderr, so stdout stays "the answer, nothing else" (AC-1.2, AC-1.11). The line is printed after the answer, only when `prompting` is true.
+- **Sanitising (AC-4.3).** Arguments and the result line pass through the same `_CONTROL` filter as the draft, and values over 100 characters are cut with `…`.
+- **Colour (AC-5.2).** `color_level` requires `os.isatty(stream.fileno())`, so the fake terminals in the approved tests (which only define `isatty()`) never get colour, whatever the environment of the machine running the tests. 256-colour output maps each RGB value to the nearest entry of the xterm cube and grey ramp. No colour is used on `dumb` terminals.
+- **Answer colouring (AC-5.4).** `Style.answer(text)` works line by line on text that is already final: it wraps whole lines equal to the known banner and note constants (`formatter.BANNER`, `UNREFERENCED_BANNER`, `UNCITED_NOTE`, `PARTIAL_NOTE`, the stale-index warning), the line-start marks, the trailing ` (not cited)` tag, `[N]` markers and the `Sources` heading. It never inserts, removes or reorders characters other than escape sequences; the tests assert `strip_escapes(Style.answer(t)) == t` over a property-style set of answers.
+- **Themes (AC-5.1, AC-5.6).** `Style(level, theme)`; `theme_name(flag, environ)` resolves `--theme`, then `CODECOMPASS_THEME`, then `auto` (`COLORFGBG` last field `7` or `15` means `light`). The palettes, by role:
+
+  | Role | Used for | `dark` (Rosé Pine Moon) | `light` (Rosé Pine Dawn) |
+  |---|---|---|---|
+  | accent | title, prompt, `[N]` markers | iris `#c4a7e7` | iris `#907aa9`, bold |
+  | info | status line, tools line, `Sources` heading | foam `#9ccfd8` | pine `#286983` |
+  | warn | stale warning, note lines, draft header, `[NOT REFERENCED IN ANSWER]` | gold `#f6c177` | love `#b4637a` |
+  | tag | ` (not cited)` | rose `#ea9a97` | subtle `#797593` |
+  | danger | `error:`, flagged banner, `[UNVERIFIED]` | love `#eb6f92`, bold | custom `#91344f`, bold |
+  | ok | `cache hit` | pine `#3e8fb0` | pine `#286983` |
+  | muted | startup details, `/tools` header | `#6272a4` | subtle `#797593` |
+
+  Reference backgrounds for the contrast check: `dark` `#232136` and `#000000`; `light` `#faf4ed` and `#ffffff`. The `light` theme leaves out Dawn's gold, rose and muted, whose contrast is 2.1 to 2.7:1, and gives `danger` a custom colour (Q12): Dawn's love with the same hue (343°) and the lightness lowered from 0.55 to 0.39. Measured contrast of what it uses, on `#faf4ed` / white: iris 3.5 / 3.8, love 3.8 / 4.2, subtle 4.0 / 4.4, pine 5.6 / 6.1, custom danger 6.8 / 7.5. `dark` on `#232136` / black: iris 7.5 / 10.0, foam 9.2 / 12.3, gold 9.5 / 12.8, rose 7.1 / 9.6, love 5.4 / 7.2, pine 4.3 / 5.8, muted 3.3 / 4.5.
+- **Prompt and banner text stay as they are** (`> `, `codecompass: repo: …`): the approved tests assert them, and the look comes from colour. Only the colour around them is new.
+- **No thread, no spinner, no new dependency** (P3 holds).
+
+| Test layer | Tests |
+|---|---|
+| Unit | `tool_calls`, `summary_line`, `format_tools` on hand-made rounds; `color_level` over environments; `paint` and `answer` round-trip with escapes stripped; 256-colour mapping |
+| Session | `run_session` with a fake `answer` and a fake `tool_rounds`: the count line, `/tools`, failed and interrupted questions, piped mode |
+| Integration | `main` on the fixture repo with the stubs and a generator that requests `git_log`: the real audit log reaches the count line and `/tools` |
+

@@ -55,3 +55,26 @@ Paths are under `codecompass/online/` and `tests/online/` unless stated.
 **T2.6 Docs**
 - README: draft display and `--no-draft`, warm-up, layered config, GPU settings with the measurements and the VRAM trade-off, and the CPU-only `llama-server` finding. AI log entries.
 - ACs: AC-3.5. | Touches: `README.md`, `ai-log/`. | Depends on: T2.5.
+
+---
+
+## Phase 3 (draft, pending approval): tools view and look
+
+**T3.1 Tool count and `/tools`**
+- Tests first: `summary_line` gives "No tools called", "1 tool called" and "N tools called" (AC-4.1 wording); `tool_calls` counts only entries with a `tool` name, so a malformed request, a `final_call` entry and an `ignored_calls` entry are not counted; `format_tools` lists each executed call in order with round, tool, arguments, `cache hit` or `cache miss`, the first line of the result and `failed` on error, adds one line for each malformed or refused request, removes control characters from arguments and results and cuts values over 100 characters with `…`; in `run_session` (fake `answer`, fake `tool_rounds`): on terminals the count line follows the answer on stderr and stdout holds only the answer; with piped input there is no count line; `/tools` prints the last answered question's list to stderr and is never sent to `answer`; `/tools` before any question says no question has been answered; a question that raises, or is interrupted, leaves the previous list in place; `/tools now` is a question; without a `tool_rounds` callable nothing extra is printed; through `main` (stubs, a generator that requests `git_log`), the real audit log feeds the count line and `/tools`, and a result without an audit log counts as no tool calls.
+- **Existing approved tests:** approved tests that run `main` on fake terminals may assert the whole of stderr. The count line adds one line there. Run the full suite after the change; if an approved test fails for that reason, stop and ask (Article IX.3).
+- ACs: AC-4.1 to 4.5. | Touches: `online/tui_view.py` (new), `tui.py`, `tests/online/test_tui_tools_t31.py`. | Depends on: T2.5.
+
+**T3.2 Colour support**
+- Tests first: `color_level` is `none` for a stream without a file descriptor, for `NO_COLOR`, for `--no-color`, for `TERM=dumb` and for a pipe; `truecolor` for `COLORTERM=truecolor` or `24bit` or `WT_SESSION`; `256` for a `TERM` containing `256color`; `paint` emits exact 24-bit sequences from the AC-5.1 palette of the chosen theme, the nearest 256-colour index otherwise, and the unchanged text with level `none`; `strip_escapes(paint(t)) == t`; `theme_name` gives `light` for `COLORFGBG=0;15` and `0;7` (and `15;0;7`), `dark` for `15;0`, an unset or malformed `COLORFGBG`, and `auto`; the flag beats `CODECOMPASS_THEME`, which beats `auto`; an unknown value raises an error naming the allowed values; every colour of both themes has a WCAG contrast of at least 3:1 against its two reference backgrounds, so a future palette edit cannot make text unreadable; the `danger` colour of each theme has at least 4.5:1 against the same backgrounds, and in `light` it is `#91344f`, distinct from `warn`.
+- ACs: AC-5.1, AC-5.2, AC-5.6. | Touches: `online/tui_view.py`, `tests/online/test_tui_color_t32.py`. | Depends on: T3.1.
+
+**T3.3 Coloured answer**
+- Tests first: with colour on, the banner and note lines, the two marks, `(not cited)`, `[N]` markers, the `Sources` heading and the stale warning are wrapped in the AC-5.1 colours; for flagged answers from `formatter.render` over a set of cases (banner, unreferenced, uncited, stale) `strip_escapes(output) == answer` exactly; a flagged answer never contains a success-coloured segment (pine); with colour off the output is byte-identical to the answer; model text that merely looks like a mark in the middle of a line is not touched.
+- **Approved test changes:** none expected; AC-1.2 and AC-1.3 are amended in the spec only (colour around, text identical).
+- ACs: AC-5.4. | Touches: `online/tui_view.py`, `tui.py`, `tests/online/test_tui_answer_color_t33.py`. | Depends on: T3.2.
+
+**T3.4 Look, flag, docs**
+- Tests first: on a colour terminal the startup banner, prompt, status line, `error:` and `warning:` prefixes, the count line, `/tools` and the draft header are coloured and their text is unchanged; draft lines stay dim and marked; `--no-color` and `NO_COLOR` give exactly today's output; `--theme light` and `--theme dark` change only the colour sequences (the text with escapes removed is identical); an unknown `--theme` or `CODECOMPASS_THEME` is a startup error with exit code 1; `main(["--help"])` mentions `--no-color` and `--theme`; piped output has no escape sequence. README: "Interactive mode" gains `/tools`, the colours, the two themes, `--theme`, `--no-color` and `NO_COLOR`; the AI-log entry (with "How I checked it" left as `TODO (member)`).
+- ACs: AC-5.3, AC-5.5, AC-5.6. | Touches: `tui.py`, `README.md`, `ai-log/rodney-wang.md`, `tests/online/test_tui_look_t34.py`. | Depends on: T3.3.
+
