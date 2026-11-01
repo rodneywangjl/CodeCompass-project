@@ -402,10 +402,12 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
     def answer(question: str, on_draft=None, on_tool=None) -> str:
         if warm is not None and warm.is_alive():  # only the first question can find it so
             with tui_live.LOCK:  # shared with the spinner, so the two never interleave
+                tui_live.pause_active()  # keep the message readable while we wait
                 _say(stderr, f"{CLEAR_LINE}{_paint(chrome, 'Preparing index and models…', 'info')}")
             warm.join()
             with tui_live.LOCK:
                 _say(stderr, f"{CLEAR_LINE}{_paint(chrome, STATUS, 'info')}")
+                tui_live.resume_active()  # and the spinner is back at once
         extra = {"on_tool": on_tool} if on_tool is not None else {}
         result = online.ask(root, question, config=config, profile=name,
                             index_dir=args.index_dir, generator=generator,

@@ -15,6 +15,7 @@ CLEAR_LINE = "\r\x1b[K"  # back to the start of the line, and erase it
 THINKING = "Thinking…"
 # one lock for everything written to the terminal while a question runs (AC-6.3)
 LOCK = threading.RLock()
+ACTIVE = None  # the spinner of the question that is running, if any
 
 
 def is_terminal(stream, environ) -> bool:
@@ -74,8 +75,10 @@ class Spinner:
         self._write(CLEAR_LINE + status_text(int(self._clock() - self._t0), self._style))
 
     def start(self) -> None:
+        global ACTIVE
         with self.lock:
             self._t0, self._running, self._paused = self._clock(), True, False
+            ACTIVE = self
             self._draw()
         if self._threaded:
             self.thread = threading.Thread(target=self._loop, name="codecompass-spinner",
@@ -103,8 +106,11 @@ class Spinner:
 
     def stop(self) -> None:
         """No more drawing, and the thread is gone. Clearing the line is the caller's job."""
+        global ACTIVE
         with self.lock:
             self._running = False
+            if ACTIVE is self:
+                ACTIVE = None
         self._stopping.set()
         if self.thread is not None and self.thread is not threading.current_thread():
             self.thread.join()
@@ -141,4 +147,16 @@ def prompt_box(width: int, info, style=None) -> str:
     width = max(width, MIN_WIDTH)
     return "\n".join([*box_lines(width, style), status_line(*info, width=width, style=style)]
                      ) + CURSOR_INTO_BOX
+
+
+def pause_active() -> None:
+    """Pause the running spinner, if there is one (others are writing the status line)."""
+    if ACTIVE is not None:
+        ACTIVE.pause()
+
+
+def resume_active() -> None:
+    """Resume the running spinner and draw it at once, if there is one."""
+    if ACTIVE is not None:
+        ACTIVE.resume()
 
