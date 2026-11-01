@@ -480,3 +480,16 @@ TODO (member)
 - The generator health check is a warning, never a failure, so the session starts even with no server; the warning includes the `llama-server` start command built from the profile (reusing `launch_command`).
 - `pytest -m "not model"`: 546 passed.
 - Left out on purpose: `readline` (arrow keys and history). It only works through `input()`, which T1.1's approved stream-based loop does not use, so adding it would change that design. I will raise it separately.
+
+## 2026-11-01 · T1.3 The `codecompass` command
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** tests/online/test_tui_entry_t13.py, pyproject.toml
+- **Outcome:** Changed
+### What I asked for
+Task T1.3 of Spec 004: make typing `codecompass` in the terminal start the TUI, and put all the TUI work on one branch.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- All TUI commits now sit on a single branch, `feat/tui`. The earlier stacked branches (`feat/tui-t0.1`, `feat/tui-t1.1`, `docs/spec-004-tui`) were ancestors of it, so deleting them lost nothing.
+- Tests first: 6 tests; 4 fail because `pyproject.toml` has no `[project.scripts]`, `[build-system]` or package list, and 2 pass as guards (the help text and "no runtime dependency"). I approved them, then `pyproject.toml` got a pinned `[build-system]` (setuptools==84.2.1), a `[project.scripts]` entry and a package list limited to `codecompass*`. All 6 pass; `pytest -m "not model"`: 552 passed. `pip install -e .` has not been run yet.
+- I added a check that the build backend is pinned (`setuptools==<version>`), since the repo pins everything that affects results (Article VIII.3).
