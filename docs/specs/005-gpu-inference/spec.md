@@ -59,7 +59,7 @@ The GPU work above was measured only on Linux with an NVIDIA card. The constitut
 - **AC-4.2** The start command printed when `llama-server` is down is quoted for the platform: Windows quoting on Windows, POSIX quoting elsewhere, with a placeholder path in the platform's own style.
 - **AC-4.3** On Windows the terminal is switched to understand ANSI escape sequences before anything is printed, so the dimmed draft and status line do not show as stray characters.
 - **AC-4.4** On every platform, writing to stdout or stderr never fails because the terminal's encoding cannot represent a character (`⚠`, `│`, `─`, `…`): unrepresentable characters are replaced.
-- **AC-4.5** The user-level config file is looked up in `%APPDATA%\codecompass\codecompass.toml` on Windows (falling back to `~/.config/codecompass/`), and in `$XDG_CONFIG_HOME` or `~/.config` elsewhere. This amends Spec 004 AC-1.13 for Windows only.
+- **AC-4.5** The user-level config file is looked up in `$XDG_CONFIG_HOME/codecompass/` when that variable is set, on every platform (an explicit choice wins). Otherwise it is `%APPDATA%\codecompass\codecompass.toml` on Windows (falling back to `~/.config/codecompass/`), and `~/.config/codecompass/` elsewhere. This amends Spec 004 AC-1.13. *(First written without the XDG rule; the first Windows CI run showed that Windows then ignored a deliberately set `XDG_CONFIG_HOME`.)*
 - **AC-4.6** CI runs the required suite on Ubuntu, Windows and macOS, so a platform bug fails a pull request. The required suite stays model-free and network-free.
 - **AC-4.7** The README says, per platform, which `llama.cpp` build to use, what was tested, and what was not.
 
