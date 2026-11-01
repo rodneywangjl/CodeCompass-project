@@ -8,6 +8,7 @@ import re
 import shlex
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -168,6 +169,23 @@ def _find_configs(root: Path, explicit: str | None) -> list[Path]:
     return [path for path in candidates if path.is_file()]
 
 
+def _start_warm_up(warm_up, root: Path, config, index_dir) -> threading.Thread:
+    """Run *warm_up* in the background while the user types (Spec 004 AC-3.2).
+
+    A daemon thread, so /exit never waits for it. Its errors are dropped here: the
+    first real question hits the same problem and reports it (AC-3.3).
+    """
+    def run() -> None:
+        try:
+            warm_up(root, config=config, index_dir=index_dir)
+        except Exception:  # noqa: BLE001
+            pass
+
+    thread = threading.Thread(target=run, name="codecompass-warm-up", daemon=True)
+    thread.start()
+    return thread
+
+
 def _start_command(profile, server_url: str) -> str:
     from codecompass.online.generator.server import launch_command
     model = f"/path/to/{profile.gguf_file or '<model>.gguf'}"
@@ -229,7 +247,14 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
                      "Type a question. /exit or Ctrl-D to quit.\n")
     _check_generator(generator, profile, config.generator.server_url, stderr)
 
+    warm = (_start_warm_up(online.warm_up, root, config, args.index_dir)
+            if stdin.isatty() and stderr.isatty() else None)
+
     def answer(question: str, on_draft=None) -> str:
+        if warm is not None and warm.is_alive():  # only the first question can find it so
+            _say(stderr, f"{CLEAR_LINE}Preparing index and models…")
+            warm.join()
+            _say(stderr, f"{CLEAR_LINE}{STATUS}")
         return online.ask(root, question, config=config, profile=name,
                           index_dir=args.index_dir, generator=generator,
                           on_draft=on_draft).answer

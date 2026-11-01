@@ -173,5 +173,21 @@ def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None =
 
 def warm_up(repo_path, *, config: OnlineConfig, index_dir=None, embedder=None,
             reranker=None) -> None:
-    """Bring the index current and load the models, so the first question does not wait."""
-    raise NotImplementedError
+    """Bring the index current and load the models, so the first question does not wait.
+
+    Prints nothing and changes no pipeline behaviour: it makes the calls the first
+    ask() would make, ahead of time, on the shared models (Spec 004 US3). Errors are
+    raised for the caller to ignore or report; ask() raises them again on its own.
+    """
+    ensured = ensure_current(repo_path, config=config.offline, index_dir=index_dir,
+                             embedder=embedder)
+    if not ensured.ok:
+        raise RuntimeError(ensured.message or ensured.status)
+    handles = open_index(repo_path, config=config.offline, index_dir=index_dir,
+                         embedder=embedder)
+    try:
+        if handles.vector.count() > 0:
+            handles.embed_query("warm up")  # loads the embedder
+    finally:
+        handles.close()
+    (reranker or _default_reranker(config)).rerank("warm up", ["warm up"])

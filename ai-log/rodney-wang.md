@@ -585,3 +585,18 @@ TODO (member)
 - Tests first: 21 tests, 13 failing on assertions at first. Two of my own assertions were wrong (they ignored the next `> ` prompt and the status-line clear sequence), so I corrected them in a separate `test(T2.4)` commit before the implementation commit. The behaviour under test did not change.
 - `run_session` takes a `draft` flag and calls `answer(question, on_draft=...)` only when it is set and stderr is a terminal, so the approved T1.1 tests, whose fake answers take only a question, still pass unchanged.
 - `pytest -m "not model"`: 614 passed.
+
+## 2026-11-01 · T2.5 Background warm-up
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/__init__.py, codecompass/online/tui.py, tests/online/test_warmup_t25.py
+- **Outcome:** Changed
+### What I asked for
+Task T2.5 of Spec 004: bring the index current and load the models in the background while I type my first question.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- New `online.warm_up(repo, config=...)`: runs `ensure_current`, opens the index and embeds one query (loads the embedder), and runs the re-ranker once, on the shared models from T0.1, printing nothing. The TUI runs it in a daemon thread on a terminal only, after a good start-up.
+- A question asked while it runs shows `Preparing index and models…` and waits; a warm-up error is dropped in the thread and the question reports its own; `/exit` never waits (daemon thread); piped input and failed start-ups start nothing.
+- Tests first: 11 tests, 7 failing on the missing behaviour and 4 guards. I tightened one test that passed vacuously because `pytest.raises(Exception)` also caught the stub's `NotImplementedError`. The threaded tests passed 8 runs out of 8.
+- Risk to know about: a daemon thread that is still loading a model when the process exits could in principle misbehave at interpreter shutdown. I did not see it, and a clean `/exit` normally comes after the warm-up has finished.
+- `pytest -m "not model"`: 625 passed.
