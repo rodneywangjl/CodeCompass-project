@@ -659,3 +659,20 @@ TODO (member)
 - What I could NOT do: run anything on a real Windows or macOS machine. The README marks those rows "not tested". The GPU numbers are still from one Linux NVIDIA laptop.
 - `pytest -m "not model"`: 676 passed (Linux).
 - First CI run on all three systems: Ubuntu and macOS passed; Windows had 6 failures out of 676, all one cause that I introduced: on Windows my new code read the runner's real `%APPDATA%` and ignored a deliberately set `XDG_CONFIG_HOME`, and `Path.home()` ignores `HOME` there, so the older tests that point the user config at a temp folder could not find it. Fix: an explicit `XDG_CONFIG_HOME` wins on every platform (spec amended first), and the shared `world` test fixture now also isolates `USERPROFILE` and `APPDATA`. That edits a fixture from an earlier approved test file; it is isolation only and changes nothing on Linux, and it is in its own commit.
+
+## 2026-11-02 · Evidence gate: refuse when nothing retrieved matches the question
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/config.py, codecompass/online/__init__.py, tests/online/test_evidence_gate_t151.py, docs/specs/002-online-retrieval/spec.md, plan.md, tasks.md; three approved-test setups (tests/online/ask_support.py, test_cli_t123.py, test_tui_main_t12.py)
+- **Outcome:** Changed
+### What I asked for
+While checking the app by hand, Claude found that "What is the capital of France?" got "The capital of France is Paris." from the 7B model with no evidence at all (best re-rank score 0.006), against Article I.2. I asked for the "honesty fix".
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Spec first (Article IX.1): AC-1.5 (a best re-rank score below `retrieval.min_top_score` means no generator call, no tool, the existing no-evidence answer plus the closest files), AC-1.6 (the threshold setting), AC-1.7 (the closest-files list and `retrieval.closest_files`), AC-7.4 (the gate is logged), FR-20, clarification C13, plan D19, task T15.1.
+- Decisions I made on three open questions: the refusal names the closest files (default 3 distinct files, best first, each with its best chunk's lines); the default threshold is 0.02, not Claude's first 0.01, because I asked whether it was too low and the logged best scores showed 0.01 was only 1.7 times above the highest no-answer question (0.0058); the uncited-answer note above a refusal stays.
+- The 0.02 is still a guess: the best re-rank scores of 8 questions tried by hand on one repository on the 7B setup (no answer in the repo: 0.0014 and 0.0058; answerable: 0.061 to 0.38). It is provisional until the evaluation set exists (Article VII.1, VII.5). No new questions were run to choose it, because that would be tuning.
+- The closest-files list is plain text, not citations: no `Sources` section and no `[N]` markers, so the checker sees an answer with no citations and nothing is marked verified.
+- Tests first: 43 new tests, all red first (36 failed on behaviour with the settings stubbed in, 7 were guards), then green. The gate sits right after re-ranking, before any call to the generator, and reuses the no-evidence path the empty index already took.
+- Six approved tests then failed (`Why retry?` / `Why?` share no word with any chunk, so the stub re-ranker scores 0.0 and the gate refuses). I stopped and asked. The stub re-ranker could not be changed (`test_stub_reranker_t04` pins its scoring); I approved turning the gate off in the setup of those tests (`min_top_score = 0` in three places), with no assertion or question changed. It is its own commit and is listed in tasks.md under T15.1.
+- `pytest -m "not model"`: 720 passed.
