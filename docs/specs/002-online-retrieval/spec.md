@@ -69,6 +69,9 @@ Priorities: **P1** = required for the sprint to be done, **P2** = should ship, *
 - **AC-1.2** Every factual claim in the answer is traceable to text that was placed in the generator's context (Article I.1). Code can check only the deterministic part, that every citation points at evidence actually in context (US4, AC-4.x). Whether each *claim* is supported by the evidence it cites cannot be decided by deterministic code; it is measured by the evaluation (Spec 003, Article VII), not by required tests.
 - **AC-1.3** Given insufficient evidence after all allowed tool rounds, the answer explicitly states what could not be determined rather than guessing (Article I.2, I.3).
 - **AC-1.4** The generator receives plain text with file/line/commit metadata, never raw vectors (Article IV.4).
+- **AC-1.5** Given that the best re-ranker score of the shortlist is below `retrieval.min_top_score`, then the generator is not called, no tool runs, and the answer is the standard no-evidence answer ("I could not find enough evidence in the indexed code to answer this question.") followed by the closest matches (AC-1.7): text that matches the question that poorly is not evidence, and a model given it tends to answer from its own knowledge instead (Article I.2, I.3, X.2). A best score equal to the threshold proceeds. This applies in `rag_tools` and `rag`; `no_retrieval` retrieves nothing and is unaffected (AC-10.2).
+- **AC-1.6** `retrieval.min_top_score` is a named configuration value, a number from 0 to 1, default **0.02**; 0 turns the gate off. A value that is not a number, or is outside 0 to 1, fails loudly at startup. The default is provisional and untuned (Article VII.1). It sits in the gap between the best scores of the two questions with no answer in the repository (0.0014 and 0.0058) and the lowest of six answerable ones (0.061), all tried by hand against one repository on the 7B setup, so it must be re-checked with the evaluation set once it exists (Article VII.5).
+- **AC-1.7** The closest matches are the first `retrieval.closest_files` distinct files in re-ranker order, each with the line range of its best-scoring chunk, one per line as `- <path>, lines <start>-<end>`, under the line `Closest matches found (these are not evidence for an answer; check them yourself):`. `retrieval.closest_files` is a whole number from 0 up, default **3**; 0 omits the list and the line. The list is plain text, not citations: it has no `Sources` section and no `[N]` markers, so the citation checker reads the refusal as an answer with no citations (AC-4.8) and no entry is checked or marked verified.
 
 ### US2 (P1): Hybrid retrieval with RRF and re-ranking
 
@@ -142,6 +145,7 @@ Priorities: **P1** = required for the sprint to be done, **P2** = should ship, *
 - **AC-7.1** Every query produces a structured log containing: question text, active profile, resolved model id, retrieval scores (per-chunk RRF and re-ranker scores), tool calls (round, tool, arguments, result summary, cache hit/miss), citation-check outcome (F or G with details), and timing.
 - **AC-7.2** The log is written to a per-query file (or a structured log stream) that is queryable after the fact.
 - **AC-7.3** The stale-index warning, if triggered, is recorded in the log.
+- **AC-7.4** Every query that was re-ranked records the evidence gate in its log: the `min_top_score` in force, the best score seen, and whether the gate let the question through (Article V.4).
 
 ### US8 (P2): CLI entry point
 
@@ -192,6 +196,7 @@ Priorities: **P1** = required for the sprint to be done, **P2** = should ship, *
 | FR-16 | Commit metadata in `Sources` entries **MUST** be harness-copied from tool results. | AC-4.6 |
 | FR-17 | All model names, parameters, and paths **MUST** be configuration, not hard-coded. | Article VIII.1 |
 | FR-18 | The three evaluation configurations **MUST** be selectable by one config setting, with the same model and the citation checker in every one. | AC-10.1–10.5, Article VII.3 |
+| FR-20 | The generator **MUST NOT** be called when the best re-ranker score is below `retrieval.min_top_score`; the answer states that not enough evidence was found and names the closest files. | AC-1.5, AC-1.6, AC-1.7 |
 
 ## 6. Edge Cases
 
@@ -247,13 +252,13 @@ Each of these needs at least one test:
 
 | Article | How this spec complies |
 |---------|------------------------|
-| I (Grounding) | Every claim must trace to context; insufficient evidence produces an explicit "could not determine" answer (AC-1.2, 1.3). |
+| I (Grounding) | Every claim must trace to context; insufficient evidence produces an explicit "could not determine" answer (AC-1.2, 1.3), and retrieved text that matches the question too poorly never reaches the generator (AC-1.5). |
 | II (Two pipelines) | Online pipeline uses only the offline public API: `ensure_current` (write), `open_index` (read), and `status` (read). Same embedder enforced (AC-2.2). The query embedder is reached through `open_index` handles (`embed_query`), resolved in plan §3. |
 | III (Index correctness) | `ensure_current` called before every answer; failure produces stale-flagged answer, not a hang (AC-6.1–6.3). |
 | IV (Hybrid retrieval) | Both semantic and keyword search, RRF merge, cross-encoder on shortlist only, configurable k values (AC-2.1–2.7). |
 | V (Agent loop) | Bounded at 3 rounds, allow-listed tools, validated args, cached results, per-query logging (AC-3.1–3.8). |
 | VI (Citation integrity) | Deterministic checker, F/G outcomes, fixed format, harness-copied commit metadata, non-bypassable (AC-4.1–4.7). |
-| VII (Evaluation first) | The three Article VII.2 configurations are one config setting in this codebase; same model in all; no tuning here (US10). |
+| VII (Evaluation first) | The three Article VII.2 configurations are one config setting in this codebase; same model in all; no tuning here (US10); the AC-1.6 default is provisional and untuned. |
 | VIII (Models/environment) | llama.cpp only, switchable profiles, pinned GGUF, localhost, no mlx-lm, all config (AC-5.1–5.11). |
 | IX (Spec-driven, TDD) | Every AC is testable; stub generator for required suite; tests first (section 10). |
 | X (Responsible AI) | Citations as navigable references, stale-index warnings, "no rationale found" honesty, local-only by default (AC-1.3, 3.7, 4.7, 6.3). |
@@ -297,6 +302,7 @@ Every AC above becomes one or more tests written **before** the code that satisf
 | C10 | Tool calls per round | One. Only the first tool call in a response is executed; Article V.1's round limit (`max_verifier_rounds`, default 3) therefore equals the maximum number of tool executions per question. |
 | C11 | Commit the tools run against | The indexed commit, not HEAD, so `git blame` line numbers match the retrieved chunks even when the index is stale. |
 | C12 | "Tool messages" (Article V.3, AC-3.5) | Read as "messages that carry tool results", not the chat API's `tool` role, which belongs to the server-side tool-calling feature the harness must not use (Article VIII.2). Tool results are sent as `user`-role messages wrapped in `<tool_result>` tags (plan D16). Constitution 1.2.1 states this reading in Article V.3. |
+| C13 | Evidence gate (AC-1.5) | The refusal is the fixed no-evidence answer plus the closest files, with no model call. Observed on a 7B model (`spm_proj`): "What is the capital of France?" re-ranked at best 0.006 and was answered "Paris" from the model's own knowledge. Decided with the author on 2026-11-02: (a) the refusal names the closest files (Article X.2); (b) the default is 0.02, not 0.01, because 0.01 sat only 1.7 times above the highest score of a question with no answer (0.0058) and the midpoint of the gap to the lowest answerable one (0.061) is about 0.02. It is still a first guess from eight hand-tried questions and stays provisional (AC-1.6); (c) the uncited-answer note above a refusal (AC-4.8) is accurate and stays as it is. |
 
 ## 12. What Comes Next
 

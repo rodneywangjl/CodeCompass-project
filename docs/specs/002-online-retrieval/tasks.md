@@ -276,6 +276,13 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - **Approved test changes (need reviewer sign-off, Article IX.3):** Constitution 1.4.0 makes three approved tests out of date: `test_tool_allowlist_t54.py::test_allowed_tools_constant` and `test_tool_settings_t05.py` (default allowed tools) now expect all four tools, and `test_harness_messages_t85.py` (D14 template) has the new tool rule 3. No other assertion changes.
 - ACs: Article V.2, VI.1, VI.4; plan D14, D17, D18. | Touches: `agent/harness.py`, `agent/tools.py`, `config.py`, `__init__.py`, `offline/stores/vector.py` (read-only `symbols_for_path`), spec 002, and the three approved tests above. | Depends on: T14.1, T14.2, T8.6.
 
+## S15: Evidence gate (plan D19)
+
+**T15.1 Evidence gate**
+- Tests first (stub embedder, a stub re-ranker that returns chosen scores, stub generator, real stores on small fixture repositories): a best score below `retrieval.min_top_score` gives the no-evidence answer with **zero** generator calls and no tool run, in `rag_tools` and `rag`; a best score equal to the threshold proceeds to the generator; one good chunk among poor ones proceeds; 0 turns the gate off; the refusal lists up to `retrieval.closest_files` distinct files best first, each once with its best chunk's line range, under the AC-1.7 line, and fewer when the repo has fewer; 0 lists none; the list is never read as citations (no sources, outcome G with no entries); the log has `evidence_gate` with the threshold, the best score and `passed`, and every retrieved entry is `sent: false` when the gate refuses; `no_retrieval` and an empty index have no `evidence_gate` and no list; `retrieval.min_top_score` defaults to 0.02 and `retrieval.closest_files` to 3, both are accepted from the config file, and a bad value (min_top_score: negative, above 1, a string, a bool, None; closest_files: negative, a fraction, a string, a bool, None) raises `ValueError` naming the setting.
+- **Existing approved tests:** the stub re-ranker scores by word overlap, so a question sharing no word with any chunk scores 0.0 and would now be refused. Run the full suite after the change. If an approved test fails for that reason, stop and ask (Article IX.3); do not edit it.
+- ACs: AC-1.5, 1.6, 1.7, 7.4, FR-20; Article I.2, I.3, V.4, X.2. | Touches: `config.py`, `__init__.py`. | Depends on: T10.3, T11.1.
+
 ---
 
 ## Completion checklist (spec "definition of done")
