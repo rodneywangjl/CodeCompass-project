@@ -68,7 +68,7 @@ Install with `pip install -e .` (add `--no-build-isolation` when offline; setupt
 - `LlamaServerGenerator.generate(messages, *, on_text=None)`: with a callback, request `stream: true` on `/v1/chat/completions` and feed each text delta to `on_text`; return the full text so callers see no difference. If the stream cannot be opened, make the normal call and pass the whole text once.
 - The harness passes `on_text` through to each generator call. A small filter holds back the first characters of a round until it is clear whether the text starts with `<tool>`; tool rounds are never forwarded (AC-2.3).
 - `ask(..., on_draft=None)` hands the callback to the harness via the timed generator wrapper. The default `None` leaves every code path as it is today.
-- The TUI writes deltas to stderr only when stderr is a terminal and `--no-draft` is absent, dimmed with an ANSI style, then a `Checked answer:` line, then the answer on stdout. Cursor movement is avoided on purpose: the draft stays in the scrollback.
+- The TUI writes to stderr only when stderr is a terminal and `--no-draft` is absent: the `⚠ DRAFT — NOT CHECKED…` header once, then each delta with every line prefixed `draft │ ` and dimmed (a line splitter holds a partial line until its newline, so the prefix is never split), a `Drafting… N s` status line, then `Draft finished. Checking citations…`, then `── Checked answer ──`, then the answer on stdout. Cursor movement is avoided on purpose: the draft stays in the scrollback.
 - `tests/support/stub_generator.py` gains the same `on_text` keyword and streams its canned text in pieces.
 
 ## 7. Warm-up and layered config (US3)
