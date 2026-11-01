@@ -659,3 +659,16 @@ TODO (member)
 - What I could NOT do: run anything on a real Windows or macOS machine. The README marks those rows "not tested". The GPU numbers are still from one Linux NVIDIA laptop.
 - `pytest -m "not model"`: 676 passed (Linux).
 - First CI run on all three systems: Ubuntu and macOS passed; Windows had 6 failures out of 676, all one cause that I introduced: on Windows my new code read the runner's real `%APPDATA%` and ignored a deliberately set `XDG_CONFIG_HOME`, and `Path.home()` ignores `HOME` there, so the older tests that point the user config at a temp folder could not find it. Fix: an explicit `XDG_CONFIG_HOME` wins on every platform (spec amended first), and the shared `world` test fixture now also isolates `USERPROFILE` and `APPDATA`. That edits a fixture from an earlier approved test file; it is isolation only and changes nothing on Linux, and it is in its own commit.
+
+## 2026-11-01 · Hide the jina "optimum is not installed" warning
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/offline/embedding.py, tests/offline/test_optimum_warning.py
+- **Outcome:** Changed
+### What I asked for
+The embedder's remote code prints a harmless `optimum is not installed` warning on every start. I asked to hide it, but only that message.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Wrapped the `SentenceTransformer(...)` load in `CodeEmbedder._load()` in `warnings.catch_warnings()` with an `ignore` filter for that one message. Other warnings still show and the filter is gone after the load. Three tests use a fake `sentence_transformers` (no model download); two failed first, the third guards against a global filter.
+- Not a spec task, so it is a `fix:` on branch `fix/hide-optimum-warning`; the test commit came first.
+- Known gap: in the full suite the warning still appeared in 1 of 3 runs, in a warm-up test that loads the real model on a background thread. `warnings.catch_warnings` is not thread-safe, so overlapping threads can drop the filter. With the real model alone, and with the warm-up test file alone, it never appeared. `pytest -m "not model"`: 680 passed.
