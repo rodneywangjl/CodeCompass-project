@@ -25,6 +25,7 @@ DIM, RESET = "\x1b[2m", "\x1b[0m"
 _CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")  # all but \n and \t
 EXIT_COMMANDS = ("/exit", "/quit")
 TOOLS_COMMAND = "/tools"
+THEME_COMMAND = "/theme"
 CONFIG_NAME = "codecompass.toml"
 DEFAULT_PORT = 8080  # llama-server port when the configured URL names none
 
@@ -95,7 +96,7 @@ def _end_question(printer, stderr, status: bool, *, failed: bool) -> None:
 
 
 def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
-                tool_rounds=None, style=None, chrome=None) -> int:
+                tool_rounds=None, style=None, chrome=None, theme=None) -> int:
     """Read questions from *stdin*, print ``answer(question)`` to *stdout* (Spec 004).
 
     Only answers go to stdout. The prompt, status line, hints and errors go to
@@ -114,7 +115,9 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
     *style*, if given, is a ``tui_view.Style``: each answer is written through
     ``style.answer``, which only adds colour (AC-5.4). *chrome* is the same kind of
     object for stderr: it colours the prompt, status, tool line, ``/tools``, ``error:``
-    and the draft header, and never changes a word (AC-5.3).
+    and the draft header, and never changes a word (AC-5.3). *theme*, a
+    ``tui_view.ThemeSwitch``, makes ``/theme`` and ``/theme X`` commands that change
+    the colour of what follows (AC-5.7); without one they are ordinary lines.
     """
     prompting = stdin.isatty() and stderr.isatty()
     status = stderr.isatty()
@@ -136,6 +139,11 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
             continue
         if question in EXIT_COMMANDS:
             return 0
+        if theme is not None and (question == THEME_COMMAND
+                                  or question.startswith(THEME_COMMAND + " ")):
+            reply = theme.command(question[len(THEME_COMMAND):].strip())
+            _say(stderr, _paint(chrome, reply, "muted") + "\n")  # in the new colours
+            continue
         if question == TOOLS_COMMAND:
             _say(stderr, (tui_view.format_tools(last_rounds, chrome) if answered
                           else _paint(chrome, "No question has been answered yet.", "muted")) + "\n")
@@ -303,8 +311,14 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
         theme = tui_view.theme_name(args.theme, os.environ)
         out_level = tui_view.color_level(stdout, os.environ, no_color=args.no_color)
         err_level = tui_view.color_level(stderr, os.environ, no_color=args.no_color)
-        style = tui_view.Style(out_level, theme) if out_level != "none" else None
-        chrome = tui_view.Style(err_level, theme) if err_level != "none" else None
+        # what each stream could show, ignoring NO_COLOR: /theme rose-pine may override it (AC-5.7)
+        could = {name: value for name, value in os.environ.items() if name != "NO_COLOR"}
+        out_could = tui_view.color_level(stdout, could)
+        err_could = tui_view.color_level(stderr, could)
+        style = (tui_view.Style(out_level, theme, capability=out_could)
+                 if out_could != "none" else None)
+        chrome = (tui_view.Style(err_level, theme, capability=err_could)
+                  if err_could != "none" else None)
         root = _repo_root(args.repo)
         config_files = _find_configs(root, args.config)
         # heavy model libraries are not imported here: they load on the first question
@@ -345,4 +359,5 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
 
     return run_session(answer, stdin=stdin, stdout=stdout, stderr=stderr,
                        draft=not args.no_draft, tool_rounds=lambda: last["rounds"],
-                       style=style, chrome=chrome)
+                       style=style, chrome=chrome,
+                       theme=tui_view.ThemeSwitch(theme, [s for s in (style, chrome) if s]))

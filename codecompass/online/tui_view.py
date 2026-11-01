@@ -162,8 +162,11 @@ _WHOLE_LINE = {formatter.BANNER: "danger", formatter.UNCITED_NOTE: "warn",
 class Style:
     """Paint text in the colour of a role, for one colour level and theme (AC-5.1)."""
 
-    def __init__(self, level: str, theme: str) -> None:
+    def __init__(self, level: str, theme: str, capability: str | None = None) -> None:
+        # level is what is shown now; capability is what the stream could show, so that
+        # /theme can switch colour off and on again (AC-5.7)
         self.level, self.theme = level, theme
+        self.capability = level if capability is None else capability
 
     def paint(self, text: str, role: str) -> str:
         colour, bold = PALETTES[self.theme][role]  # an unknown role is a KeyError
@@ -211,3 +214,40 @@ class Style:
             tail = " " + self.paint(formatter.TAG.strip(), "tag")
             line = line[:-len(formatter.TAG)]
         return head + _MARKER.sub(lambda m: self.paint(m.group(0), "accent"), line) + tail
+
+
+UNAVAILABLE = ("Colour is not available here: neither stdout nor stderr is a terminal "
+               "that can show colour.")
+
+
+class ThemeSwitch:
+    """The `/theme` command: none or rose-pine for the rest of the session (AC-5.7).
+
+    *styles* are the live styles of the streams that could ever show colour; the
+    command changes their level in place. Nothing is saved.
+    """
+
+    def __init__(self, variant: str, styles) -> None:
+        self.variant, self.styles = variant, list(styles)
+
+    def state(self) -> str:
+        on = any(style.level != "none" for style in self.styles)
+        return f"rose-pine ({self.variant})" if on else "none"
+
+    def command(self, argument: str) -> str:
+        """Apply `/theme <argument>` and return the reply."""
+        if argument == "":
+            return f"Theme: {self.state()}. Choices: none, rose-pine."
+        if argument == "none":
+            for style in self.styles:
+                style.level = "none"
+            return "Theme: none."
+        if argument == "rose-pine":
+            capable = [style for style in self.styles if style.capability != "none"]
+            if not capable:
+                return UNAVAILABLE
+            for style in capable:
+                style.level = style.capability
+            return f"Theme: {self.state()}."
+        return f"Unknown theme {argument!r}. Choices: none, rose-pine."
+
