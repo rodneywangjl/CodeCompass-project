@@ -436,9 +436,9 @@ TODO (member)
 - Repo root is found with `git rev-parse --show-toplevel`, so it works from any subdirectory.
 - Spec 003 already exists on a remote branch, so this one is 004. Not committed yet.
 
-## 2026-11-01 · T0.1 Reuse default models across questions (tests)
+## 2026-11-01 · T0.1 Reuse default models across questions
 - **Tool (model):** Claude Code (claude-sonnet-5-5)
-- **Files:** tests/online/test_model_reuse_tui_t01.py
+- **Files:** tests/online/test_model_reuse_tui_t01.py, codecompass/offline/embedding.py, codecompass/offline/__init__.py, codecompass/online/__init__.py
 - **Outcome:** Changed
 ### What I asked for
 Task T0.1 of Spec 004: tests for building the default re-ranker and embedder once per process and reusing them on every later question, without weakening the embedder identity check (Article II.4).
@@ -447,4 +447,6 @@ TODO (member)
 ### What I kept or changed
 - Six tests. Four fail for the expected reason today (the models are rebuilt on every question: 3 re-rankers and 4 embedders where 1 is expected). Two already pass and act as guards: injected stubs never enter the cache, and a cached embedder still cannot bypass the mismatch check.
 - Two of my own first drafts were wrong and were fixed before review: one stub embedder had the wrong identity, and the two "different config" tests passed trivially until I made them ask A, B, A.
-- Waiting for approval of these tests. No implementation written yet.
+- I approved the tests, then the implementation went in: `shared_embedder()` in `offline/embedding.py` (used by `ensure_current` and `open_index`) and a small cache in `online/__init__.py` for the re-ranker. Both are keyed on class and config, at most 4 entries each.
+- The first version keyed on config only and broke the existing `test_ensure_default_embedder.py` in the full suite (an earlier test had cached a real `CodeEmbedder` for the stub config, so that test's monkeypatch never took effect). I fixed it in the code by adding the class to the key and did not touch any approved test.
+- `pytest -m "not model"`: 506 passed. The test commit comes before the implementation commit on `feat/tui-t0.1`.
