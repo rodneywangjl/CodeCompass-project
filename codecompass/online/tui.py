@@ -59,3 +59,8 @@ def run_session(answer, *, stdin, stdout, stderr) -> int:
 def _clear(stderr, status: bool) -> None:
     if status:
         _say(stderr, CLEAR_LINE)
+
+
+def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
+    """`codecompass [REPO]`: start an interactive session (Spec 004)."""
+    raise NotImplementedError
