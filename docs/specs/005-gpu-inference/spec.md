@@ -38,7 +38,7 @@ This spec adds the two things that make the last row possible and nothing else.
 ### US1 (P1): Choose the re-ranker's precision
 
 - **AC-1.1** `[reranker] dtype` accepts `"float32"` (default) or `"float16"`. Any other value fails at config load with an error that lists the allowed values (Article VIII.1; fail loudly).
-- **AC-1.2** `float16` with a CPU device fails at config load with an error saying it needs a CUDA device. `float32` works on any device.
+- **AC-1.2** `float16` with a CPU device (`cpu`, `cpu:0`, any case) fails at config load with an error saying it needs a GPU device and naming `cuda` and `mps`. Any other device is accepted, so the code assumes no particular GPU API (Article VIII.2). `float32` works on any device.
 - **AC-1.3** With the default `float32` the model is loaded exactly as before (no extra load argument). With `float16` the cross-encoder is loaded in half precision, at the same pinned model and revision.
 - **AC-1.4** Both config loaders (`load_online_config` and `load_online_config_layers`) accept the setting, and layering merges it like any other key.
 - **AC-1.5** Every per-query audit log records the re-ranker model, revision, device and dtype in force (Article VII.3, VII.5).
@@ -51,9 +51,21 @@ This spec adds the two things that make the last row possible and nothing else.
 - **AC-2.3** The warning shown when `llama-server` is down prints a start command for this profile that includes `-c 8192` and all of its `server_args`.
 - **AC-2.4** The profile comment records the `llama.cpp` build used (b11960, `0.8.0-dev`, commit `8642541b2`) and marks results from this profile as development signals only (Article VIII.5).
 
+### US4 (P1): Works on Linux, Windows and macOS (Article VIII.2)
+
+The GPU work above was measured only on Linux with an NVIDIA card. The constitution requires the project to run on Linux, Windows and macOS with the GPU API chosen per machine and CPU-only always possible. The code must not stand in the way, and the documentation must say what is and is not tested.
+
+- **AC-4.1** The precision setting does not depend on CUDA (AC-1.2): Apple's `mps` works.
+- **AC-4.2** The start command printed when `llama-server` is down is quoted for the platform: Windows quoting on Windows, POSIX quoting elsewhere, with a placeholder path in the platform's own style.
+- **AC-4.3** On Windows the terminal is switched to understand ANSI escape sequences before anything is printed, so the dimmed draft and status line do not show as stray characters.
+- **AC-4.4** On every platform, writing to stdout or stderr never fails because the terminal's encoding cannot represent a character (`⚠`, `│`, `─`, `…`): unrepresentable characters are replaced.
+- **AC-4.5** The user-level config file is looked up in `%APPDATA%\codecompass\codecompass.toml` on Windows (falling back to `~/.config/codecompass/`), and in `$XDG_CONFIG_HOME` or `~/.config` elsewhere. This amends Spec 004 AC-1.13 for Windows only.
+- **AC-4.6** CI runs the required suite on Ubuntu, Windows and macOS, so a platform bug fails a pull request. The required suite stays model-free and network-free.
+- **AC-4.7** The README says, per platform, which `llama.cpp` build to use, what was tested, and what was not.
+
 ### US3 (P2): Documentation
 
-- **AC-3.1** The README gives the GPU install steps (download the b11960 CUDA 13.4 archives, check their SHA-256, extract, copy the CUDA runtime next to the binaries), the start command, the measurements above, and which combinations do not fit.
+- **AC-3.1** The README gives the NVIDIA-on-Linux GPU install steps (download the b11960 CUDA 13.4 archives, check their SHA-256, extract, copy the CUDA runtime next to the binaries), the start command, the measurements above, and which combinations do not fit.
 
 ## 4. Constitution check
 
@@ -64,6 +76,7 @@ This spec adds the two things that make the last row possible and nothing else.
 | VIII.2 | The `llama.cpp` build is recorded; server flags live in the profile; only the generator wrapper talks to the server. |
 | VIII.4, VIII.5 | A new named profile, no code change to switch; marked as a 7B development profile, not mixable with 14B results. |
 | XI.1 | No new component or dependency. |
+| VIII.2 *(US4)* | No GPU API is assumed in code; the GPU API is chosen per machine in the profile's launch settings; CPU-only keeps working. |
 
 ## 5. Decisions
 

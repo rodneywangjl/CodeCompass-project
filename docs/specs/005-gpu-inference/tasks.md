@@ -13,3 +13,15 @@
 **T3.3 Docs, user config and a real run**
 - README section; update the user-level config; run the TUI against the GPU server and record the measured per-question time and peak GPU memory in the AI log.
 - ACs: AC-3.1. | Touches: `README.md`, `ai-log/`. | Depends on: T3.1, T3.2.
+
+**T3.4 Precision works on any GPU device**
+- Tests first: `float16` is accepted on `mps`, `cuda:1` and `xpu`, rejected on `cpu`, `cpu:0` and `CPU`; the error names a GPU device with `cuda` and `mps`; `float32` works on any device; both loaders accept `mps`.
+- ACs: AC-1.2, AC-4.1. | Touches: `online/config.py`, `tests/online/test_reranker_devices_t34.py`. | Depends on: T3.1.
+
+**T3.5 Windows and macOS safe terminal behaviour**
+- Tests first (the platform is faked by patching `sys.platform`): Windows quoting and placeholder path in the start command, POSIX elsewhere; ANSI is enabled once at start on Windows only; stdout and stderr are reconfigured to replace unencodable characters when they can be; the user config is read from `%APPDATA%` on Windows and `~/.config` elsewhere.
+- ACs: AC-4.2 to AC-4.5. | Touches: `online/tui.py`, `tests/online/test_tui_platform_t35.py`. | Depends on: T3.4.
+
+**T3.6 CI on three platforms, and per-platform docs**
+- CI matrix `ubuntu-latest`, `windows-latest`, `macos-latest` running `pytest -m "not model"`; README platform table. Verified by the CI results of the pull request.
+- ACs: AC-4.6, AC-4.7. | Touches: `.github/workflows/ci.yml`, `README.md`. | Depends on: T3.5.
