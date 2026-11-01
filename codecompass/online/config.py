@@ -232,3 +232,8 @@ def load_online_config(path: str | pathlib.Path | None) -> OnlineConfig:
         pipeline=pipeline,
         offline=offline_cfg,
     )
+
+
+def load_online_config_layers(paths) -> OnlineConfig:
+    """Merge several `codecompass.toml` files, lowest priority first (Spec 004 AC-3.1)."""
+    raise NotImplementedError
