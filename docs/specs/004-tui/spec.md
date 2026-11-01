@@ -24,9 +24,10 @@ A developer types `codecompass` in a terminal inside (or pointing at) a git repo
 - Piped (non-interactive) input works, one question per line.
 - *(US4)* After an answer, a line saying how many tool calls it used, and a `/tools` command that lists them.
 - *(US5)* A calmer, more modern look: a fixed dark palette as foreground colours, on terminals that support it, with no change to any word the user reads.
+- *(US5)* A `/theme` command to switch colour off or on during a session.
 
 **Out of scope**
-- Streaming the *answer* to stdout (only an unchecked draft on stderr, US2), interrupting the server's generation, panes, mouse (so no clicking: US4 uses a command), markdown or syntax rendering, persistent history, slash commands other than `/exit`, `/quit` and `/tools`. Colour is in scope only as US5 describes it (foreground colours, no layout engine).
+- Streaming the *answer* to stdout (only an unchecked draft on stderr, US2), interrupting the server's generation, panes, mouse (so no clicking: US4 uses a command), markdown or syntax rendering, persistent history, slash commands other than `/exit`, `/quit`, `/tools` and `/theme`. Colour is in scope only as US5 describes it (foreground colours, no layout engine).
 - Conversation memory: every question is independent (`ask()` has no history).
 - Starting or stopping `llama-server`. Server lifecycle is manual (Spec 002 C9).
 - Any change to retrieval, prompts, models, thresholds or the citation checker (Article VII.5).
@@ -101,6 +102,12 @@ Measured: the first question took 352 s (index 193 s, re-ranking 65 s, generatio
 - **AC-5.4** *(amends AC-1.2 and AC-1.3)* On a terminal with colour on, the TUI may add colour *around* these parts of the answer and nothing else: the flagged banner and the note lines (whole lines), the `[UNVERIFIED] ` mark, the ` (not cited)` tags, inline `[N]` markers, the `Sources` heading, and the stale-index warning. With every escape sequence removed, stdout is exactly `QueryResult.answer`: no word is added, removed or reordered. A flagged answer keeps its banner and marks in the warning colours (love, gold). The unreferenced-sources banner and `[NOT REFERENCED IN ANSWER] ` mark of Spec 002 AC-4.10 (an open pull request when this was written) get the `warn` role in a small follow-up once they are in `main`; until then the TUI colours only what `main` produces. No colour is used to suggest an answer is verified, and "verified" is never styled as "true" (Article VI.3, VI.5).
 - **AC-5.5** Nothing here adds a dependency, a thread or a full-screen mode (Article XI.1). `--no-color` and `NO_COLOR` give today's plain output exactly.
 - **AC-5.6** `--theme auto|dark|light` (default `auto`), and the environment variable `CODECOMPASS_THEME` with the same values (the flag wins). `auto` picks `light` when `COLORFGBG` is set and its last field, the background colour index, is `7` or `15`, and `dark` otherwise (best effort: only some terminals set it; others use `--theme light`). Any other value is a startup error (`error: ...`, exit code 1), as an unknown profile is (AC-1.9). The theme changes colours only; it never changes a word.
+- **AC-5.7** *(amended 2026-11-02)* The command `/theme` (a line that is `/theme` or starts with `/theme ` is a command, never a question) chooses between two themes for the rest of the session: `none` (plain text) and `rose-pine` (colour; Moon or Dawn, as `--theme`, `CODECOMPASS_THEME` or the terminal's background hint already decide, AC-5.6). It replies on stderr, in muted colour when colour is on, and works with piped input too:
+  - `/theme` shows the current choice: `Theme: rose-pine (dark). Choices: none, rose-pine.` (or `(light)`, or `Theme: none. Choices: none, rose-pine.`);
+  - `/theme none` and `/theme rose-pine` switch and reply `Theme: none.` or `Theme: rose-pine (dark).`; the change applies to everything printed after it, on both streams, and leaves what was printed before as it was;
+  - `/theme rose-pine` overrides `NO_COLOR` and `--no-color`, which are standing preferences (no-color.org lets an explicit choice override them), but not what the terminal can show: a stream that is not a colour terminal stays plain, and if neither stream can show colour the reply is `Colour is not available here: neither stdout nor stderr is a terminal that can show colour.` and the theme stays `none`;
+  - any other argument replies `Unknown theme 'neon'. Choices: none, rose-pine.` and changes nothing;
+  - the choice lasts for the session only: nothing is written to any file. `--theme`, `CODECOMPASS_THEME`, `--no-color` and `NO_COLOR` remain the way to set it every time.
 
 ## 4. Constitution check
 
@@ -133,3 +140,6 @@ Q1, Q2 and Q4 were approved by the team member on 2026-11-01 with the recommende
 | Q10 | **RESOLVED (2026-11-02, author).** Does "what all the tools are" mean the tools the answer *called*, or also the tools *available*? | The tools the answer called (AC-4.2). No "available tools" line. |
 | Q11 | **RESOLVED (2026-11-02, author).** The palette is built for dark backgrounds; what about light terminals? | A second theme, `light` = Rosé Pine Dawn (AC-5.1, AC-5.6), chosen automatically when the terminal says its background is light, or with `--theme light`. `NO_COLOR` and `--no-color` remain for plain output. |
 | Q12 | **RESOLVED (2026-11-02, author).** Rosé Pine Dawn's own gold (2.1:1 on its background), rose (2.6:1) and muted (2.7:1) are too pale to read as text. What does `light` use for errors? | A custom darker colour: `#91344f`, Dawn's love at the same hue (343°) and lower lightness, 6.8:1 on `#faf4ed` and 7.5:1 on white (AC-5.1). `warn` keeps Dawn's love (3.8 / 4.2:1); Dawn's gold, rose and muted are not used. |
+| Q13 | **RESOLVED (2026-11-02, author).** What are the `/theme` choices? | `none` and `rose-pine`; Moon or Dawn is chosen as before, by `--theme`, `CODECOMPASS_THEME` or `COLORFGBG` (AC-5.7). |
+| Q14 | **RESOLVED (2026-11-02, author).** Is the choice remembered? | No: this session only. Remembering it would need a new config section and a command that edits a file in the home folder. |
+| Q15 | **RESOLVED (2026-11-02, author).** May `/theme rose-pine` override `NO_COLOR`? | Yes, because it is an explicit choice made in the session; it still cannot make a terminal show colour it cannot show (AC-5.7). |

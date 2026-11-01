@@ -154,6 +154,16 @@ strip_escapes(text) -> str             removes every SGR sequence (used by the t
   `/tools` by part: the header and the "No tools…" / "No question…" lines muted; in a call block `round N` muted, the tool name accent, `cache hit` ok, `cache miss` muted, `failed` danger, arguments and the result line plain; the lines for malformed, refused and ignored requests warn. `tui_view.summary_line` and `tui_view.format_tools` take an optional `Style`; without one they return exactly what T3.1 pinned.
 
   Draft lines keep their `draft │ ` marker and their dimming (AC-2.1); the chrome style never touches them. Startup errors are painted when the theme and the stderr colour are already known (so a bad `--theme` is reported plain). Flags: `--theme auto|dark|light` and `--no-color`; `--theme` is validated by `theme_name`, so a bad value is `error: …`, exit code 1, not argparse's exit code 2. Order of precedence is the one of AC-5.6.
+- **`/theme` (AC-5.7, T3.5).** The styles are already objects, so the command changes them in place instead of rebuilding anything:
+
+  ```
+  Style.capability                  the level the stream could show (set when it is created)
+  tui_view.ThemeSwitch(variant, styles)   .state() -> "none" | "rose-pine (dark)" | "rose-pine (light)"
+                                          .command(argument) -> reply text; toggles style.level
+  run_session(..., theme=None)      with a ThemeSwitch, "/theme" and "/theme X" are commands
+  ```
+
+  `main` builds one `Style` for each stream that *could* show colour, using `color_level` on an environment copy without `NO_COLOR` (a terminal-capability check), and gives it the level the normal rules (including `NO_COLOR` and `--no-color`) say for the start; `ThemeSwitch` holds those styles. `/theme none` sets every `style.level` to `"none"`; `/theme rose-pine` sets it back to `style.capability`; with no styles at all it replies that colour is not available. A stream with no style object stays plain for good. The reply is printed with the chrome style as it is after the change, so `none` replies in plain text and `rose-pine` in muted colour. Without a `ThemeSwitch`, `run_session` treats `/theme` as it does any other line, so every earlier test is unchanged. Nothing is written to a file.
 - **Prompt and banner text stay as they are** (`> `, `codecompass: repo: …`): the approved tests assert them, and the look comes from colour. Only the colour around them is new.
 - **No thread, no spinner, no new dependency** (P3 holds).
 
