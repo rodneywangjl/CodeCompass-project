@@ -97,7 +97,8 @@ def _end_question(printer, stderr, status: bool, *, failed: bool) -> None:
 
 def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
                 tool_rounds=None, style=None, chrome=None, theme=None,
-                live_tools: bool = False) -> int:
+                live_tools: bool = False, spinner: bool = False,
+                spinner_interval: float = 1.0) -> int:
     """Read questions from *stdin*, print ``answer(question)`` to *stdout* (Spec 004).
 
     Only answers go to stdout. The prompt, status line, hints and errors go to
@@ -120,7 +121,9 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
     ``tui_view.ThemeSwitch``, makes ``/theme`` and ``/theme X`` commands that change
     the colour of what follows (AC-5.7); without one they are ordinary lines. With
     *live_tools* and a terminal on stderr, ``answer`` is also given ``on_tool`` and
-    each tool call is shown as it finishes (AC-6.2).
+    each tool call is shown as it finishes (AC-6.2). With *spinner* and a terminal on
+    stderr the status line is a spinner with the elapsed time, redrawn by one thread;
+    every stderr write during a question then goes through one lock (AC-6.3).
     """
     prompting = stdin.isatty() and stderr.isatty()
     status = stderr.isatty()
@@ -152,18 +155,36 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
                           else _paint(chrome, "No question has been answered yet.", "muted")) + "\n")
             continue
         printer = _DraftPrinter(stderr, status, chrome) if draft and status else None
-        if status:
+        spin = (tui_live.Spinner(lambda text: _say(stderr, text), style=chrome,
+                                 interval=spinner_interval) if spinner and status else None)
+        if spin:
+            spin.start()
+        elif status:
             _say(stderr, _paint(chrome, STATUS, "info"))
         options = {}
         if printer:
-            options["on_draft"] = printer.write
+            def draft(piece, printer=printer, spin=spin):
+                if spin:
+                    spin.stop()  # the draft replaces the spinner; it does not come back
+                printer.write(piece)
+            options["on_draft"] = draft
         if live_tools and status:
-            def show_tool(entry):
-                _say(stderr, CLEAR_LINE + "\n".join(tui_live.tool_lines(entry, chrome)) + "\n"
-                     + _paint(chrome, STATUS, "info"))
+            def show_tool(entry, spin=spin):
+                block = CLEAR_LINE + "\n".join(tui_live.tool_lines(entry, chrome)) + "\n"
+                if spin:
+                    with spin.lock:  # the whole block, then the spinner again
+                        spin.pause()
+                        _say(stderr, block)
+                        spin.resume()
+                else:
+                    _say(stderr, block + _paint(chrome, STATUS, "info"))
             options["on_tool"] = show_tool
         try:
-            text = answer(question, **options)
+            try:
+                text = answer(question, **options)
+            finally:
+                if spin:
+                    spin.stop()
         except KeyboardInterrupt:
             _end_question(printer, stderr, status, failed=True)
             _say(stderr, "Interrupted.\n")
@@ -365,9 +386,11 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
 
     def answer(question: str, on_draft=None, on_tool=None) -> str:
         if warm is not None and warm.is_alive():  # only the first question can find it so
-            _say(stderr, f"{CLEAR_LINE}{_paint(chrome, 'Preparing index and models…', 'info')}")
+            with tui_live.LOCK:  # shared with the spinner, so the two never interleave
+                _say(stderr, f"{CLEAR_LINE}{_paint(chrome, 'Preparing index and models…', 'info')}")
             warm.join()
-            _say(stderr, f"{CLEAR_LINE}{_paint(chrome, STATUS, 'info')}")
+            with tui_live.LOCK:
+                _say(stderr, f"{CLEAR_LINE}{_paint(chrome, STATUS, 'info')}")
         extra = {"on_tool": on_tool} if on_tool is not None else {}
         result = online.ask(root, question, config=config, profile=name,
                             index_dir=args.index_dir, generator=generator,
@@ -379,4 +402,4 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
                        draft=not args.no_draft, tool_rounds=lambda: last["rounds"],
                        style=style, chrome=chrome,
                        theme=tui_view.ThemeSwitch(theme, [s for s in (style, chrome) if s]),
-                       live_tools=live)
+                       live_tools=live, spinner=live)
