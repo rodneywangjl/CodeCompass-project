@@ -571,3 +571,17 @@ TODO (member)
 - Two of my own tests had bugs (a path type and a fake profile missing a field) and were fixed before review. I approved them, then the filter and the plumbing were implemented; all 15 pass.
 - Implementation: a small `_DraftFilter` in `agent/harness.py` (forward text up to a `<tool>` tag, hold back at most five characters that could start one, flush a held tail that never became a tag), `_generate()` that gives the generator a callback only when `on_draft` is set, and the callback passed down through `ask()`, `_agent()`, `_retrieve_and_answer()` and `TimedGenerator`. `pytest -m "not model"`: 593 passed.
 - From here on I told the assistant to treat test approval as given and finish the remaining tasks without stopping at each gate; tests are still written and committed before the code.
+
+## 2026-11-01 · T2.4 The draft in the terminal
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/tui.py, tests/online/test_tui_draft_t24.py, docs/specs/004-tui/spec.md, docs/specs/004-tui/plan.md, docs/specs/004-tui/tasks.md
+- **Outcome:** Changed
+### What I asked for
+Task T2.4 of Spec 004: show the model's text live on stderr as an unmistakable, unchecked draft (Q5), with only the checked answer on stdout, and a `--no-draft` option.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Spec change before the tests: I dropped the live "Drafting… N s" counter (it would need a timer thread rewriting a line that is already receiving text) and used closing lines instead: `Draft finished after N s.` and `── Checked answer (replaces the draft above) ──`. Also added: control characters from the model are removed so a draft cannot restyle or overwrite the screen.
+- Tests first: 21 tests, 13 failing on assertions at first. Two of my own assertions were wrong (they ignored the next `> ` prompt and the status-line clear sequence), so I corrected them in a separate `test(T2.4)` commit before the implementation commit. The behaviour under test did not change.
+- `run_session` takes a `draft` flag and calls `answer(question, on_draft=...)` only when it is set and stderr is a terminal, so the approved T1.1 tests, whose fake answers take only a question, still pass unchanged.
+- `pytest -m "not model"`: 614 passed.
