@@ -325,7 +325,8 @@ def test_the_real_pipeline_end_to_end_flags_a_bad_citation_and_builds_models_onc
     monkeypatch.setattr("codecompass.online.retrieval.reranker.BgeReranker", Reranker)
     cfg = world.repo.path / "codecompass.toml"
     cfg.write_text(f'[embedder]\nmodel = "stub"\nrevision = "stub-{tmp.name}"\ndimension = 8\n'
-                   f'[reranker]\nrevision = "rerank-{tmp.name}"\n')
+                   f'[reranker]\nrevision = "rerank-{tmp.name}"\n'
+                   '[retrieval]\nmin_top_score = 0\n')  # not about the evidence gate (T15.1)
     monkeypatch.chdir(world.repo.path)
     stdout, stderr = Out(), Out()
     code = main(["--index-dir", str(tmp / "idx")], stdin=In("a?\n", "b?\n", "c?\n"),
