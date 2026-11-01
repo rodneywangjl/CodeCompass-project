@@ -1,6 +1,6 @@
 # Spec 005: Running the 7B generator and the re-ranker together on one 8 GB GPU
 
-**Project:** CodeCompass (SE201 G1-T1) | **Status:** Building; measurements in section 1 (author approved on 2026-11-01)
+**Project:** CodeCompass (SE201 G1-T1) | **Status:** Implemented (T3.1 to T3.3); measured end to end 2026-11-01
 **Constitution version:** 1.4.0 | **Constitution articles touched:** VII.3, VII.5, VIII.1, VIII.2, VIII.4, VIII.5, IX, XI
 
 ## 1. Purpose

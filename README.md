@@ -318,27 +318,59 @@ codecompass                     # or: codecompass /path/to/repo
 - **Warm-up:** on a terminal, as soon as the session opens, a background thread brings the index current and loads the models while you type. A question asked before it finishes shows `Preparing index and models…` and waits; one asked afterwards starts at once. Piped input does not warm up, and `/exit` never waits for it.
 - **Watching the model write (unchecked draft):** on a terminal, the model's text appears on stderr as it is written, under `⚠ DRAFT — NOT CHECKED. The model is still writing. Do not rely on this text.`, every line starting with `draft │ ` and dimmed. When the answer is ready you see `Draft finished after N s.` and `── Checked answer (replaces the draft above) ──`, and only then does the **checked** answer go to stdout. The draft is never on stdout, has not been through the citation check, and may contain citations that the check will flag. Turn it off with `--no-draft`; it is also off when stderr is not a terminal. Control characters in the draft are removed.
 
-#### Speeding it up on a GPU
+#### Running fast on an 8 GB GPU
 
-Measured on an RTX 3070 Ti (8 GB), with this repository and the 7B profile:
+Measured on an RTX 3070 Ti (8 GB) with this repository and the 7B model, one question end to end:
 
-| Step | CPU | GPU (`device = "cuda"`) |
-|---|---|---|
-| Embedding 192 chunks | 73 s | 2.7 s (27x faster; vectors match to 12 decimals) |
-| Re-ranking one shortlist (50 chunks) | 52 s | 2 s (same top-8 order; peak 3.2 GiB of GPU memory) |
+| Setup | Per question |
+|---|---|
+| CPU-only `llama-server` (the Arch `llama-cpp` package), re-ranker on GPU | about 100 s |
+| GPU `llama-server`, re-ranker on CPU | about 55 s |
+| GPU `llama-server` and the fp32 re-ranker together | out of memory |
+| **GPU `llama-server` (26 layers) and the fp16 re-ranker** (`dev-7b-gpu`) | **5 to 12 s** (re-rank 0.7 s, generation 4 to 11 s) |
 
-Put this in your user-level config (not in the shared repo file: a teammate without CUDA would fail):
+The embedder alone is 27x faster on the GPU (73 s to 2.7 s for 192 chunks), and the fp16 re-ranker takes 0.64 s against 52 s on the CPU. The three components do not all fit in 8 GB, so this setup puts the **embedder on the CPU** (at query time it embeds one short question) and the re-ranker on the GPU in half precision.
+
+**1. Install a GPU `llama-server`** (the Arch package has no GPU backend; `llama-server --list-devices` shows none). Official build b11960, CUDA 13.4, no `sudo` needed:
+
+```bash
+mkdir -p ~/.local/opt/llama.cpp/download && cd ~/.local/opt/llama.cpp/download
+for f in llama-b11960-bin-ubuntu-cuda-13.4-x64.tar.gz cudart-llama-b11960-bin-ubuntu-cuda-13.4-x64.tar.gz; do
+  curl -L --fail -C - -O "https://github.com/ggml-org/llama.cpp/releases/download/b11960/$f"; done
+sha256sum *.tar.gz     # must equal the two values in the comment above [generator.profiles.dev-7b-gpu]
+mkdir -p ../b11960-cuda-13.4 && for f in *.tar.gz; do tar -xzf "$f" -C ../b11960-cuda-13.4; done
+cp ../b11960-cuda-13.4/cudart-*/*.so* ../b11960-cuda-13.4/llama-b11960/
+../b11960-cuda-13.4/llama-b11960/llama-server --list-devices      # should list your GPU
+```
+
+Check the size and checksum before extracting: a download can stop early and still report success.
+
+**2. Personal settings** in `~/.config/codecompass/codecompass.toml`:
 
 ```toml
-[embedder]
-device = "cuda"
+[generator]
+default_profile = "dev-7b-gpu"     # a repo's own default_profile still wins; use --profile dev-7b-gpu there
 
 [reranker]
 device = "cuda"
+dtype = "float16"                  # half precision: 1.6 GiB peak instead of 3.2 GiB
+
+[embedder]
+device = "cpu"                     # with the embedder on the GPU too, the total ran out of memory
 ```
 
-The device is not part of the index identity or config fingerprint, so changing it does not force a re-index. Two limits to know: the generator is the next cost, and Arch's `llama-cpp` package is a CPU-only build (`llama-server --list-devices` shows none), so `-ngl` has no effect until you install a CUDA or Vulkan build; and a 7B model (about 5.5 GB with its cache) plus the re-ranker (3.2 GiB) does not fit in 8 GB, so with a GPU `llama-server` you must offload fewer layers or keep one of the two models on the CPU.
+**3. Start the server and ask.** The warning that `codecompass` prints when the server is down gives this command with your path filled in:
 
+```bash
+~/.local/opt/llama.cpp/b11960-cuda-13.4/llama-b11960/llama-server \
+  -m ~/.cache/codecompass/models/qwen2.5-coder-7b-instruct-q4_k_m.gguf \
+  --host 127.0.0.1 --port 8080 -c 8192 -ngl 26 -ub 256 --cache-type-k q8_0 --cache-type-v q8_0
+codecompass --profile dev-7b-gpu
+```
+
+**Memory.** About 7.75 GiB of the 8 GiB card is used at the peak (desktop 0.8 GiB, server 4.2 GiB, re-ranker process about 2.5 GiB). With all 29 layers on the GPU, or the default `-ub 512`, the second question ran out of memory. On a tighter card use `-ngl 24` (generation 43 tok/s instead of 54), or put the re-ranker back on the CPU. Indexing a **new** repository is faster with the embedder on the GPU: stop `llama-server` first and run once with a copy of the config that sets `[embedder] device = "cuda"`. The device is not part of the index identity, so the index it builds is the same.
+
+The fp16 re-ranker kept the same top-8 chunks on three test questions (and the same order on two; the third swapped near-tied chunks, score difference under 0.0005). It is recorded in every query's audit log as `reranker.dtype`, and a change like this must be re-checked once an evaluation set exists (Article VII.5). Results from `dev-7b-gpu` are development signals only (Article VIII.5).
 
 ## How indexing works
 
@@ -421,6 +453,7 @@ Hard rules: never edit, weaken, skip, or xfail an approved test to pass; stay in
 - The first question in a repository with no index builds the index first. With the real embedder on CPU that took about 6 minutes for this repository (3 minutes of it indexing, 1 minute re-ranking, 1.5 minutes generating). On a terminal the warm-up does this while you type; the GPU settings above shrink the embedding and re-ranking parts. Run `python -m codecompass.offline.cli index <repo>` ahead of time to pay it separately.
 - Interactive mode has no conversation memory and no arrow-key history. The text streamed while the model writes is an unchecked draft, not an answer (see section 7).
 - A daemon warm-up thread that is still loading a model when you exit is abandoned, not waited for.
+- On an 8 GB GPU the 7B server, the re-ranker and the embedder do not all fit; see "Running fast on an 8 GB GPU" for the tested split.
 
 ---
 

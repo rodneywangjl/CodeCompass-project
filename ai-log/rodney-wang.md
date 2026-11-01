@@ -628,3 +628,18 @@ TODO (member)
 - Measured: the 7B on the GPU does a 3,278-token prompt plus 120 tokens in 2.0 s (3,951 tok/s prompt, 102 tok/s generation), against 85 to 99 s on the CPU build. The fp32 re-ranker ran out of memory next to it; fp16 peaks at 1.6 GiB and takes 0.64 s, with the same top-8 set on 3 of 3 questions and the same order on 2 of 3.
 - New `[reranker] dtype` (`float32` default, `float16`), rejected for unknown values and for float16 on a CPU device. The default load is unchanged; the audit log now records the re-ranker model, revision, device and dtype. This is a pipeline change under Article VII.5 (nothing to re-run yet: no evaluation set).
 - Tests first: 17 tests, 16 failing because the field did not exist and 1 guard. The real CUDA test (`-m model`) passes, so the string dtype loads the pinned model in half precision. `pytest -m "not model"`: 641 passed.
+
+## 2026-11-01 · T3.2 dev-7b-gpu profile and T3.3 GPU docs, with end-to-end measurements
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass.toml, tests/online/test_gpu_profile_t32.py, docs/specs/005-gpu-inference/*, README.md, ~/.config/codecompass/codecompass.toml (outside the repo)
+- **Outcome:** Changed
+### What I asked for
+Finish the GPU work: a profile that lets the 7B server and the re-ranker share my 8 GB card, the docs for it, and a real test that proves it.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- First draft of the profile used all layers on the GPU (`-ngl 99`). Running it for real showed it fails: the fp16 re-ranker and the server together left about 180 MiB free and the second question ran out of memory; moving the embedder to the CPU was not enough, and `-ub 256` alone passed once by luck and failed the next time.
+- Measured four server settings with six repeated re-ranks each. `-ngl 26 -ub 256` passed every time with about 400 MiB to spare (prompt 2,500 tok/s, generation 54 tok/s); `-ngl 24` is safer and slower (43 tok/s). I changed Spec 005 first, then updated my own T3.2 test to the measured flags in a separate `test(T3.2)` commit, then the profile. That test edit follows a spec change, not a failing result.
+- Final run through a real terminal with the server started from the TUI's own printed command: three questions took 8.6 s, 5.1 s and 11.6 s (re-rank 0.7 s, generation 4 to 11 s, fp16 recorded in the log), no errors, peak GPU memory 7,754 of 8,192 MiB. Before the GPU work the same kind of question took about 100 s.
+- Mistakes worth noting: I once ran `pkill -f` with a pattern that also matched my own shell (it killed the command), and my first pseudo-terminal harness waited 388 s on a failed question because it only watched for a success marker.
+- `pytest -m "not model"`: 648 passed.
