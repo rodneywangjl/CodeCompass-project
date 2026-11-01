@@ -159,10 +159,13 @@ def _is_windows() -> bool:
 
 
 def _user_config_dir() -> Path:
-    """%APPDATA% on Windows, else $XDG_CONFIG_HOME or ~/.config (Spec 005 AC-4.5)."""
+    """$XDG_CONFIG_HOME if set (an explicit choice, any platform), else %APPDATA% on
+    Windows, else ~/.config (Spec 005 AC-4.5)."""
+    if os.environ.get("XDG_CONFIG_HOME"):
+        return Path(os.environ["XDG_CONFIG_HOME"])
     if _is_windows() and os.environ.get("APPDATA"):
         return Path(os.environ["APPDATA"])
-    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+    return Path.home() / ".config"
 
 
 def _prepare_terminal(*streams) -> None:
