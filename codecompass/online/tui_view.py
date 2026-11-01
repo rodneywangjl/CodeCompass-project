@@ -28,44 +28,53 @@ def tool_calls(rounds) -> list[dict]:
     return [entry for entry in rounds if entry.get("tool") is not None]
 
 
-def summary_line(rounds) -> str:
+def _plain(text: str, role: str) -> str:
+    return text
+
+
+def summary_line(rounds, style=None) -> str:
     n = len(tool_calls(rounds))
     if n == 0:
-        return "▸ No tools called"
-    return f"▸ {n} tool{'s' if n != 1 else ''} called — type /tools to see them"
+        text = "▸ No tools called"
+    else:
+        text = f"▸ {n} tool{'s' if n != 1 else ''} called — type /tools to see them"
+    return style.paint(text, "info") if style else text
 
 
-def _executed(entry) -> list[str]:
+def _executed(entry, paint) -> list[str]:
     args = " ".join(f"{key}={_clean(value)}" for key, value in entry.get("args", {}).items())
-    head = f"round {entry.get('round', 0)}  {entry['tool']}" + (f"  {args}" if args else "")
-    detail = ["cache hit" if entry.get("cache_hit") else "cache miss"]
+    head = (paint(f"round {entry.get('round', 0)}", "muted") + "  "
+            + paint(entry["tool"], "accent") + (f"  {args}" if args else ""))
+    detail = [paint("cache hit", "ok") if entry.get("cache_hit") else paint("cache miss", "muted")]
     if entry.get("error"):
-        detail.append("failed")
+        detail.append(paint("failed", "danger"))
     if entry.get("result_summary"):
         detail.append(_clean(entry["result_summary"]))
     return [head, " " * 9 + " · ".join(detail)]
 
 
-def _other(entry) -> list[str]:
+def _other(entry, paint) -> list[str]:
     """A round that ran no tool, so that every round is accounted for (AC-4.2)."""
     where = f"round {entry.get('round', 0)}  "
     if entry.get("malformed"):
-        return [where + "malformed request, no tool ran"]
+        return [paint(where + "malformed request, no tool ran", "warn")]
     if entry.get("final_call"):
-        return [where + "request refused: the round limit was reached"]
+        return [paint(where + "request refused: the round limit was reached", "warn")]
     if entry.get("reason") == "tools disabled":
-        return [where + "request ignored: tools are off in this mode"]
+        return [paint(where + "request ignored: tools are off in this mode", "warn")]
     return []
 
 
-def format_tools(rounds) -> str:
-    """The text `/tools` prints (AC-4.2, Plan 004 section 8)."""
+def format_tools(rounds, style=None) -> str:
+    """The text `/tools` prints (AC-4.2, Plan 004 section 8); *style* only adds colour."""
+    paint = style.paint if style else _plain
     lines = []
     for entry in rounds:
-        lines += _executed(entry) if entry.get("tool") is not None else _other(entry)
+        lines += (_executed(entry, paint) if entry.get("tool") is not None
+                  else _other(entry, paint))
     if not tool_calls(rounds):
-        return "\n".join(["No tools were called for the last question."] + lines)
-    return "\n".join(["Tools called for the last question:"] + lines)
+        return "\n".join([paint("No tools were called for the last question.", "muted")] + lines)
+    return "\n".join([paint("Tools called for the last question:", "muted")] + lines)
 
 
 # --- colour (Spec 004 US5) -----------------------------------------------------------

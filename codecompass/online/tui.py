@@ -34,6 +34,11 @@ def _say(stream, text: str) -> None:
     stream.flush()
 
 
+def _paint(style, text: str, role: str) -> str:
+    """*text* in the colour of *role* when there is a style; else unchanged (Spec 004 US5)."""
+    return style.paint(text, role) if style else text
+
+
 class _DraftPrinter:
     """Show the model's unchecked text on stderr so it cannot be taken for the answer.
 
@@ -41,8 +46,8 @@ class _DraftPrinter:
     (Spec 004 AC-2.1, AC-2.2).
     """
 
-    def __init__(self, stderr, status: bool) -> None:
-        self._stderr, self._status = stderr, status
+    def __init__(self, stderr, status: bool, chrome=None) -> None:
+        self._stderr, self._status, self._chrome = stderr, status, chrome
         self.started, self._at_line_start, self._t0 = False, True, 0.0
 
     def write(self, piece: str) -> None:
@@ -52,7 +57,7 @@ class _DraftPrinter:
         if not self.started:
             self.started, self._t0 = True, time.monotonic()
             _clear(self._stderr, self._status)
-            _say(self._stderr, DRAFT_HEADER + "\n")
+            _say(self._stderr, _paint(self._chrome, DRAFT_HEADER, "warn") + "\n")
         for part in re.split("(\n)", piece):
             if part == "\n":
                 if self._at_line_start:  # a blank line is still a marked line
@@ -90,7 +95,7 @@ def _end_question(printer, stderr, status: bool, *, failed: bool) -> None:
 
 
 def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
-                tool_rounds=None, style=None) -> int:
+                tool_rounds=None, style=None, chrome=None) -> int:
     """Read questions from *stdin*, print ``answer(question)`` to *stdout* (Spec 004).
 
     Only answers go to stdout. The prompt, status line, hints and errors go to
@@ -107,14 +112,16 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
     previous list in place (AC-4.4).
 
     *style*, if given, is a ``tui_view.Style``: each answer is written through
-    ``style.answer``, which only adds colour (AC-5.4).
+    ``style.answer``, which only adds colour (AC-5.4). *chrome* is the same kind of
+    object for stderr: it colours the prompt, status, tool line, ``/tools``, ``error:``
+    and the draft header, and never changes a word (AC-5.3).
     """
     prompting = stdin.isatty() and stderr.isatty()
     status = stderr.isatty()
     answered, last_rounds = False, []
     while True:
         if prompting:
-            _say(stderr, PROMPT)
+            _say(stderr, _paint(chrome, PROMPT.rstrip(), "accent") + PROMPT[len(PROMPT.rstrip()):])
         try:
             line = stdin.readline()
         except KeyboardInterrupt:
@@ -130,12 +137,12 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
         if question in EXIT_COMMANDS:
             return 0
         if question == TOOLS_COMMAND:
-            _say(stderr, (tui_view.format_tools(last_rounds) if answered
-                          else "No question has been answered yet.") + "\n")
+            _say(stderr, (tui_view.format_tools(last_rounds, chrome) if answered
+                          else _paint(chrome, "No question has been answered yet.", "muted")) + "\n")
             continue
-        printer = _DraftPrinter(stderr, status) if draft and status else None
+        printer = _DraftPrinter(stderr, status, chrome) if draft and status else None
         if status:
-            _say(stderr, STATUS)
+            _say(stderr, _paint(chrome, STATUS, "info"))
         try:
             text = answer(question, on_draft=printer.write) if printer else answer(question)
         except KeyboardInterrupt:
@@ -144,7 +151,7 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
             continue
         except Exception as exc:  # noqa: BLE001 (one failed question must not end the session)
             _end_question(printer, stderr, status, failed=True)
-            _say(stderr, f"error: {str(exc) or type(exc).__name__}\n")
+            _say(stderr, f"{_paint(chrome, 'error:', 'danger')} {str(exc) or type(exc).__name__}\n")
             continue
         _end_question(printer, stderr, status, failed=False)
         shown = style.answer(text) if style is not None else text
@@ -153,7 +160,7 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
         if tool_rounds is not None:
             last_rounds = list(tool_rounds() or [])
             if prompting:
-                _say(stderr, tui_view.summary_line(last_rounds) + "\n")
+                _say(stderr, tui_view.summary_line(last_rounds, chrome) + "\n")
 
 
 def _clear(stderr, status: bool) -> None:
@@ -250,7 +257,7 @@ def _start_command(profile, server_url: str) -> str:
     return subprocess.list2cmdline(command) if _is_windows() else shlex.join(command)
 
 
-def _check_generator(generator, profile, server_url: str, stderr) -> None:
+def _check_generator(generator, profile, server_url: str, stderr, chrome=None) -> None:
     """Warn (never fail) when the generator is down or does not match the profile (AC-1.10)."""
     try:
         if generator.health_check():
@@ -259,7 +266,7 @@ def _check_generator(generator, profile, server_url: str, stderr) -> None:
                    f"  {_start_command(profile, server_url)}")
     except Exception as exc:  # noqa: BLE001 (a mismatched server explains itself)
         message = str(exc) or type(exc).__name__
-    _say(stderr, f"warning: {message}\n")
+    _say(stderr, f"{_paint(chrome, 'warning:', 'warn')} {message}\n")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -275,6 +282,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--index-dir", help="override the index directory")
     parser.add_argument("--no-draft", action="store_true",
                         help="do not show the model's unchecked draft while it writes")
+    parser.add_argument("--theme", help="colour theme: auto (the default: light when the terminal "
+                                         "says its background is light), dark (Rose Pine Moon) or "
+                                         "light (Rose Pine Dawn); the CODECOMPASS_THEME "
+                                         "environment variable does the same")
+    parser.add_argument("--no-color", action="store_true",
+                        help="use no colour (the NO_COLOR environment variable does the same)")
     return parser
 
 
@@ -283,13 +296,17 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
     stdin, stdout, stderr = stdin or sys.stdin, stdout or sys.stdout, stderr or sys.stderr
     _prepare_terminal(stdout, stderr)
     args = _parser().parse_args(argv)
+    style = chrome = None  # colour for the answer (stdout) and for the interface (stderr)
     try:
+        # each stream is coloured only if it is itself a terminal (AC-5.2, AC-5.6); the theme
+        # comes first so that every later error can already be painted
+        theme = tui_view.theme_name(args.theme, os.environ)
+        out_level = tui_view.color_level(stdout, os.environ, no_color=args.no_color)
+        err_level = tui_view.color_level(stderr, os.environ, no_color=args.no_color)
+        style = tui_view.Style(out_level, theme) if out_level != "none" else None
+        chrome = tui_view.Style(err_level, theme) if err_level != "none" else None
         root = _repo_root(args.repo)
         config_files = _find_configs(root, args.config)
-        # colour for the answer on stdout: decided by stdout itself and the environment
-        theme = tui_view.theme_name(None, os.environ)
-        level = tui_view.color_level(stdout, os.environ)
-        style = tui_view.Style(level, theme) if level != "none" else None
         # heavy model libraries are not imported here: they load on the first question
         import codecompass.online as online
         from codecompass.online.config import load_online_config_layers
@@ -300,14 +317,15 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
         generator = LlamaServerGenerator(profile, server_url=config.generator.server_url,
                                          timeout_seconds=config.generator.timeout_seconds)
     except Exception as exc:  # noqa: BLE001 (startup problems are reported, not traced)
-        _say(stderr, f"error: {exc}\n")
+        _say(stderr, f"{_paint(chrome, 'error:', 'danger')} {exc}\n")
         return 1
     if stdin.isatty() and stderr.isatty():
-        _say(stderr, f"codecompass: repo: {root}\n"
-                     f"codecompass: profile {name} ({profile.model_id})\n"
-                     f"codecompass: config: {', '.join(map(str, config_files)) or 'built-in defaults'}\n"
-                     "Type a question. /exit or Ctrl-D to quit.\n")
-    _check_generator(generator, profile, config.generator.server_url, stderr)
+        details = (f"repo: {root}", f"profile {name} ({profile.model_id})",
+                   f"config: {', '.join(map(str, config_files)) or 'built-in defaults'}")
+        _say(stderr, "".join(f"{_paint(chrome, 'codecompass:', 'accent')} "
+                             f"{_paint(chrome, detail, 'muted')}\n" for detail in details)
+                     + _paint(chrome, "Type a question. /exit or Ctrl-D to quit.", "muted") + "\n")
+    _check_generator(generator, profile, config.generator.server_url, stderr, chrome)
 
     warm = (_start_warm_up(online.warm_up, root, config, args.index_dir)
             if stdin.isatty() and stderr.isatty() else None)
@@ -316,9 +334,9 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
 
     def answer(question: str, on_draft=None) -> str:
         if warm is not None and warm.is_alive():  # only the first question can find it so
-            _say(stderr, f"{CLEAR_LINE}Preparing index and models…")
+            _say(stderr, f"{CLEAR_LINE}{_paint(chrome, 'Preparing index and models…', 'info')}")
             warm.join()
-            _say(stderr, f"{CLEAR_LINE}{STATUS}")
+            _say(stderr, f"{CLEAR_LINE}{_paint(chrome, STATUS, 'info')}")
         result = online.ask(root, question, config=config, profile=name,
                             index_dir=args.index_dir, generator=generator,
                             on_draft=on_draft)
@@ -327,4 +345,4 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
 
     return run_session(answer, stdin=stdin, stdout=stdout, stderr=stderr,
                        draft=not args.no_draft, tool_rounds=lambda: last["rounds"],
-                       style=style)
+                       style=style, chrome=chrome)
