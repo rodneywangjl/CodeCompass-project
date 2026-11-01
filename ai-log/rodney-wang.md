@@ -600,3 +600,17 @@ TODO (member)
 - Tests first: 11 tests, 7 failing on the missing behaviour and 4 guards. I tightened one test that passed vacuously because `pytest.raises(Exception)` also caught the stub's `NotImplementedError`. The threaded tests passed 8 runs out of 8.
 - Risk to know about: a daemon thread that is still loading a model when the process exits could in principle misbehave at interpreter shutdown. I did not see it, and a clean `/exit` normally comes after the warm-up has finished.
 - `pytest -m "not model"`: 625 passed.
+
+## 2026-11-01 · T2.6 Docs for draft, warm-up, layered config and GPU settings; real terminal check
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** README.md, docs/specs/004-tui/spec.md
+- **Outcome:** Changed
+### What I asked for
+Finish the TUI: document draft streaming, warm-up and layered config, and check the whole thing in a real terminal.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- README section 7 now describes layered config, the warm-up, the unchecked draft (and `--no-draft`), and a GPU table with the measurements and the VRAM and CPU-only `llama-server` caveats. Known limitations were corrected where they said there was no streaming.
+- Spec 004: Q6 marked resolved, AC-1.13 marked as amended by AC-3.1, status set to implemented.
+- Real run through a pseudo-terminal against the 7B server with this repo's config layered over my user-level file: the banner listed both files, the warm-up ran while I "typed" for 12 s, the question showed the `⚠ DRAFT — NOT CHECKED` header and 32 marked, dimmed lines over 34 s, then `Draft finished after 34 s.`, `── Checked answer (replaces the draft above) ──` and the checked answer. The 7B again wrote no inline `[N]` markers, so the checked answer carried the uncited-answer note, which is the checker doing its job.
+- `pytest -m "not model"`: 625 passed.

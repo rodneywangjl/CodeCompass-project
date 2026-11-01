@@ -1,6 +1,6 @@
 # Spec 004: Minimal Terminal UI
 
-**Project:** CodeCompass (SE201 G1-T1) | **Status:** Draft for review
+**Project:** CodeCompass (SE201 G1-T1) | **Status:** Implemented (T0.1 to T2.5); README in T2.6
 **Constitution version:** 1.4.0 | **Constitution articles touched:** I, VI, VIII, IX, X, XI
 
 > This spec says **what** the terminal UI must do and how we will know it works. Module layout and design choices belong in the plan.
@@ -47,7 +47,7 @@ A developer types `codecompass` in a terminal inside (or pointing at) a git repo
 - **AC-1.9** Startup fails loudly (message on stderr, exit code 1) for: a path that is not a git repository, an unknown profile, or an invalid config (Article VIII.4).
 - **AC-1.10** At startup the session prints the active profile and resolved model id once to stderr (Article VIII.4). If the generator's health check fails, it prints a one-line warning with the `llama-server` start command for that profile, and still starts.
 - **AC-1.11** When stdin is not a terminal, no prompt, banner or status line is printed; each input line is answered in turn and output is just the answers. EOF ends the session.
-- **AC-1.13** *(implemented as "first file wins"; amended by AC-3.1 below, pending approval)* The config file is the first that exists of: `--config PATH`, `<repo root>/codecompass.toml`, `~/.config/codecompass/codecompass.toml` (or `$XDG_CONFIG_HOME/codecompass/codecompass.toml`). If none exists, built-in defaults apply. The file used (or "built-in defaults") is named in the startup banner. A `--config` path that does not exist is a startup error, not a fallback.
+- **AC-1.13** *(amended by AC-3.1 below: the files are layered, not "first wins")* The config file is the first that exists of: `--config PATH`, `<repo root>/codecompass.toml`, `~/.config/codecompass/codecompass.toml` (or `$XDG_CONFIG_HOME/codecompass/codecompass.toml`). If none exists, built-in defaults apply. The file used (or "built-in defaults") is named in the startup banner. A `--config` path that does not exist is a startup error, not a fallback.
 - **AC-1.12** Typing `codecompass` works after `pip install -e .` in the virtual environment, with no new runtime dependency.
 
 ### US2 (P2): See the model write (unchecked draft)
@@ -101,5 +101,5 @@ Q1, Q2 and Q4 were approved by the team member on 2026-11-01 with the recommende
 | Q2 | **Packaging.** `pyproject.toml` has no `[build-system]` or `[project.scripts]`. `pip install -e .` needs a build backend (setuptools, a build-time dependency not listed in `requirements.txt`) and an explicit package list, since the repo root also holds `tests/` and `docs/`. | Adding a build backend is a dependency decision, so I will not do it unprompted. |
 | Q4 | **Where does `codecompass.toml` come from when run in another repo?** The `ask` CLI reads `./codecompass.toml` from the working directory. For a repo that has none, the built-in defaults apply (profile `dev`, the 14B). Options: (a) `--config`, then `<repo root>/codecompass.toml`, then built-in defaults; (b) also a user-level file such as `~/.config/codecompass/codecompass.toml`. | Recommended: (b), so your `dev-7b` choice follows you into any repo. Needs a decision because it adds a config location. |
 | Q5 | **RESOLVED (yes, 2026-11-01), with the requirement that the draft is obviously a draft (AC-2.1, AC-2.2).** *Question was:* does a stderr draft break Article VI.1? VI.1 says the checker must verify before "any answer is shown". The draft is labelled unchecked and goes to stderr, with the checked answer alone on stdout, so the plan treats it as a progress display. A stricter reading would need a constitution amendment first. | Approved by the team member; the PR reviewer still confirms. |
-| Q6 | **User-level base layer (AC-3.1).** This changes what you approved in Q4 ("first file wins"). It is needed because this repo has its own `codecompass.toml`, which hides the user-level file. | Recommended. Needs approval. |
+| Q6 | **RESOLVED (approved 2026-11-01).** User-level base layer (AC-3.1). It changes Q4 ("first file wins"), and was needed because this repo has its own `codecompass.toml`, which hid the user-level file. | Done in T2.1. |
 | Q3 | Does the session accept an optional readline-style line editor? | Plan assumes the standard library `readline` when present (history and arrow keys in memory only), nothing otherwise. |
