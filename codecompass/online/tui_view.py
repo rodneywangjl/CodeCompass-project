@@ -10,6 +10,9 @@ from __future__ import annotations
 import os
 import re
 
+from codecompass.online import STALE_WARNING
+from codecompass.online.citation import formatter
+
 LIMIT = 100  # longest value shown from a tool call; longer ones end with "…"
 _CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 
@@ -139,6 +142,14 @@ def strip_escapes(text: str) -> str:
     return _SGR.sub("", text)
 
 
+# --- colouring a checked answer (AC-5.4) -----------------------------------------------
+
+_MARKER = re.compile(r"(?<![\w\]])\[(\d+)\]")  # as the checker finds markers
+_HEADING = re.compile(r"\s*(?:#+\s*)?\**\s*sources\s*\**\s*:?\s*\**\s*", re.IGNORECASE)
+_WHOLE_LINE = {formatter.BANNER: "danger", formatter.UNCITED_NOTE: "warn",
+               formatter.PARTIAL_NOTE: "warn", STALE_WARNING: "warn"}
+
+
 class Style:
     """Paint text in the colour of a role, for one colour level and theme (AC-5.1)."""
 
@@ -154,3 +165,40 @@ class Style:
         else:
             params = f"38;5;{to_256(colour)}"
         return f"\x1b[{'1;' if bold else ''}{params}m{text}\x1b[0m"
+
+
+    def answer(self, text: str) -> str:
+        """*text* with colour added around the flagged-answer parts, and nothing else.
+
+        Only escape sequences are inserted: with them removed the result is *text*
+        (AC-5.4). Marks, tags and banners are recognised only where the formatter puts
+        them, so a lookalike in the middle of a line is not touched, nor is a code fence.
+        """
+        if self.level == "none":
+            return text
+        lines = text.split("\n")
+        heading = max((i for i, line in enumerate(lines) if _HEADING.fullmatch(line)),
+                      default=None)
+        in_fence = False
+        for i, line in enumerate(lines):
+            if line.strip().startswith("```"):
+                in_fence = not in_fence
+            elif in_fence:
+                continue
+            elif line in _WHOLE_LINE:
+                lines[i] = self.paint(line, _WHOLE_LINE[line])
+            elif i == heading:
+                lines[i] = self.paint(line, "info")
+            else:
+                lines[i] = self._inline(line)
+        return "\n".join(lines)
+
+    def _inline(self, line: str) -> str:
+        head = tail = ""
+        if line.startswith(formatter.MARK):  # "[UNVERIFIED] ": the space stays plain
+            head = self.paint(formatter.MARK.rstrip(), "danger") + " "
+            line = line[len(formatter.MARK):]
+        if line.endswith(formatter.TAG):  # " (not cited)": the space stays plain
+            tail = " " + self.paint(formatter.TAG.strip(), "tag")
+            line = line[:-len(formatter.TAG)]
+        return head + _MARKER.sub(lambda m: self.paint(m.group(0), "accent"), line) + tail

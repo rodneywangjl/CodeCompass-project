@@ -90,7 +90,7 @@ def _end_question(printer, stderr, status: bool, *, failed: bool) -> None:
 
 
 def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
-                tool_rounds=None) -> int:
+                tool_rounds=None, style=None) -> int:
     """Read questions from *stdin*, print ``answer(question)`` to *stdout* (Spec 004).
 
     Only answers go to stdout. The prompt, status line, hints and errors go to
@@ -105,6 +105,9 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
     stderr then gives the count, and the line ``/tools`` lists the calls of the last
     answered question (AC-4.1, AC-4.2); a failed or interrupted question leaves the
     previous list in place (AC-4.4).
+
+    *style*, if given, is a ``tui_view.Style``: each answer is written through
+    ``style.answer``, which only adds colour (AC-5.4).
     """
     prompting = stdin.isatty() and stderr.isatty()
     status = stderr.isatty()
@@ -144,7 +147,8 @@ def run_session(answer, *, stdin, stdout, stderr, draft: bool = False,
             _say(stderr, f"error: {str(exc) or type(exc).__name__}\n")
             continue
         _end_question(printer, stderr, status, failed=False)
-        _say(stdout, text if text.endswith("\n") else text + "\n")
+        shown = style.answer(text) if style is not None else text
+        _say(stdout, shown if text.endswith("\n") else shown + "\n")
         answered = True
         if tool_rounds is not None:
             last_rounds = list(tool_rounds() or [])
@@ -282,6 +286,10 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
     try:
         root = _repo_root(args.repo)
         config_files = _find_configs(root, args.config)
+        # colour for the answer on stdout: decided by stdout itself and the environment
+        theme = tui_view.theme_name(None, os.environ)
+        level = tui_view.color_level(stdout, os.environ)
+        style = tui_view.Style(level, theme) if level != "none" else None
         # heavy model libraries are not imported here: they load on the first question
         import codecompass.online as online
         from codecompass.online.config import load_online_config_layers
@@ -318,4 +326,5 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
         return result.answer
 
     return run_session(answer, stdin=stdin, stdout=stdout, stderr=stderr,
-                       draft=not args.no_draft, tool_rounds=lambda: last["rounds"])
+                       draft=not args.no_draft, tool_rounds=lambda: last["rounds"],
+                       style=style)
