@@ -300,6 +300,8 @@ Every mode calls `ensure_current` (Article III.2), uses the same active profile 
 - **Citations (Article VI.4).** Every code block a tool shows is carried in the tool result as a chunk, collected by the harness and passed to the citation checker together with the retrieved chunks. A citation to code the model was shown passes; a citation to anything else is still flagged.
 - **Modes (D17).** `rag` and `no_retrieval` run no tools, so they are unchanged.
 
+**D20. Unreferenced sources (AC-4.10, 7.5; Article VI.3, VI.5).** `CitationResult` gets `unreferenced: list[int]` (default empty). In `checker.check`, an entry whose marker is used by exactly one entry and passes `_verified` against the context, but whose marker the body does not use, is *unreferenced*: its `SourceEntry.verified` stays False and its marker stays in `unverified`, so the outcome is G exactly as before (T9.3). `formatter.render` then splits `unverified` in two: markers also in `unreferenced` get the prefix `[NOT REFERENCED IN ANSWER] `, the rest keep `[UNVERIFIED] ` and the `(no matching Sources entry)` lines. The banner is `UNREFERENCED_BANNER` only when every unverified marker is unreferenced; any other flagged answer keeps `BANNER`. The log's `citation` record gets `unreferenced` only when it is non-empty, because `test_full_pipeline_t122` pins the record of an ordinary answer. No change to what counts as G, to the prompt, or to `(not cited)` tagging (D11).
+
 ## 6. Optimisations
 
 | # | Optimisation | Saves | Must not break |
@@ -423,6 +425,7 @@ query_log_dir = ""   # default: <index_dir>/queries/
 | S11 | Audit logging: per-query structured log | 7.1–7.3 |
 | S12 | Public `ask` API, CLI entry point | 8.1–8.4, 9.1, 9.2 |
 | S13 | Real generator and real re-ranker `model`-marked tests | end-to-end smoke |
+| S16 | Unreferenced sources: separate mark and banner wording for real but unlinked `Sources` entries | 4.10, 7.5 |
 
 ## 11. Constitution check
 

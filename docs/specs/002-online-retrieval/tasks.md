@@ -276,6 +276,13 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - **Approved test changes (need reviewer sign-off, Article IX.3):** Constitution 1.4.0 makes three approved tests out of date: `test_tool_allowlist_t54.py::test_allowed_tools_constant` and `test_tool_settings_t05.py` (default allowed tools) now expect all four tools, and `test_harness_messages_t85.py` (D14 template) has the new tool rule 3. No other assertion changes.
 - ACs: Article V.2, VI.1, VI.4; plan D14, D17, D18. | Touches: `agent/harness.py`, `agent/tools.py`, `config.py`, `__init__.py`, `offline/stores/vector.py` (read-only `symbols_for_path`), spec 002, and the three approved tests above. | Depends on: T14.1, T14.2, T8.6.
 
+## S16: Unreferenced sources (plan D20)
+
+**T16.1 Unreferenced sources**
+- Tests first (checker and formatter on the T9.3 fixture chunks, then `ask` with a stub generator): an entry that matches the context but whose marker the body does not use is in `unreferenced` and still in `unverified`, outcome G; an entry that fails the evidence check, a duplicate marker, and a marker with no entry are never in `unreferenced`; a commit entry that matches a tool result but is not referenced is; a fully referenced answer has an empty `unreferenced` and outcome F; when every flagged entry is unreferenced the answer starts with the AC-4.10 banner and the entry has `[NOT REFERENCED IN ANSWER] ` and no `[UNVERIFIED]`; with a failed entry as well, the AC-4.4 banner is used and each entry keeps its own prefix; a marker with no entry is unchanged; the banner never says the sources are true; the flagged text is never identical to the cited text; through `ask`, a real source listed without a marker gives G with the new banner, and the log's `citation` has `unreferenced` only in that case.
+- **Approved test risk:** `test_entry_without_marker_is_g` requires the entry to stay in `unverified`; `test_full_pipeline_t122` requires `{"outcome": "F", "unverified": []}` for an ordinary answer. Both are kept by design. If another approved test fails, stop and ask (Article IX.3).
+- ACs: AC-4.4, 4.10, 7.5; Article VI.3, VI.5. | Touches: `citation/checker.py`, `citation/formatter.py`, `models.py`, `__init__.py`. | Depends on: T9.3, T9.4, T11.1.
+
 ---
 
 ## Completion checklist (spec "definition of done")
