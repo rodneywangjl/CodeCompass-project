@@ -676,3 +676,18 @@ TODO (member)
 - Tests first: 43 new tests, all red first (36 failed on behaviour with the settings stubbed in, 7 were guards), then green. The gate sits right after re-ranking, before any call to the generator, and reuses the no-evidence path the empty index already took.
 - Six approved tests then failed (`Why retry?` / `Why?` share no word with any chunk, so the stub re-ranker scores 0.0 and the gate refuses). I stopped and asked. The stub re-ranker could not be changed (`test_stub_reranker_t04` pins its scoring); I approved turning the gate off in the setup of those tests (`min_top_score = 0` in three places), with no assertion or question changed. It is its own commit and is listed in tasks.md under T15.1.
 - `pytest -m "not model"`: 720 passed.
+
+## 2026-11-02 · Say what is wrong when a real source is listed but not referenced
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/citation/checker.py, codecompass/online/citation/formatter.py, codecompass/online/models.py, codecompass/online/__init__.py, tests/online/test_unreferenced_t161.py, docs/specs/002-online-retrieval/spec.md, plan.md, tasks.md
+- **Outcome:** Changed
+### What I asked for
+Checking the app by hand, Claude found answers shown as "citations could not be verified" with `[UNVERIFIED]` on a source that did match a chunk the model was sent (`backend/registration_policy.py`, lines 31-74). The 7B model had listed the source under `Sources` but never wrote `[1]` in the answer. I asked for the wording to describe what is actually wrong.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- The rule stays: an entry no marker refers to is outcome G and stays in `unverified` (plan D9.3, approved `test_entry_without_marker_is_g`). What changes is how it is shown: a new `CitationResult.unreferenced` list; entries that matched the evidence but are not referenced get `[NOT REFERENCED IN ANSWER]` and, when they are the only problem, a banner saying the answer does not say which statement each source supports. Any failed or missing citation keeps the old banner and `[UNVERIFIED]`.
+- Spec first: AC-4.10, AC-7.5, an edge case, clarification C14, plan D20, task T16.1. On a separate branch from `main` (`feat/online-retrieval-t16.1`), so its spec text will meet the evidence-gate branch's at the same places (AC/C/D numbers are different; expect easy doc conflicts, and in `ai-log`).
+- The log gets `unreferenced` only when it is non-empty, because the approved `test_full_pipeline_t122` pins the whole citation record of an ordinary answer.
+- Not changed: the prompt (the 7B ignores the marker instruction, but prompt work is deferred until the evaluation set exists), and what counts as G.
+- Tests first: 17 tests, red first (7 failed on behaviour with the field and banner constant stubbed in, 10 were guards), then green. No approved test needed editing. `pytest -m "not model"`: 694 passed.

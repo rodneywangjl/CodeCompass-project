@@ -284,6 +284,13 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - **Approved test changes (need reviewer sign-off, Article IX.3):** with the gate on by default, six approved tests ask a question that shares no word with any chunk ("Why retry?", "Why?"), so the stub re-ranker scores it 0.0 and the gate refuses. They are about citations, stale warnings, modes and the CLI, not the gate, so the gate is switched off in their setup (`min_top_score = 0`): `tests/online/ask_support.py::config()` (used by `test_citation_nonbypassable_t96`, `test_modes_t124`, `test_stale_fallback_t102`), the `setup` fixture of `test_cli_t123.py`, and the inline config of the end-to-end test in `test_tui_main_t12.py`. No assertion and no question changes. The stub re-ranker is left alone: `test_stub_reranker_t04` pins its scoring.
 - ACs: AC-1.5, 1.6, 1.7, 7.4, FR-20; Article I.2, I.3, V.4, X.2. | Touches: `config.py`, `__init__.py`, and the three test setups above. | Depends on: T10.3, T11.1.
 
+## S16: Unreferenced sources (plan D20)
+
+**T16.1 Unreferenced sources**
+- Tests first (checker and formatter on the T9.3 fixture chunks, then `ask` with a stub generator): an entry that matches the context but whose marker the body does not use is in `unreferenced` and still in `unverified`, outcome G; an entry that fails the evidence check, a duplicate marker, and a marker with no entry are never in `unreferenced`; a commit entry that matches a tool result but is not referenced is; a fully referenced answer has an empty `unreferenced` and outcome F; when every flagged entry is unreferenced the answer starts with the AC-4.10 banner and the entry has `[NOT REFERENCED IN ANSWER] ` and no `[UNVERIFIED]`; with a failed entry as well, the AC-4.4 banner is used and each entry keeps its own prefix; a marker with no entry is unchanged; the banner never says the sources are true; the flagged text is never identical to the cited text; through `ask`, a real source listed without a marker gives G with the new banner, and the log's `citation` has `unreferenced` only in that case.
+- **Approved test risk:** `test_entry_without_marker_is_g` requires the entry to stay in `unverified`; `test_full_pipeline_t122` requires `{"outcome": "F", "unverified": []}` for an ordinary answer. Both are kept by design. If another approved test fails, stop and ask (Article IX.3).
+- ACs: AC-4.4, 4.10, 7.5; Article VI.3, VI.5. | Touches: `citation/checker.py`, `citation/formatter.py`, `models.py`, `__init__.py`. | Depends on: T9.3, T9.4, T11.1.
+
 ---
 
 ## Completion checklist (spec "definition of done")

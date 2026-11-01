@@ -194,6 +194,8 @@ def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None =
     if stale:
         rendered = f"{STALE_WARNING}\nReason: {reason}\n\n{rendered}"
     log["citation"] = {"outcome": result.outcome, "unverified": list(result.unverified)}
+    if result.unreferenced:  # only when there are some: the record of an ordinary answer is pinned
+        log["citation"]["unreferenced"] = list(result.unreferenced)
     log["timings"]["total"] = time.perf_counter() - started
     path = write_log(log, _log_dir(config, index_dir))
     return QueryResult(answer=rendered, sources=list(result.sources),
