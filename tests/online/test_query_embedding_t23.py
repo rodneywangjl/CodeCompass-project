@@ -49,7 +49,7 @@ def test_question_is_embedded_with_the_index_embedder(handles):
 def test_online_imports_only_the_public_offline_api():
     allowed = {"codecompass.offline", "codecompass.offline.config"}
     for path in ONLINE.rglob("*.py"):
-        tree = ast.parse(path.read_text(), filename=str(path))
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module:
                 names = [node.module]

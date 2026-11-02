@@ -18,6 +18,7 @@ import pytest
 
 from codecompass.offline.models import EmbedderIdentity
 from codecompass.online import tui
+from codecompass.online import tui_live
 from codecompass.online import tui_view as view
 from codecompass.online.citation import formatter
 from codecompass.online.tui import main, run_session
@@ -177,6 +178,9 @@ class TtyOut(io.StringIO):
         return True
 
 
+_UNTHREADED = tui_live.Spinner
+
+
 @pytest.fixture
 def world(tmp_path, monkeypatch):
     tmp = tmp_path.resolve()
@@ -214,6 +218,10 @@ def world(tmp_path, monkeypatch):
     monkeypatch.setattr("codecompass.offline.embedding.CodeEmbedder", Embedder)
     monkeypatch.setattr("codecompass.online.retrieval.reranker.BgeReranker", Reranker)
     monkeypatch.setattr(tui, "_start_warm_up", lambda *a, **k: None)
+    # No timer thread: a slow runner must not draw an extra "1s" frame in one of two
+    # runs these tests compare. The spinner's own ticking is tested in T4.2.
+    monkeypatch.setattr(tui_live, "Spinner",
+                        lambda *a, **k: _UNTHREADED(*a, **{**k, "threaded": False}))
     (repo.path / "codecompass.toml").write_text(
         f'[embedder]\nmodel = "stub"\nrevision = "stub-{tmp.name}"\ndimension = 8\n'
         f'[reranker]\nrevision = "rerank-{tmp.name}"\n')
