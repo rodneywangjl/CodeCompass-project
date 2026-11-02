@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 
 from codecompass.online.agent.cache import ToolCache
@@ -166,10 +167,12 @@ def _generate(generator, messages: list[dict], on_draft) -> str:
 
 
 def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: int,
-              tools_enabled: bool = True, on_draft=None) -> AgentRun:
+              tools_enabled: bool = True, on_draft=None, on_tool=None) -> AgentRun:
     """Answer, running at most *max_rounds* tool calls, one per round (Plan D15).
 
     *on_draft*, if given, receives the model's text as it is written (Spec 004 US2).
+    *on_tool*, if given, is called with a deep copy of the audit record of each tool call
+    that ran, in order (Spec 004 US6); it only observes.
     """
     messages = [{"role": "system", "content": system_prompt(tools_enabled=tools_enabled)},
                 {"role": "user", "content": user_message(question, chunks)}]
@@ -212,6 +215,8 @@ def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: i
         if len(calls) > 1:
             entry["ignored_calls"] = len(calls) - 1
         run.rounds.append(entry)
+        if on_tool is not None:
+            on_tool(copy.deepcopy(entry))
         run.commits.extend(output.commits)
         run.chunks.extend(output.chunks)
         messages.append({"role": "user", "content": tool_result_message(call, output)})

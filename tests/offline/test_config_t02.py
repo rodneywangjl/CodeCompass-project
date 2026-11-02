@@ -67,6 +67,6 @@ def test_nothing_hardcoded():
     for p in pathlib.Path("codecompass").rglob("*.py"):
         if p.name == "config.py":
             continue
-        if "jina" in p.read_text().lower():
+        if "jina" in p.read_text(encoding="utf-8").lower():
             hits.append(str(p))
     assert hits == [], f"model name hard-coded outside config defaults: {hits}"
