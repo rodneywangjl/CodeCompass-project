@@ -24,6 +24,11 @@ DEFAULT_EMBEDDER_DIMENSION = 768
 DEFAULT_TARGET_TOKENS = 512
 DEFAULT_HARD_MAX_TOKENS = 8192  # embedder input limit (constitution VIII.1)
 DEFAULT_LOCK_TIMEOUT_SECONDS = 120  # spec C8
+# Embedding memory cap: a batch holds at most this much of (texts * longest^2),
+# longest in tokens. Measured on the CPU, peak memory is about 0.16-0.19 GB per
+# million of it on top of the loaded model (1.8 GB). The default lets 32 texts of
+# 512 tokens (the chunk target) through together: 8 at 1,024, 2 at 2,048, 1 above ~2,900.
+DEFAULT_MAX_BATCH_COST = 32 * 512 ** 2
 
 
 def _default_index_base() -> str:
@@ -72,6 +77,7 @@ class EmbedderConfig:
     dimension: int = DEFAULT_EMBEDDER_DIMENSION
     device: str = "cpu"
     batch_size: int = 32
+    max_batch_cost: int | None = DEFAULT_MAX_BATCH_COST
 
 
 @dataclass(frozen=True)
@@ -94,7 +100,8 @@ _KNOWN_KEYS: dict[str, set[str]] = {
     "chunking": {"target_tokens", "hard_max_tokens", "batch_files"},
     "files": {"max_file_bytes", "source_extensions", "exclude_patterns", "exclude_dirs"},
     "languages": {"treesitter"},
-    "embedder": {"model", "revision", "dimension", "device", "batch_size"},
+    "embedder": {"model", "revision", "dimension", "device", "batch_size",
+                 "max_batch_cost"},
     "lock": {"timeout_seconds"},
 }
 

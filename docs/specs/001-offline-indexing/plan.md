@@ -172,7 +172,7 @@ Production code depends only on these protocols. Tests supply a deterministic `S
 [chunking]   target_tokens=512  hard_max_tokens=<embedder limit>  batch_files
 [files]      max_file_bytes  source_extensions  exclude_patterns  exclude_dirs
 [languages]  treesitter = ["python","javascript","typescript","tsx","java"]
-[embedder]   model  revision  device  batch_size
+[embedder]   model  revision  device  batch_size  max_batch_cost=32*512^2 (O4: cap on texts * longest_tokens^2 per batch)
 [lock]       timeout_seconds=120
 ```
 
