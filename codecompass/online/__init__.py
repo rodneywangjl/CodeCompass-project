@@ -30,6 +30,8 @@ __all__ = ["ask", "warm_up"]
 STALE_WARNING = ("⚠ WARNING: The index may be out of date. The answer below is based "
                  "on an older version of the codebase.")
 NO_EVIDENCE = "I could not find enough evidence in the indexed code to answer this question."
+CLOSEST_HEADER = ("Closest matches found (these are not evidence for an answer; "
+                  "check them yourself):")
 NO_INDEX = ("No index is available for this repository yet, so this question cannot "
             "be answered.")
 
@@ -64,6 +66,30 @@ def _log_dir(config: OnlineConfig, index_dir) -> Path:
     return Path(index_dir or config.offline.index.dir) / "queries"
 
 
+def _log_retrieved(log, ranked, rrf, sent_ids) -> None:
+    log["retrieved"] = [{"chunk_id": c.chunk_id, "path": c.path,
+                         "lines": f"{c.start_line}-{c.end_line}",
+                         "rrf_score": rrf[c.chunk_id], "rerank_score": score,
+                         "sent": c.chunk_id in sent_ids} for c, score in ranked]
+
+
+def _refusal(ranked, closest_files: int) -> str:
+    """NO_EVIDENCE plus the closest files, best first, each once (AC-1.7, Plan D19).
+
+    Plain text, not citations: no Sources section and no [N] markers.
+    """
+    lines, listed = [], set()
+    for chunk, _ in ranked:
+        if len(lines) >= closest_files:
+            break
+        if chunk.path not in listed:
+            listed.add(chunk.path)
+            lines.append(f"- {chunk.path}, lines {chunk.start_line}-{chunk.end_line}")
+    if not lines:
+        return NO_EVIDENCE
+    return f"{NO_EVIDENCE}\n\n{CLOSEST_HEADER}\n" + "\n".join(lines)
+
+
 def _retrieve_and_answer(handles, repo_path, question, *, config, profile, tools, tools_on,
                          generator, reranker, log, on_draft=None):
     """Hybrid retrieval, re-rank, budget, then the agent loop (Plan §1)."""
@@ -77,16 +103,19 @@ def _retrieve_and_answer(handles, repo_path, question, *, config, profile, tools
     reranker = reranker or _default_reranker(config)
     with timed(log, "reranking"):
         ranked = rerank_chunks(reranker, question, chunks, len(chunks))
+    rrf = dict(shortlist)
+    if ranked:  # the evidence gate (AC-1.5, Plan D19): poor matches are not evidence
+        top, minimum = max(score for _, score in ranked), config.retrieval.min_top_score
+        log["evidence_gate"] = {"min_top_score": minimum, "top_score": top,
+                                "passed": top >= minimum}
+        if top < minimum:
+            _log_retrieved(log, ranked, rrf, set())
+            return _refusal(ranked, config.retrieval.closest_files), [], []
     prefix = (generator.count_tokens(system_prompt(tools_enabled=tools_on))
               + generator.count_tokens(user_message(question, [])))
     sent = fit_chunks([c for c, _ in ranked[:config.retrieval.final_k]],
                       chunk_budget(profile, tools, prefix), generator.count_tokens)
-    rrf = dict(shortlist)
-    sent_ids = {c.chunk_id for c in sent}
-    log["retrieved"] = [{"chunk_id": c.chunk_id, "path": c.path,
-                         "lines": f"{c.start_line}-{c.end_line}",
-                         "rrf_score": rrf[c.chunk_id], "rerank_score": score,
-                         "sent": c.chunk_id in sent_ids} for c, score in ranked]
+    _log_retrieved(log, ranked, rrf, {c.chunk_id for c in sent})
     if not sent:
         return NO_EVIDENCE, [], []
     # tools run at the indexed commit, the version the chunks came from (Plan D7)
@@ -165,6 +194,8 @@ def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None =
     if stale:
         rendered = f"{STALE_WARNING}\nReason: {reason}\n\n{rendered}"
     log["citation"] = {"outcome": result.outcome, "unverified": list(result.unverified)}
+    if result.unreferenced:  # only when there are some: the record of an ordinary answer is pinned
+        log["citation"]["unreferenced"] = list(result.unreferenced)
     log["timings"]["total"] = time.perf_counter() - started
     path = write_log(log, _log_dir(config, index_dir))
     return QueryResult(answer=rendered, sources=list(result.sources),

@@ -20,6 +20,11 @@ DEFAULT_KEYWORD_K = 50
 DEFAULT_RRF_CONSTANT = 60
 DEFAULT_RERANK_K = 50
 DEFAULT_FINAL_K = 8
+# Evidence gate (Spec 002 AC-1.5 to 1.7, Plan D19). Provisional and untuned (Article VII.1):
+# it sits between the best re-rank scores of two questions with no answer in the repository
+# (0.0014, 0.0058) and the lowest of six answerable ones (0.061). Re-check with the evaluation set.
+DEFAULT_MIN_TOP_SCORE = 0.02
+DEFAULT_CLOSEST_FILES = 3
 
 # Verifier tools defaults (Article V.1, Plan §7)
 MAX_VERIFIER_ROUNDS = 3
@@ -49,6 +54,19 @@ class RetrievalConfig:
     rrf_constant: int = DEFAULT_RRF_CONSTANT
     rerank_k: int = DEFAULT_RERANK_K
     final_k: int = DEFAULT_FINAL_K
+    min_top_score: float = DEFAULT_MIN_TOP_SCORE
+    closest_files: int = DEFAULT_CLOSEST_FILES
+
+    def __post_init__(self) -> None:
+        score = self.min_top_score
+        if (isinstance(score, bool) or not isinstance(score, (int, float))
+                or not 0 <= score <= 1):
+            raise ValueError(f"retrieval.min_top_score must be a number from 0 to 1; "
+                             f"got {score!r}")
+        count = self.closest_files
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            raise ValueError(f"retrieval.closest_files must be a whole number, 0 or more; "
+                             f"got {count!r}")
 
 
 RERANKER_DTYPES = ("float32", "float16")

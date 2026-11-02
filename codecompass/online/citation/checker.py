@@ -60,13 +60,16 @@ def check(answer: str, chunks, commits) -> CitationResult:
         counts[s.marker] = counts.get(s.marker, 0) + 1
     # An entry is verified only if its evidence is in context, its marker is
     # used in the body, and no other entry claims the same marker.
-    sources = [dataclasses.replace(
-        s, verified=(s.marker in markers and counts[s.marker] == 1
-                     and _verified(s, chunks, commits)))
-        for s in parsed.sources]
+    sources, unreferenced = [], set()
+    for s in parsed.sources:
+        matches = counts[s.marker] == 1 and _verified(s, chunks, commits)
+        if matches and s.marker not in markers:
+            unreferenced.add(s.marker)  # real evidence, but tied to no statement (AC-4.10)
+        sources.append(dataclasses.replace(s, verified=matches and s.marker in markers))
     unverified = sorted({s.marker for s in sources if not s.verified}
                         | (markers - counts.keys()))
     flagged = bool(unverified) or not parsed.has_sources
     answer, sources = _copy_commit_metadata(answer, parsed.body, sources, commits)
     return CitationResult(outcome="G" if flagged else "F", sources=sources,
-                          unverified=unverified, answer_text=answer)
+                          unverified=unverified, unreferenced=sorted(unreferenced),
+                          answer_text=answer)

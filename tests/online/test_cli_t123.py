@@ -36,7 +36,8 @@ def setup(tmp_path, monkeypatch):
     # as_posix(): Windows backslashes are escape sequences in TOML basic strings.
     toml.write_text(f'[index]\ndir = "{(tmp_path / "idx").as_posix()}"\n'
                     '[embedder]\nmodel = "stub"\nrevision = "stub-1"\ndimension = 8\n'
-                    f'[logging]\nquery_log_dir = "{(tmp_path / "queries").as_posix()}"\n')
+                    f'[logging]\nquery_log_dir = "{(tmp_path / "queries").as_posix()}"\n'
+                    '[retrieval]\nmin_top_score = 0\n')  # not about the evidence gate (T15.1)
     monkeypatch.delenv("GENERATOR_PROFILE", raising=False)
     return repo.path, toml
 

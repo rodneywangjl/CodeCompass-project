@@ -705,3 +705,35 @@ TODO (member)
 - Wrapped the `SentenceTransformer(...)` load in `CodeEmbedder._load()` in `warnings.catch_warnings()` with an `ignore` filter for that one message. Other warnings still show and the filter is gone after the load. Three tests use a fake `sentence_transformers` (no model download); two failed first, the third guards against a global filter.
 - Not a spec task, so it is a `fix:` on branch `fix/hide-optimum-warning`; the test commit came first.
 - Known gap: in the full suite the warning still appeared in 1 of 3 runs, in a warm-up test that loads the real model on a background thread. `warnings.catch_warnings` is not thread-safe, so overlapping threads can drop the filter. With the real model alone, and with the warm-up test file alone, it never appeared. `pytest -m "not model"`: 680 passed.
+
+## 2026-11-02 · Evidence gate: refuse when nothing retrieved matches the question
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/config.py, codecompass/online/__init__.py, tests/online/test_evidence_gate_t151.py, docs/specs/002-online-retrieval/spec.md, plan.md, tasks.md; three approved-test setups (tests/online/ask_support.py, test_cli_t123.py, test_tui_main_t12.py)
+- **Outcome:** Changed
+### What I asked for
+While checking the app by hand, Claude found that "What is the capital of France?" got "The capital of France is Paris." from the 7B model with no evidence at all (best re-rank score 0.006), against Article I.2. I asked for the "honesty fix".
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Spec first (Article IX.1): AC-1.5 (a best re-rank score below `retrieval.min_top_score` means no generator call, no tool, the existing no-evidence answer plus the closest files), AC-1.6 (the threshold setting), AC-1.7 (the closest-files list and `retrieval.closest_files`), AC-7.4 (the gate is logged), FR-20, clarification C13, plan D19, task T15.1.
+- Decisions I made on three open questions: the refusal names the closest files (default 3 distinct files, best first, each with its best chunk's lines); the default threshold is 0.02, not Claude's first 0.01, because I asked whether it was too low and the logged best scores showed 0.01 was only 1.7 times above the highest no-answer question (0.0058); the uncited-answer note above a refusal stays.
+- The 0.02 is still a guess: the best re-rank scores of 8 questions tried by hand on one repository on the 7B setup (no answer in the repo: 0.0014 and 0.0058; answerable: 0.061 to 0.38). It is provisional until the evaluation set exists (Article VII.1, VII.5). No new questions were run to choose it, because that would be tuning.
+- The closest-files list is plain text, not citations: no `Sources` section and no `[N]` markers, so the checker sees an answer with no citations and nothing is marked verified.
+- Tests first: 43 new tests, all red first (36 failed on behaviour with the settings stubbed in, 7 were guards), then green. The gate sits right after re-ranking, before any call to the generator, and reuses the no-evidence path the empty index already took.
+- Six approved tests then failed (`Why retry?` / `Why?` share no word with any chunk, so the stub re-ranker scores 0.0 and the gate refuses). I stopped and asked. The stub re-ranker could not be changed (`test_stub_reranker_t04` pins its scoring); I approved turning the gate off in the setup of those tests (`min_top_score = 0` in three places), with no assertion or question changed. It is its own commit and is listed in tasks.md under T15.1.
+- `pytest -m "not model"`: 720 passed.
+
+## 2026-11-02 · Say what is wrong when a real source is listed but not referenced
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/citation/checker.py, codecompass/online/citation/formatter.py, codecompass/online/models.py, codecompass/online/__init__.py, tests/online/test_unreferenced_t161.py, docs/specs/002-online-retrieval/spec.md, plan.md, tasks.md
+- **Outcome:** Changed
+### What I asked for
+Checking the app by hand, Claude found answers shown as "citations could not be verified" with `[UNVERIFIED]` on a source that did match a chunk the model was sent (`backend/registration_policy.py`, lines 31-74). The 7B model had listed the source under `Sources` but never wrote `[1]` in the answer. I asked for the wording to describe what is actually wrong.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- The rule stays: an entry no marker refers to is outcome G and stays in `unverified` (plan D9.3, approved `test_entry_without_marker_is_g`). What changes is how it is shown: a new `CitationResult.unreferenced` list; entries that matched the evidence but are not referenced get `[NOT REFERENCED IN ANSWER]` and, when they are the only problem, a banner saying the answer does not say which statement each source supports. Any failed or missing citation keeps the old banner and `[UNVERIFIED]`.
+- Spec first: AC-4.10, AC-7.5, an edge case, clarification C14, plan D20, task T16.1. On a separate branch from `main` (`feat/online-retrieval-t16.1`), so its spec text will meet the evidence-gate branch's at the same places (AC/C/D numbers are different; expect easy doc conflicts, and in `ai-log`).
+- The log gets `unreferenced` only when it is non-empty, because the approved `test_full_pipeline_t122` pins the whole citation record of an ordinary answer.
+- Not changed: the prompt (the 7B ignores the marker instruction, but prompt work is deferred until the evaluation set exists), and what counts as G.
+- Tests first: 17 tests, red first (7 failed on behaviour with the field and banner constant stubbed in, 10 were guards), then green. No approved test needed editing. `pytest -m "not model"`: 694 passed.
