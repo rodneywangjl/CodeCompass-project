@@ -23,7 +23,10 @@ def config(tmp_path, mode="rag_tools", **tools):
     return dataclasses.replace(
         base, offline=offline, pipeline=online_config.PipelineConfig(mode=mode),
         logging=online_config.LoggingConfig(query_log_dir=str(tmp_path / "queries")),
-        tools=dataclasses.replace(base.tools, **tools))
+        tools=dataclasses.replace(base.tools, **tools),
+        # These tests are not about the evidence gate (T15.1): the stub re-ranker scores a
+        # question with no shared word 0.0, which the gate would refuse. 0 turns it off.
+        retrieval=dataclasses.replace(base.retrieval, min_top_score=0))
 
 
 class CitingGenerator(StubGenerator):

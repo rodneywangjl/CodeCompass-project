@@ -660,6 +660,84 @@ TODO (member)
 - `pytest -m "not model"`: 676 passed (Linux).
 - First CI run on all three systems: Ubuntu and macOS passed; Windows had 6 failures out of 676, all one cause that I introduced: on Windows my new code read the runner's real `%APPDATA%` and ignored a deliberately set `XDG_CONFIG_HOME`, and `Path.home()` ignores `HOME` there, so the older tests that point the user config at a temp folder could not find it. Fix: an explicit `XDG_CONFIG_HOME` wins on every platform (spec amended first), and the shared `world` test fixture now also isolates `USERPROFILE` and `APPDATA`. That edits a fixture from an earlier approved test file; it is isolation only and changes nothing on Linux, and it is in its own commit.
 
+## 2026-11-01 · Indexing a new repo ran out of memory (embedding batches)
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/offline/embedding.py, codecompass/offline/config.py, codecompass/offline/orchestrator.py, tests/offline/test_embed_budget.py, README.md, docs/specs/001-offline-indexing/plan.md
+- **Outcome:** Changed
+### What I asked for
+Running `codecompass` in `spm_proj` sat on "Preparing index and models…" for 36 minutes. I asked Claude to find out why, then to fix the cause properly ("make it optimal").
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Diagnosis (Claude): the machine was swapping (about 20 GB of the process in swap), and `systemd-oomd` killed the terminal at 23:10. spm_proj had no index, so the "ensure current" step was indexing 491 files (3,217 chunks) with the embedder on the CPU. `embed_in_batches` sorted chunks by length and took 32 at a time, so the longest chunks (571 over 512 tokens, 21 over 2,048, one of 9,297) arrived together in the last batches. Reproduced under a 6 GB memory cap with no swap: killed after 8m47s.
+- Fix: a batch is cut when `count * longest_tokens^2` would pass a new config value `embedder.max_batch_cost`. Lengths are the embedder's own token counts (character counts if it cannot count). A lone over-budget text still goes through alone. 13 tests, written first; I approved them before any code.
+- First default (32 x 1024^2) was a guess from attention size, and Claude's first fix still ran out of memory under the 6 GB cap (killed after 7m25s). So Claude measured the real model: about 0.16-0.19 GB per million of `texts * longest^2` above the 1.8 GB loaded model (e.g. 32 x 512 tokens: +1.4 GB; 1 x 4096: +3.1 GB). The default became 32 x 512^2. Changing it meant editing my own approved test (one constant, plus one assertion made stricter); I signed that off and it is its own commit with the numbers in the message.
+- With 32 x 512^2 a 6 GB capped run lasted 17m49s instead of 7m25s but was still killed. Computing the batch plan with the measured numbers shows why: one batch is left over the cap, the single 9,297-token chunk (about 14 GB if it ran; extrapolated, never run). Batching cannot fix that, so it is the next entry (the chunker never uses the embedder's tokenizer).
+- Problem file in spm_proj: `backend/tests/verify_attendee_registrations.py`, lines 59-546, one 488-line function (2,790 words but 9,297 tokens). Next largest: `tests/confirmation.spec.ts:65-345` (4,448), `tests/coordinatorLead.spec.ts:379-677` (3,823), `frontend/src/Coordinator.jsx:679-854` (3,823).
+- On its own this change was not enough: the capped run still died on the one 9,297-token chunk. With the chunker fix in the next entry the same run finishes (peak 5,587 MB). `pytest -m "not model"`: 690 passed at this point.
+
+## 2026-11-02 · Chunker sized chunks by words, not the embedder's tokens
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/offline/orchestrator.py, tests/offline/test_chunk_embedder_tokens.py
+- **Outcome:** Changed
+### What I asked for
+After the batching fix still ran out of memory on one chunk, I asked Claude to fix that cause too and to note which file in `spm_proj` causes it.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Cause: both chunkers take an injected `tokenizer` and default to whitespace words; the orchestrator called `chunk_file(path, text, head, policy=policy)` with no tokenizer, so `CodeEmbedder.tokenize` (documented for "C7, AC-3.3") was never used. Spec 001 C7 and AC-3.3 already require the embedder's own tokens and "no emitted chunk exceeds the embedder's input limit", so this is a bug against the spec, not a spec change.
+- Problem file in spm_proj: `backend/tests/verify_attendee_registrations.py`, lines 59-546: one function, 2,790 words, 9,297 tokens (about 3.3 tokens per word), kept whole as a STRUCTURED chunk, over the 8,192-token limit.
+- Fix: the orchestrator passes `embedder.tokenize` (when the embedder has one) to `chunk_file`. Embedders without it (the stub) keep word counts. 4 tests written first and approved by me (2 failed first: a dense Python file and a dense Go file each came out as one oversized chunk; 2 are guards). I dropped a fifth test I had drafted because it passed before the fix.
+- Effect on spm_proj, chunked with the real tokenizer (no embedding): 5,047 chunks instead of 3,217, none over 8,192 (the 9,297 one is split), largest now 4,448 (`tests/confirmation.spec.ts:65-345`), 18 over 2,048. Chunking took 13 s.
+- Not done, my decision: lowering the default `hard_max_tokens` (for example to 2,048). Chunks up to 8,192 tokens are still allowed and one that size is estimated at about 14 GB to embed (extrapolated, not run). Spec C7 makes the ceiling the embedder's limit and a change rebuilds every index, so it needs a spec decision. It is a config value, so a lower one can be set per machine in the meantime.
+- `pytest -m "not model"`: 694 passed.
+- End to end, with both fixes (batching and tokenizer), `spm_proj` indexed on the CPU embedder under a 6 GB memory cap with no swap: exit 0, 5,047 chunks, embed 807 s, total 821 s, peak RSS 5,587 MB, and `check` reports both stores consistent (5,047 chunks agree). It passed with only about 0.4 GB to spare, and the 6 GB cap covered the indexing process only (not `llama-server` or the re-ranker). Before the fixes the same run was killed three times (after 8m47s, 7m25s and 17m49s).
+
+## 2026-11-01 · Hide the jina "optimum is not installed" warning
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/offline/embedding.py, tests/offline/test_optimum_warning.py
+- **Outcome:** Changed
+### What I asked for
+The embedder's remote code prints a harmless `optimum is not installed` warning on every start. I asked to hide it, but only that message.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Wrapped the `SentenceTransformer(...)` load in `CodeEmbedder._load()` in `warnings.catch_warnings()` with an `ignore` filter for that one message. Other warnings still show and the filter is gone after the load. Three tests use a fake `sentence_transformers` (no model download); two failed first, the third guards against a global filter.
+- Not a spec task, so it is a `fix:` on branch `fix/hide-optimum-warning`; the test commit came first.
+- Known gap: in the full suite the warning still appeared in 1 of 3 runs, in a warm-up test that loads the real model on a background thread. `warnings.catch_warnings` is not thread-safe, so overlapping threads can drop the filter. With the real model alone, and with the warm-up test file alone, it never appeared. `pytest -m "not model"`: 680 passed.
+
+## 2026-11-02 · Evidence gate: refuse when nothing retrieved matches the question
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/config.py, codecompass/online/__init__.py, tests/online/test_evidence_gate_t151.py, docs/specs/002-online-retrieval/spec.md, plan.md, tasks.md; three approved-test setups (tests/online/ask_support.py, test_cli_t123.py, test_tui_main_t12.py)
+- **Outcome:** Changed
+### What I asked for
+While checking the app by hand, Claude found that "What is the capital of France?" got "The capital of France is Paris." from the 7B model with no evidence at all (best re-rank score 0.006), against Article I.2. I asked for the "honesty fix".
+### How I checked it
+TODO (member)
+### What I kept or changed
+- Spec first (Article IX.1): AC-1.5 (a best re-rank score below `retrieval.min_top_score` means no generator call, no tool, the existing no-evidence answer plus the closest files), AC-1.6 (the threshold setting), AC-1.7 (the closest-files list and `retrieval.closest_files`), AC-7.4 (the gate is logged), FR-20, clarification C13, plan D19, task T15.1.
+- Decisions I made on three open questions: the refusal names the closest files (default 3 distinct files, best first, each with its best chunk's lines); the default threshold is 0.02, not Claude's first 0.01, because I asked whether it was too low and the logged best scores showed 0.01 was only 1.7 times above the highest no-answer question (0.0058); the uncited-answer note above a refusal stays.
+- The 0.02 is still a guess: the best re-rank scores of 8 questions tried by hand on one repository on the 7B setup (no answer in the repo: 0.0014 and 0.0058; answerable: 0.061 to 0.38). It is provisional until the evaluation set exists (Article VII.1, VII.5). No new questions were run to choose it, because that would be tuning.
+- The closest-files list is plain text, not citations: no `Sources` section and no `[N]` markers, so the checker sees an answer with no citations and nothing is marked verified.
+- Tests first: 43 new tests, all red first (36 failed on behaviour with the settings stubbed in, 7 were guards), then green. The gate sits right after re-ranking, before any call to the generator, and reuses the no-evidence path the empty index already took.
+- Six approved tests then failed (`Why retry?` / `Why?` share no word with any chunk, so the stub re-ranker scores 0.0 and the gate refuses). I stopped and asked. The stub re-ranker could not be changed (`test_stub_reranker_t04` pins its scoring); I approved turning the gate off in the setup of those tests (`min_top_score = 0` in three places), with no assertion or question changed. It is its own commit and is listed in tasks.md under T15.1.
+- `pytest -m "not model"`: 720 passed.
+
+## 2026-11-02 · Say what is wrong when a real source is listed but not referenced
+- **Tool (model):** Claude Code (claude-sonnet-5-5)
+- **Files:** codecompass/online/citation/checker.py, codecompass/online/citation/formatter.py, codecompass/online/models.py, codecompass/online/__init__.py, tests/online/test_unreferenced_t161.py, docs/specs/002-online-retrieval/spec.md, plan.md, tasks.md
+- **Outcome:** Changed
+### What I asked for
+Checking the app by hand, Claude found answers shown as "citations could not be verified" with `[UNVERIFIED]` on a source that did match a chunk the model was sent (`backend/registration_policy.py`, lines 31-74). The 7B model had listed the source under `Sources` but never wrote `[1]` in the answer. I asked for the wording to describe what is actually wrong.
+### How I checked it
+TODO (member)
+### What I kept or changed
+- The rule stays: an entry no marker refers to is outcome G and stays in `unverified` (plan D9.3, approved `test_entry_without_marker_is_g`). What changes is how it is shown: a new `CitationResult.unreferenced` list; entries that matched the evidence but are not referenced get `[NOT REFERENCED IN ANSWER]` and, when they are the only problem, a banner saying the answer does not say which statement each source supports. Any failed or missing citation keeps the old banner and `[UNVERIFIED]`.
+- Spec first: AC-4.10, AC-7.5, an edge case, clarification C14, plan D20, task T16.1. On a separate branch from `main` (`feat/online-retrieval-t16.1`), so its spec text will meet the evidence-gate branch's at the same places (AC/C/D numbers are different; expect easy doc conflicts, and in `ai-log`).
+- The log gets `unreferenced` only when it is non-empty, because the approved `test_full_pipeline_t122` pins the whole citation record of an ordinary answer.
+- Not changed: the prompt (the 7B ignores the marker instruction, but prompt work is deferred until the evaluation set exists), and what counts as G.
+- Tests first: 17 tests, red first (7 failed on behaviour with the field and banner constant stubbed in, 10 were guards), then green. No approved test needed editing. `pytest -m "not model"`: 694 passed.
+
 ## 2026-11-02 · TUI: show how many tools an answer used, and a more modern look
 - **Tool (model):** Claude Code (claude-sonnet-5-5)
 - **Files:** codecompass/online/tui_view.py (new), codecompass/online/tui.py, tests/online/test_tui_tools_t31.py, test_tui_color_t32.py, test_tui_answer_color_t33.py, test_tui_look_t34.py, README.md, docs/specs/004-tui/spec.md, plan.md, tasks.md
@@ -682,4 +760,3 @@ TODO (member)
 - US6, asked for after T3.5: I asked for the UI to be like Claude Code's. Claude said that is a bigger change than the colours (a live, redrawing interface) and asked what I wanted and how heavy it could be; I chose all four of the boxed prompt with a status line, the spinner with elapsed time, tool calls shown live and markdown-styled answers, on the standard library only. Claude wrote Spec 004 US6 (AC-6.1 to 6.6), plan section 9 and tasks T4.1 to T4.5 first, and made the live features switch on only for a real terminal (a tty file descriptor, not `TERM=dumb`, not `--plain`), so every earlier test, pipe and stand-in terminal gets exactly the old output. The spinner needs one background thread (the plan had ruled threads out; accepted for this one purpose). Limits stated in the spec: no pop-up `/` menu, no multi-line editing in the box, no mouse. Open: Q16, whether markdown punctuation (`**`, backticks, `#`) is removed like Claude Code or stays visible but styled (removing it breaks the rule that, with colour removed, the output is exactly the answer); needed before T4.4. T4.1 (live tool lines, `ask(on_tool=)`, `--plain`) tests first, then implemented: 28 tests in `tests/online/test_tui_live_tools_t41.py` (13 failed on behaviour and 15 passed as guards against today's behaviour, then all pass); `pytest -m "not model"`: 923 passed. I told Claude to implement the rest of US6 (T4.2 to T4.5) without asking me at each step; it still wrote tests first and committed them before the code, and was told never to edit an approved test. Also noticed while starting: a commit I did not make (`Runs script`, which adds `run.py`) sits on top of my T3.5 commit, `feat/tui-modern-t3.1` has been pushed, and a branch `tui-modern-2` points at the same commit; I continued on `tui-modern-2`.
 - T4.2 to T4.5, done without stopping for approval as I asked, each still tests first: the spinner (16 tests; `✻ Thinking… (Ns · ctrl-c to cancel)`, one daemon thread, one lock for every write during a question; tool blocks checked to arrive whole with a 0.5 ms redraw interval), the boxed prompt with the status line (13 tests), and markdown styling with the punctuation consumed (28 tests). One approved test failed on the way (T3.4's check of the "Preparing index and models…" line, because its stand-in terminal now counts as live); Claude changed its own code to keep that line, under the spinner's lock, and did not touch the test. README updated (live interface, `--plain`, the limits). `pytest -m "not model"`: 980 passed.
 - Checked in a real 60-column pseudo-terminal (the model server was down, so the question ended in the connection error): the box and status line fit the width, the question appears inside the box, the spinner counted 0 to 8 s in place, and the error and the next box followed. That run showed two cosmetic faults: the spinner drew over "Preparing index and models…" within a second, and a plain `Thinking…` flashed before the spinner came back. Fixed tests first (a new test, not an edit of an approved one): the spinner is paused while that message is up and redrawn at once afterwards. `pytest -m "not model"`: 981 passed.
-

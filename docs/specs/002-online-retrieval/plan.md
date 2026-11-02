@@ -300,6 +300,10 @@ Every mode calls `ensure_current` (Article III.2), uses the same active profile 
 - **Citations (Article VI.4).** Every code block a tool shows is carried in the tool result as a chunk, collected by the harness and passed to the citation checker together with the retrieved chunks. A citation to code the model was shown passes; a citation to anything else is still flagged.
 - **Modes (D17).** `rag` and `no_retrieval` run no tools, so they are unchanged.
 
+**D19. Evidence gate (AC-1.5, 1.6, 1.7, 7.4; Article I.2, I.3, X.2).** In `_retrieve_and_answer`, directly after re-ranking and before the context-budget fit, take `top = max(score for _, score in ranked)`. If `ranked` is non-empty and `top < config.retrieval.min_top_score`, record `retrieved` (every entry `sent: false`) and `evidence_gate`, then return `NO_EVIDENCE` plus the closest matches, with no chunks and no commits. That is the same path the empty index already takes (T10.3), so the answer is checked, rendered and logged like any other and no generator or tool is touched. Otherwise record `passed: true` and carry on. `evidence_gate` is `{"min_top_score": ..., "top_score": ..., "passed": ...}`; it is absent when nothing was re-ranked (empty index, `no_retrieval`). **Closest matches:** walk `ranked` best first, keep the first chunk of each path not yet listed, stop at `retrieval.closest_files`, and append `\n\n` + `Closest matches found (these are not evidence for an answer; check them yourself):` + one `- <path>, lines <start>-<end>` line per file. With `closest_files = 0` nothing is appended. The text has no `Sources` heading and no `[N]` marker, so the checker never parses it (it takes the no-citation path, AC-4.8). `RetrievalConfig.min_top_score` (default 0.02) and `RetrievalConfig.closest_files` (default 3) are validated in `__post_init__`, as `reranker.dtype` is: `min_top_score` a real number (not a bool) from 0 to 1, `closest_files` an integer (not a bool) of 0 or more, else `ValueError` naming `retrieval.<field>`. Why the score alone: it is a deterministic output of the pinned re-ranker (Article VII.6), so the gate is testable with a stub that returns chosen scores. Why no `search_again` retry first: a retry needs a generator call (about 90 s on a CPU-only 7B) and the model asking for it; left for a later spec.
+
+**D20. Unreferenced sources (AC-4.10, 7.5; Article VI.3, VI.5).** `CitationResult` gets `unreferenced: list[int]` (default empty). In `checker.check`, an entry whose marker is used by exactly one entry and passes `_verified` against the context, but whose marker the body does not use, is *unreferenced*: its `SourceEntry.verified` stays False and its marker stays in `unverified`, so the outcome is G exactly as before (T9.3). `formatter.render` then splits `unverified` in two: markers also in `unreferenced` get the prefix `[NOT REFERENCED IN ANSWER] `, the rest keep `[UNVERIFIED] ` and the `(no matching Sources entry)` lines. The banner is `UNREFERENCED_BANNER` only when every unverified marker is unreferenced; any other flagged answer keeps `BANNER`. The log's `citation` record gets `unreferenced` only when it is non-empty, because `test_full_pipeline_t122` pins the record of an ordinary answer. No change to what counts as G, to the prompt, or to `(not cited)` tagging (D11).
+
 ## 6. Optimisations
 
 | # | Optimisation | Saves | Must not break |
@@ -324,6 +328,8 @@ keyword_k = 50
 rrf_constant = 60
 rerank_k = 50
 final_k = 8
+min_top_score = 0.02   # provisional, untuned: below this best re-rank score no answer is generated (D19)
+closest_files = 3      # files named in that refusal; 0 names none (D19)
 
 [reranker]
 model = "BAAI/bge-reranker-v2-m3"
@@ -391,6 +397,7 @@ query_log_dir = ""   # default: <index_dir>/queries/
 | AC-7.x audit logging | `logging.py` | unit and integration (log content assertions) |
 | AC-8.x CLI | `cli.py` | CLI smoke test |
 | AC-9.x API | `__init__.ask` | unit (return structure) |
+| AC-1.5, 1.6, 1.7, 7.4 evidence gate | `config.py`, `__init__._retrieve_and_answer` (D19) | integration (stub re-ranker with chosen scores, stub generator: zero calls below the threshold, one at it; the closest files listed), unit (config validation) |
 | AC-10.x evaluation modes | `config.py`, `__init__.ask` (D17) | integration (stub generator: per mode, which stages run and what reaches the context) |
 
 ## 9. Risks
@@ -423,6 +430,8 @@ query_log_dir = ""   # default: <index_dir>/queries/
 | S11 | Audit logging: per-query structured log | 7.1–7.3 |
 | S12 | Public `ask` API, CLI entry point | 8.1–8.4, 9.1, 9.2 |
 | S13 | Real generator and real re-ranker `model`-marked tests | end-to-end smoke |
+| S15 | Evidence gate: `retrieval.min_top_score`, `retrieval.closest_files`, refusal before generation, audit field | 1.5, 1.6, 1.7, 7.4 |
+| S16 | Unreferenced sources: separate mark and banner wording for real but unlinked `Sources` entries | 4.10, 7.5 |
 
 ## 11. Constitution check
 

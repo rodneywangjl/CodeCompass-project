@@ -253,6 +253,9 @@ revision = "516f4baf13dec4ddddda8631e019b5737c8bc250"
 dimension = 768
 device = "cpu"
 batch_size = 32
+# Memory cap per embedding batch: texts * (longest text in tokens)^2. Long chunks
+# go in smaller batches, so indexing a big repo on the CPU cannot run out of memory.
+max_batch_cost = 8388608
 
 [lock]
 timeout_seconds = 120

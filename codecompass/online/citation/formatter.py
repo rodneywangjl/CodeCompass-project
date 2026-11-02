@@ -10,6 +10,10 @@ from codecompass.online.models import CitationResult
 BANNER = ("⚠ WARNING: Some citations in this answer could not be verified against "
           "the retrieved evidence. Verify the marked sources manually.")
 MARK = "[UNVERIFIED] "
+UNREFERENCED_BANNER = ("⚠ WARNING: Sources are listed, but the answer does not say which "
+                       "statement each one supports. Check them yourself before relying on "
+                       "the answer.")
+UNREF_MARK = "[NOT REFERENCED IN ANSWER] "
 UNCITED_NOTE = ("Note: This answer is not supported by any citation from the "
                 "repository. Verify it against the source code before relying on it.")
 PARTIAL_NOTE = ("Note: Some statements in this answer are not supported by a citation. "
@@ -71,12 +75,15 @@ def render(result: CitationResult) -> str:
     note = PARTIAL_NOTE + "\n\n" if _tag_uncited(lines, body_len) else ""
     if result.outcome == "F":
         return note + "\n".join(lines) if note else text
-    unverified = set(result.unverified)
+    unverified, unreferenced = set(result.unverified), set(result.unreferenced)
     for i in range(body_len, len(lines)):
         m = _ENTRY.match(lines[i])
         if m and int(m.group(1)) in unverified:
-            lines[i] = MARK + lines[i]
+            lines[i] = (UNREF_MARK if int(m.group(1)) in unreferenced else MARK) + lines[i]
     listed = {s.marker for s in result.sources}
     lines += [f"{MARK}[{n}] (no matching Sources entry)"
               for n in sorted(unverified - listed)]
-    return BANNER + "\n\n" + note + "\n".join(lines)
+    # Real sources that no statement uses get their own wording; any failed or
+    # missing citation keeps the main banner (AC-4.4, AC-4.10).
+    banner = UNREFERENCED_BANNER if unverified and unverified <= unreferenced else BANNER
+    return banner + "\n\n" + note + "\n".join(lines)

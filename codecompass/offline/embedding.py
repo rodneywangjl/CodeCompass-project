@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Protocol
 
 from codecompass.offline.models import EmbedderIdentity
@@ -15,15 +16,53 @@ class Embedder(Protocol):
         ...
 
 
-def embed_in_batches(embedder: Embedder, texts: list[str], batch_size: int) -> list:
-    """Embed length-sorted in batches, mapping vectors back to input order (O4)."""
+def _lengths(embedder: Embedder, texts: list[str]) -> list[int]:
+    """Token counts from the embedder when it can count, else character counts."""
+    count = getattr(embedder, "tokenize", None)
+    if callable(count):
+        return [len(count(t)) for t in texts]
+    return [len(t) for t in texts]
+
+
+def _plan_batches(lengths: list[int], batch_size: int,
+                  max_batch_cost: int | None) -> list[list[int]]:
+    """Cut length-sorted positions into batches of bounded count and cost.
+
+    Sorted ascending, the longest text of a batch is its last one, so adding a
+    text costs ``(count + 1) * length ** 2``. A text over the budget on its own
+    still gets a batch (of one): it is embedded, never dropped.
+    """
+    order = sorted(range(len(lengths)), key=lambda k: lengths[k])
+    batches: list[list[int]] = []
+    batch: list[int] = []
+    for k in order:
+        full = bool(batch) and (
+            len(batch) >= batch_size
+            or (max_batch_cost is not None
+                and (len(batch) + 1) * lengths[k] ** 2 > max_batch_cost))
+        if full:
+            batches.append(batch)
+            batch = []
+        batch.append(k)
+    if batch:
+        batches.append(batch)
+    return batches
+
+
+def embed_in_batches(embedder: Embedder, texts: list[str], batch_size: int,
+                     max_batch_cost: int | None = None) -> list:
+    """Embed length-sorted in batches, mapping vectors back to input order (O4).
+
+    A batch holds at most ``batch_size`` texts and, when ``max_batch_cost`` is
+    set, at most ``texts * longest ** 2`` of that cost (attention memory grows
+    with it), so long chunks never travel in a large batch.
+    """
     if not texts:
         return []
-    step = batch_size or len(texts)
-    order = sorted(range(len(texts)), key=lambda k: len(texts[k]))
+    batches = _plan_batches(_lengths(embedder, texts),
+                            batch_size or len(texts), max_batch_cost)
     got: dict[int, list[float]] = {}
-    for j in range(0, len(order), step):
-        slot = order[j:j + step]
+    for slot in batches:
         for k, vector in zip(slot, embedder.embed([texts[k] for k in slot])):
             got[k] = vector
     return [got[k] for k in range(len(texts))]
@@ -50,12 +89,17 @@ class CodeEmbedder:
     def _load(self):
         if self._model is None:
             from sentence_transformers import SentenceTransformer
-            self._model = SentenceTransformer(
-                self._config.model,
-                revision=self._config.revision or None,
-                trust_remote_code=True,
-                device=self._config.device,
-            )
+            with warnings.catch_warnings():
+                # The model's remote code warns that the optional `optimum`
+                # package is missing. It is only for ONNX export, which we do
+                # not use. Hide just that message, just during this load.
+                warnings.filterwarnings("ignore", message="optimum is not installed")
+                self._model = SentenceTransformer(
+                    self._config.model,
+                    revision=self._config.revision or None,
+                    trust_remote_code=True,
+                    device=self._config.device,
+                )
         return self._model
 
     def embed(self, texts: list[str]) -> list[list[float]]:

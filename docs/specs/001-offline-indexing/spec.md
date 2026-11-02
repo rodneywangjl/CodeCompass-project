@@ -34,7 +34,7 @@ The pipeline covers every offline component in the architecture diagram:
 - Evaluation repo, question set, and any quality tuning (deferred; Article VII.1).
 - A web UI, authentication, multi-repository support, or hosted deployment.
 - Triggering by a git hook. Indexing is triggered at query time (before each answer) and by a manual command (resolved, C2).
-- Indexing non-code files (README, markdown, JSON/YAML config, text). They are skipped and counted in the run report (resolved, C3).
+- Indexing non-code files (README, markdown, JSON/YAML config, text). They are skipped and counted in the run report (resolved, C3). This is deliberate, not only a Sprint 1 cut: CodeCompass infers what a program does from its code, and prose about the code goes out of date. The citation checker confirms that a passage was in context, not that it is true (constitution Article VI.5), so a stale document would be cited as valid evidence.
 
 ## 3. Terminology
 
@@ -224,7 +224,7 @@ Resolved per Article IX.8, so planning can start.
 |---|----------|----------|
 | C1 | Languages with tree-sitter chunking in Sprint 1 | Python, JavaScript, TypeScript (including TSX/JSX), Java. Every other source language uses the line-window fallback (AC-3.4). Adding a language later is a new spec. |
 | C2 | How indexing is triggered | Before answering each question, via `ensure-current` (AC-5.6), per the project proposal. A manual command also exists. No git hook. |
-| C3 | Non-code files | Not indexed in Sprint 1; only code files are chunked. Skipped and counted as "non-code" (AC-6.7). Docs may be added in a later spec. |
+| C3 | Non-code files | Not indexed in Sprint 1; only code files are chunked. Skipped and counted as "non-code" (AC-6.7). Reason: the code is the source of truth, and prose docs go stale yet would still pass the citation checker (Article VI.5). Docs may be added only by a later spec that shows, with the evaluation set (Article VII), that they help, and that labels them as documentation, never as code. |
 | C4 | Index storage | A per-repository directory set in configuration. Default: the user's local application-data directory, in a subfolder keyed by a stable repository identifier. It is never inside the repository's tracked files, so indexing cannot dirty the working tree. |
 | C5 | Submodules | Skipped and reported in the run report. |
 | C6 | Performance target | None for Sprint 1. The run report records timings, and a target is set after the first measured runs. The up-to-date path of `ensure-current` must stay cheap (AC-5.7). |
