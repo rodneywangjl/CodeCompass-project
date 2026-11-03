@@ -7,6 +7,7 @@ every citation, and return the rendered answer with its audit log.
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import time
 from pathlib import Path
@@ -172,39 +173,47 @@ def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None =
     gen = TimedGenerator(generator or _default_generator(config, model), log)
     check_round_reserve(model, tools, gen.count_tokens(system_prompt(tools_enabled=tools_on)))
 
-    with timed(log, "ensure_current"):
-        ensured = ensure_current(repo_path, config=config.offline, index_dir=index_dir,
+    try:
+        with timed(log, "ensure_current"):
+            ensured = ensure_current(repo_path, config=config.offline, index_dir=index_dir,
+                                     embedder=embedder)
+        stale = not ensured.ok
+        reason = (ensured.message or ensured.status) if stale else ""
+        log["index"] = {"ensure_status": ensured.status, "stale": stale, "stale_message": reason}
+
+        if stale and status(repo_path, config=config.offline,
+                            index_dir=index_dir).state == "empty":
+            answer, chunks, commits = f"{NO_INDEX} Indexing failed: {reason}", [], []
+            stale = log["index"]["stale"] = False  # nothing was answered from an old index
+        elif mode == "no_retrieval":
+            answer, chunks, commits = _agent(gen, question, [], runner=None, tools=tools,
+                                             tools_on=False, log=log, on_draft=on_draft)
+        else:
+            handles = open_index(repo_path, config=config.offline, index_dir=index_dir,
                                  embedder=embedder)
-    stale = not ensured.ok
-    reason = (ensured.message or ensured.status) if stale else ""
-    log["index"] = {"ensure_status": ensured.status, "stale": stale, "stale_message": reason}
+            try:
+                answer, chunks, commits = _retrieve_and_answer(
+                    handles, repo_path, question, config=config, profile=model, tools=tools,
+                    tools_on=tools_on, generator=gen, reranker=reranker, log=log,
+                    on_draft=on_draft, on_tool=on_tool)
+            finally:
+                handles.close()
 
-    if stale and status(repo_path, config=config.offline,
-                        index_dir=index_dir).state == "empty":
-        answer, chunks, commits = f"{NO_INDEX} Indexing failed: {reason}", [], []
-        stale = log["index"]["stale"] = False  # nothing was answered from an old index
-    elif mode == "no_retrieval":
-        answer, chunks, commits = _agent(gen, question, [], runner=None, tools=tools,
-                                         tools_on=False, log=log, on_draft=on_draft)
-    else:
-        handles = open_index(repo_path, config=config.offline, index_dir=index_dir,
-                             embedder=embedder)
-        try:
-            answer, chunks, commits = _retrieve_and_answer(
-                handles, repo_path, question, config=config, profile=model, tools=tools,
-                tools_on=tools_on, generator=gen, reranker=reranker, log=log,
-                on_draft=on_draft, on_tool=on_tool)
-        finally:
-            handles.close()
-
-    with timed(log, "citation_check"):
-        result = checker.check(answer, chunks, commits)
-    rendered = formatter.render(result)
-    if stale:
-        rendered = f"{STALE_WARNING}\nReason: {reason}\n\n{rendered}"
-    log["citation"] = {"outcome": result.outcome, "unverified": list(result.unverified)}
-    if result.unreferenced:  # only when there are some: the record of an ordinary answer is pinned
-        log["citation"]["unreferenced"] = list(result.unreferenced)
+        with timed(log, "citation_check"):
+            result = checker.check(answer, chunks, commits)
+        rendered = formatter.render(result)
+        if stale:
+            rendered = f"{STALE_WARNING}\nReason: {reason}\n\n{rendered}"
+        log["citation"] = {"outcome": result.outcome, "unverified": list(result.unverified)}
+        # only when there are some: the record of an ordinary answer is pinned
+        if result.unreferenced:
+            log["citation"]["unreferenced"] = list(result.unreferenced)
+    except BaseException as exc:  # also Ctrl-C: a failed question is still audited (T18.1)
+        log["error"] = {"type": type(exc).__name__, "message": str(exc)}
+        log["timings"]["total"] = time.perf_counter() - started
+        with contextlib.suppress(Exception):  # the original error matters more
+            write_log(log, _log_dir(config, index_dir))
+        raise
     log["timings"]["total"] = time.perf_counter() - started
     path = write_log(log, _log_dir(config, index_dir))
     return QueryResult(answer=rendered, sources=list(result.sources),
