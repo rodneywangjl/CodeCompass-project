@@ -36,3 +36,24 @@ Tests-first implementation of four Spec 002 tasks, with no approval stops betwee
 Checked the test cases myself.
 ### What I kept or changed
 Kept all four implementations. Claude corrected its own T4.2 test (d7d465e): a 4096-token window cannot hold the default reserve (3 × 768) plus a 2048-token answer, so the window was changed to 8192 (dev-lowmem). I reviewed them afterwards.
+## 2026-11-03 · GPU cluster notebook for running CodeCompass
+- **Tool (model):** Claude Code (claude-haiku-5-5)
+- **Files:** notebooks/codecompass_gpu_cluster.ipynb
+- **Outcome:** Changed
+### What I asked for
+A notebook to run CodeCompass on an individual SCIS GPU cluster account: check the GPU, unzip and install the project, download the pinned 14B GGUF with a checksum, build `llama-server` from source (the prebuilt binary needs a newer glibc than the cluster has), start the server with the `dev` profile settings, index a public repo (Flask), ask questions, and test whether the model requests the allow-listed tools. Built up over several sessions, with each failure fixed in turn.
+### How I checked it
+Ran the notebook on my SCIS cluster account (RTX 3090). Indexed Flask and asked the same question with the GPU re-ranker and the CPU re-ranker. The top scores were 0.00350 (GPU) and 0.00348 (CPU), and re-ranking took 0.4 s on the GPU against 147 s on the CPU. Ran the tool-call test: the model requested a tool in 8 of 8 runs that passed the evidence gate. 
+### What I kept or changed
+Rewrote the notebook from the cells that ran on the cluster, in the order that works after a kernel restart. Kept the layered config loader (`load_online_config_layers`) because the single-file loader ignores the user config. Kept the GPU re-ranker, which matched the CPU top score (0.00350 vs 0.00348) and took 0.4 s instead of 147 s. Left out the one-off config-swap test cell. Did not change the evidence gate or the embedder revision: the gate's 0.02 minimum is a retrieval setting, and the unpinned remote code is a team decision under Article VIII.1.
+
+## 2026-11-04 · Clean up the GPU cluster notebook and add login steps
+- **Tool (model):** Claude Code (claude-haiku-5-5)
+- **Files:** notebooks/codecompass_gpu_cluster.ipynb, ai-log/swen.md
+- **Outcome:** Changed
+### What I asked for
+Clean up the cluster notebook using the fixes from the run, so it works in order after a kernel restart, and summarise the login steps for the group.
+### How I checked it
+Read through notebook and run it to ensure it works on GPU cluster.
+### What I kept or changed
+Rewrote the notebook in run order: login steps, paths and config, one-time setup, server, index, questions, tool tests, checks and stop. Kept the layered config loader, so the user config file is read. Removed the config-swap test cell, which left the user config on CPU settings when a question failed. Added the account and data rules from scis_tech. Checked that the notebook has no passwords. Not committed.

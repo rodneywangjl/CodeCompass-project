@@ -295,8 +295,14 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 
 **T17.1 Reject questions with no words**
 - Tests first (stub generator, re-ranker and embedder; indexing and retrieval replaced by a stub that fails the test if it is reached): `ask` raises `ValueError` for a question with no letter or digit, using one input per realistic wrong check (`""`, `"   "`, `"\n\t"`, `"."`, `"?"`, a run of ASCII symbols, `"___"`, an emoji); for each, the generator is never called, no audit log is written, and the message says the question has no words and that each question is answered on its own; a question with spaces around it, a Chinese question and `"x"` still run, and the logged question is unchanged; the CLI shows one `error:` line, prints nothing to stdout and exits 1.
-- Added after the tests were written, while task numbers were agreed with the owner of S18 onwards; the tests and code match this entry.
+- Added after the tests were written, while task numbers were agreed in the team; the tests and code match this entry.
 - ACs: AC-9.3, AC-8.1. | Touches: `__init__.py`. | Depends on: T12.1, T12.3.
+
+## S18: Audit log on failure (2 Nov development test, problem 7)
+
+**T18.1 Write the audit log when a question fails**
+- Tests first (stub re-ranker and embedder, a stub generator that raises, real stores on the fixture repository): when the generator raises `TimeoutError`, the same exception object reaches the caller and exactly one log is written with the question, `error` = `{"type", "message"}`, the retrieved chunks and a generation time above 0; an exception from `ensure_current` is logged; `KeyboardInterrupt` is logged and re-raised; when `write_log` itself raises during the error, the caller still gets the original error; a successful answer has no `error` key in the returned log or on disk; an unknown `pipeline.mode` raises and writes no log; through the CLI, a generator timeout prints one `error:` line, exits 1 and leaves a log.
+- ACs: AC-7.6, AC-7.1, AC-8.1; Article V.4. | Touches: `__init__.py`. | Depends on: T11.2, T12.1, T12.3, T17.1.
 
 ## S19: Test-report fixes (dev test, 2 Nov 2026)
 

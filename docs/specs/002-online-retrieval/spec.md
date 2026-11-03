@@ -148,6 +148,7 @@ Priorities: **P1** = required for the sprint to be done, **P2** = should ship, *
 - **AC-7.3** The stale-index warning, if triggered, is recorded in the log.
 - **AC-7.4** Every query that was re-ranked records the evidence gate in its log: the `min_top_score` in force, the best score seen, and whether the gate let the question through (Article V.4).
 - **AC-7.5** When the checker found unreferenced entries (AC-4.10), the log's `citation` record also lists their markers under `unreferenced`; when there are none the key is absent, so the record of an ordinary answer is unchanged.
+- **AC-7.6** A question that fails after work has started (indexing, retrieval, re-ranking, generation, or Ctrl-C) still writes its log, with `error` (the exception type and message) and the timings collected so far, so the failing stage can be found; the same error then reaches the caller unchanged. If writing the log fails as well, the caller still gets the original error. A setting that fails before any work starts writes no log, and the log of a question that succeeds has no `error` key.
 
 ### US8 (P2): CLI entry point
 
@@ -230,6 +231,7 @@ Each of these needs at least one test:
 - The generator still requests a tool after the last allowed tool round — one final answer-only call is made and the loop ends.
 - Concurrent questions (two `ask` calls) — each gets its own context; tool cache may be shared.
 - A question with no words (`""`, `"   "`, `"?"`, `"___"`, an emoji) — rejected at once with a clear message (AC-9.3), not run through the pipeline. *Added 2026-11-03: found in the 2 Nov development test (D9, D10), where an empty question took about 2 minutes and was answered about lines containing only `}`.*
+- A question fails part-way (`llama-server` times out, the index lock times out, the user presses Ctrl-C) — the error is shown as before and the audit log is still written with the error (AC-7.6). *Added 2026-11-03: in the 2 Nov development test, two failed questions (A2 first try, B4) left no log, so the failing stage could not be found.* A process that is killed outright cannot write a log.
 
 ## 7. Non-Functional Requirements
 
