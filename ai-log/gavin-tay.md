@@ -26,3 +26,14 @@ Fix five T12.3 CLI tests that failed on Windows (on `main` too) but pass on Linu
 I ran the test cases again and it passed.
 ### What I kept or changed
 Changed the fixture to write the paths with `as_posix()`. What the tests assert is unchanged. This changes an approved test (T12.3), so it needs reviewer sign-off (Article IX.3). Required suite after the fix: 448 passed.
+
+## 2026-11-03 · T19.1 code-tool results reach the model
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/harness.py, tests/online/test_tool_result_t191.py, docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/tasks.md
+- **Outcome:** Changed
+### What I asked for
+Fix problem 1 from the 2 Nov dev test report: `open_file` and `search_again` results were replaced with "No commit history found", so the model never saw the code those tools returned (B3, D2, D6, D11), while the chunks still counted as citable evidence.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Added task T19.1 and scoped plan D16 and the T8.5 wording to git tools. Wrote 12 tests first: 9 failed on the bug, 3 guard behaviour that must stay (the git-tool "no history" message and the D16 wrapper). No approved test was changed.
