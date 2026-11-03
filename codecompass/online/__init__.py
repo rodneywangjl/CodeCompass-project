@@ -32,6 +32,9 @@ STALE_WARNING = ("⚠ WARNING: The index may be out of date. The answer below is
 NO_EVIDENCE = "I could not find enough evidence in the indexed code to answer this question."
 CLOSEST_HEADER = ("Closest matches found (these are not evidence for an answer; "
                   "check them yourself):")
+EMPTY_QUESTION = ("The question has no words in it. Each question is answered on its own, so "
+                  "type a full question, for example \"Explain what require_role does "
+                  "in simpler words\".")
 NO_INDEX = ("No index is available for this repository yet, so this question cannot "
             "be answered.")
 
@@ -153,7 +156,10 @@ def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None =
     unchecked draft, and only the returned answer has been through the citation check.
     *on_tool*, if given, receives a copy of the audit record of each tool call as it
     finishes; it only observes, and with None nothing changes (Spec 004 US6).
+    A question with no letter or digit raises ValueError before any work is done.
     """
+    if not any(ch.isalnum() for ch in question):  # "", "   ", "?", "..." (report problem 11)
+        raise ValueError(EMPTY_QUESTION)
     started = time.perf_counter()
     mode = check_mode(config.pipeline.mode)
     profile_name, model = resolve_profile(config, profile)

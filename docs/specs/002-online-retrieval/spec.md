@@ -164,6 +164,7 @@ Priorities: **P1** = required for the sprint to be done, **P2** = should ship, *
 
 - **AC-9.1** A single `ask(repo_path, question, *, config, profile)` function returns a structured result containing: answer text, sources list (with verification status per source), citation outcome (F or G), stale-index flag, and the audit log.
 - **AC-9.2** The function does not print to stdout; all output is returned in the result object.
+- **AC-9.3** A question with no letter or digit in it (empty, whitespace, or only punctuation, symbols or emoji) is rejected with a `ValueError` before any work is done: no indexing, retrieval, generator call or audit log. The message says the question has no words and that each question is answered on its own. The CLI shows it as one `error:` line and exits 1. Any other question is passed on unchanged.
 
 ### US10 (P2): Evaluation configurations
 
@@ -228,6 +229,7 @@ Each of these needs at least one test:
 - A citation whose line range overlaps a retrieved chunk but extends beyond it — flagged.
 - The generator still requests a tool after the last allowed tool round — one final answer-only call is made and the loop ends.
 - Concurrent questions (two `ask` calls) — each gets its own context; tool cache may be shared.
+- A question with no words (`""`, `"   "`, `"?"`, `"___"`, an emoji) — rejected at once with a clear message (AC-9.3), not run through the pipeline. *Added 2026-11-03: found in the 2 Nov development test (D9, D10), where an empty question took about 2 minutes and was answered about lines containing only `}`.*
 
 ## 7. Non-Functional Requirements
 
