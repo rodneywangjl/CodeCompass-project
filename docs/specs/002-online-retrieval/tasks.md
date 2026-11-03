@@ -291,6 +291,13 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - **Approved test risk:** `test_entry_without_marker_is_g` requires the entry to stay in `unverified`; `test_full_pipeline_t122` requires `{"outcome": "F", "unverified": []}` for an ordinary answer. Both are kept by design. If another approved test fails, stop and ask (Article IX.3).
 - ACs: AC-4.4, 4.10, 7.5; Article VI.3, VI.5. | Touches: `citation/checker.py`, `citation/formatter.py`, `models.py`, `__init__.py`. | Depends on: T9.3, T9.4, T11.1.
 
+## S17: Questions with no words (2 Nov development test, problem 11)
+
+**T17.1 Reject questions with no words**
+- Tests first (stub generator, re-ranker and embedder; indexing and retrieval replaced by a stub that fails the test if it is reached): `ask` raises `ValueError` for a question with no letter or digit, using one input per realistic wrong check (`""`, `"   "`, `"\n\t"`, `"."`, `"?"`, a run of ASCII symbols, `"___"`, an emoji); for each, the generator is never called, no audit log is written, and the message says the question has no words and that each question is answered on its own; a question with spaces around it, a Chinese question and `"x"` still run, and the logged question is unchanged; the CLI shows one `error:` line, prints nothing to stdout and exits 1.
+- Added after the tests were written, while task numbers were agreed with the owner of S18 onwards; the tests and code match this entry.
+- ACs: AC-9.3, AC-8.1. | Touches: `__init__.py`. | Depends on: T12.1, T12.3.
+
 ---
 
 ## Completion checklist (spec "definition of done")
