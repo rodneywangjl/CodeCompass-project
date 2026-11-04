@@ -15,6 +15,9 @@ _INTRO = """You are CodeCompass, a code Q&A assistant. Answer the developer's qu
 using ONLY the code context provided below. Do not use your training knowledge
 about the repository."""
 
+_TOOLS_INTRO = """The code context is a few pieces of code found by a search. It has no commit
+history, and it can miss code the answer needs. You can call tools to get more."""
+
 _RULES = [
     "Cite every claim with numbered markers [1], [2], etc.",
     """End with a Sources section listing each citation, one per line. Start
@@ -28,14 +31,29 @@ _RULES = [
     """If the commit history gives no reason for the code (e.g. vague commit
    messages, or no history found), say so. Do NOT invent a reason.""",
 ]
-_TOOL_RULE = """If the code context is not enough, request ONE tool per reply:
+_TOOL_RULE = """Before you answer, check that the code context is enough. If it is not,
+   reply with ONE tool call and nothing else:
    <tool>search_again(query="names or words to search for")</tool> finds more code
    <tool>open_file(path="file/path.py", lines="X-Y")</tool> reads lines of a file
    <tool>open_file(path="file/path.py")</tool> lists a file's functions with lines
    <tool>git_blame(path="file/path.py", lines="X-Y")</tool> shows who changed lines
    <tool>git_log(path="file/path.py", n=10)</tool> lists recent commits of a file
+   Call a tool when:
+   - the question asks why, when or by whom code was written or changed:
+     use git_log or git_blame (the "indexed at" hash is not that commit)
+   - the answer needs a function, class or value the context does not show:
+     use search_again or open_file
+   - a piece of code you need is cut off: use open_file
    The result comes back in a <tool_result>...</tool_result> block. It is
    evidence you may cite, just like the code context."""
+# With tools on, the insufficient-evidence rule applies only after using them (T20.1).
+_AFTER_TOOLS_RULE = """If the evidence is still insufficient after using tools, say what you
+   could not determine. Do NOT guess or make up file names, line numbers, or
+   commit hashes."""
+
+TOOL_CHECK = """Before you answer: if the code context above does not show everything the
+answer needs (for a why, when or who question: the commit history), reply
+with only one <tool> call instead."""
 
 _FORMAT_HINT = """Write one tool call on its own, with keyword arguments, exactly like:
 <tool>search_again(query="names or words to search for")</tool>
@@ -48,16 +66,23 @@ FINAL_MESSAGE = ("Tool limit reached: no more tools are available. Answer now, u
 
 
 def system_prompt(*, tools_enabled: bool) -> str:
-    """The D14 prompt; without tools, the tool rule (rule 3) is left out (D17)."""
-    rules = _RULES[:2] + ([_TOOL_RULE] if tools_enabled else []) + _RULES[2:]
+    """The D14 prompt: with tools, the tool decision is rule 1; without, the
+    pre-T20.1 prompt, unchanged (D17, Article VII.3)."""
+    if not tools_enabled:
+        rules, intro = _RULES, _INTRO
+    else:
+        rules = [_TOOL_RULE, *_RULES[:2], _AFTER_TOOLS_RULE, _RULES[3]]
+        intro = f"{_INTRO}\n\n{_TOOLS_INTRO}"
     numbered = "\n".join(f"{i}. {rule}" for i, rule in enumerate(rules, 1))
-    return f"{_INTRO}\n\nRules:\n{numbered}"
+    return f"{intro}\n\nRules:\n{numbered}"
 
 
-def user_message(question: str, chunks: list) -> str:
-    """The question, then the retrieved chunks as plain text (Plan D3)."""
+def user_message(question: str, chunks: list, *, tools_enabled: bool = False) -> str:
+    """The question, then the retrieved chunks as plain text (Plan D3); with
+    tools, the tool check closes the message (T20.1)."""
     context = format_context(chunks) if chunks else "(none retrieved)"
-    return f"Question: {question}\n\nCode context:\n\n{context}"
+    message = f"Question: {question}\n\nCode context:\n\n{context}"
+    return f"{message}\n\n{TOOL_CHECK}" if tools_enabled else message
 
 
 def _attr(value) -> str:
@@ -175,7 +200,8 @@ def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: i
     that ran, in order (Spec 004 US6); it only observes.
     """
     messages = [{"role": "system", "content": system_prompt(tools_enabled=tools_enabled)},
-                {"role": "user", "content": user_message(question, chunks)}]
+                {"role": "user", "content": user_message(question, chunks,
+                                                         tools_enabled=tools_enabled)}]
     run = AgentRun(answer="", messages=messages)
     tool_runs = 0
     while True:
