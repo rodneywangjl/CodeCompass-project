@@ -48,3 +48,14 @@ Fix problem 2 from the 2 Nov dev test report: `fit_chunks` stopped at the first 
 Ran the T19.2 tests: 8 passed on the fix; on the test-only commit 889815f, 6 failed, including the B2 case where an oversized first chunk meant nothing was sent. The approved T4.2 budget tests still pass. Full suite: 1130 passed.
 ### What I kept or changed
 Added task T19.2 and updated plan D4 item 1 and the T4.2 wording: a chunk that does not fit is skipped and later ones are still tried, within the top final_k only. Wrote 8 tests first: 6 failed on the bug, 2 cover cases that already worked. No approved test assertion changed; the T4.2 test docstring still describes the old rule and is noted for the reviewer.
+
+## 2026-11-04 · T20.1 tool-use prompt
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/harness.py, codecompass/online/__init__.py, tests/online/test_tool_prompt_t201.py, tests/online/test_harness_messages_t85.py, docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/tasks.md
+- **Outcome:** Changed
+### What I asked for
+Fix problem 3 from the 2 Nov dev test report: the model skips the git tools for why, when and who questions and answers from the code alone (the role-cache question, B3, E1, and B2 again after T19.1 and T19.2). Make the tool decision come first in the prompt and say plainly that the code context has no commit history.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Brought back the tool-prompt work started before the test report was fixed, renumbered from T17.1 to T20.1 (task numbers agreed in the team), and updated the plan D14 rationale now that T19.1 has fixed the hidden tool results. Tests first: 16 fail on the current prompt, 8 cover behaviour that must not change (the tools-off prompt and configuration (b)). The approved T8.5 prompt test is updated to the new prompt and needs reviewer sign-off.
