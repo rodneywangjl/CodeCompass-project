@@ -187,3 +187,15 @@ For each answerable question, I opened the "Where" lines in ~/flask at 85c5d93 a
 I have check that `g` in src/flask/ctx.py (class at line 29) has no `__getitem__`, that `json_body` has no match in the repo (`git grep -n json_body`), and the README Donate section (lines 38-45).
 ### What I kept or changed
 I kept 18 questions, their developer-style wording, their tags and reference answers unchanged after checking them. After Kelsey's review I replaced unanswerable 05 (PyPI downloads) and 06 (GitHub stars) with two in-repo false-premise traps, `g['user_id']` and `request.json_body`, because off-topic questions would mostly be stopped by the evidence gate and so test the gate rather than the model. I also added to the sponsors answer that the README only has a Donate link. Architectural-08 and design-rationale-05 share evidence (sansio/app.py:59, app.py:81); I kept both because one asks what and the other why. Every question stays marked `ai_assisted: true`.
+
+## 2026-11-05 · Spec 003 T1.1: question-set check
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/eval/questions.py, tests/eval/test_question_set_t11.py, docs/specs/003-evaluation/plan.md, docs/specs/003-evaluation/tasks.md, docs/specs/003-evaluation/spec.md
+- **Outcome:** Changed
+### What I asked for
+After Kelsey's review pointed out that the "JSONL checker" in my log was not in the repo, I asked Claude Code to add it properly: a plan section and task (T1.1), tests first, then a standard-library checker for the agreed question format, with every reference checked at repo_commit. When I ran it on Windows by mistake (my Flask checkout is in WSL), it printed one confusing error per question, so I asked for a clearer error, again test-first. I also asked it to update Spec 003 so that Kelsey and I own all of it.
+### How I checked it
+I read the tests and the rules before approving them, saw them fail red for the missing functions, then saw 28 pass, the full suite pass (1158 in WSL), and the checker report 0 problems on our 40 questions. For the error-message fix, I approved 5 new tests after seeing them fail for the right reason; afterwards all 33 passed, the full suite passed (1163 in WSL), the checker still reported 0 problems in WSL with `--repo ~/flask`, and my earlier Windows command now prints a single "is not a git repository" error.
+### What I kept or changed
+Kept the plan section, the tests and the implementation. Changed the error handling after my Windows run: a `--repo` that is not a git repository now gives one clear error, a commit missing from the repository says "not in this git repository" and names the path, and a short commit asks for the full 40-character SHA. Category counts (8 per category) are left to a later task. Updated Spec 003 §14 and the related acceptance criteria so Kelsey and I own all of Spec 003, replacing the proposal's five-person split.
+
