@@ -164,3 +164,26 @@ Fix outside a numbered task, found while wiring `ask()`: with no embedder given,
 test_ensure_default_embedder.py passed in WSL.
 ### What I kept or changed
 Kept unchanged.
+
+## 2026-11-02 · Review of PR #27 (modern terminal UI)
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** none changed (review only of PR #27: codecompass/online/tui.py, tui_live.py, tui_view.py, run.py and their tests)
+- **Outcome:** Kept
+### What I asked for
+I asked Claude Code to summarise Rodney's open PRs (#25, #26, #27) without changing any files, and to explain what each one changes and how it affects our evaluation plan. For PR #27, I asked why its CI was failing on Windows and how to test it locally in WSL, including a checklist for trying the live terminal UI with our 14B model.
+### How I checked it
+I fetched the PR through Windows (WSL had no GitHub login) and confirmed I was on commit 60672b8. `pytest -m "not model"` in WSL gave 981 passed, matching the PR description. I read the Windows CI failure myself (`test_config_t02` UnicodeDecodeError and `test_tui_look_t34`). With our 14B model running, I tried the live terminal UI and every check worked: the prompt box and status line, the spinner, live tool lines, `/tools`, `/theme`, `--plain`, `--no-color`, piped mode, and a flagged answer keeping its banner. Nothing looked wrong apart from the failing Windows CI.
+### What I kept or changed
+I kept the summary and the test checklist. I did not approve the PR, because its Windows CI still fails (Article IX.7); I left a comment on the PR about it.
+
+## 2026-11-04 · Spec 003 core questions: architectural, unanswerable and design-rationale 5-8
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** eval/questions/flask-core-nicole.jsonl
+- **Outcome:** Changed
+### What I asked for
+I asked Claude Code to draft my 20 of the 40 core evaluation questions on Flask at commit 85c5d93: 8 architectural, 8 unanswerable controls and design-rationale 5-8. They had to avoid Kelsey's topics and the 48 SWE-QA questions, use only code files as ground truth, and cite a commit for each "why" question. I then asked it to reword the questions the way a developer would ask them, draft a reference answer for each, and convert the checked set into the agreed JSONL format. After Kelsey's review of the PR, I asked it to replace two off-topic unanswerable questions with in-repo false-premise traps and to refine the sponsors answer.
+### How I checked it
+For each answerable question, I opened the "Where" lines in ~/flask at 85c5d93 and confirmed the code says what the answer says. For the 4 design-rationale questions, I read each commit with `git show` and checked that the reasons and quoted words match. For the 8 unanswerable questions, I ran `git grep` checks myself across the whole repo to confirm the answer isn't there. I also saw the automatic checks pass: every file, line range and commit reference was valid, the format check found 0 problems, and the questions and answers in the JSONL file matched my checked file word for word. Those checks were local scripts run during drafting; they are not in the repo yet, and the question-set check will be added test-first as a Spec 003 task (AC-1.2).
+I have check that `g` in src/flask/ctx.py (class at line 29) has no `__getitem__`, that `json_body` has no match in the repo (`git grep -n json_body`), and the README Donate section (lines 38-45).
+### What I kept or changed
+I kept 18 questions, their developer-style wording, their tags and reference answers unchanged after checking them. After Kelsey's review I replaced unanswerable 05 (PyPI downloads) and 06 (GitHub stars) with two in-repo false-premise traps, `g['user_id']` and `request.json_body`, because off-topic questions would mostly be stopped by the evidence gate and so test the gate rather than the model. I also added to the sponsors answer that the README only has a Donate link. Architectural-08 and design-rationale-05 share evidence (sansio/app.py:59, app.py:81); I kept both because one asks what and the other why. Every question stays marked `ai_assisted: true`.
