@@ -52,13 +52,13 @@ def chunk_budget(profile, tools, prefix_tokens: int) -> int:
 
 
 def fit_chunks(chunks: list[RetrievedChunk], budget: int, count_tokens) -> list[RetrievedChunk]:
-    """Chunks in order while each formatted block fits; the first misfit ends it."""
+    """Chunks in order whose formatted blocks fit; a misfit is skipped, not an end (T19.2)."""
     kept: list[RetrievedChunk] = []
     used = 0
     for chunk in chunks:
         cost = count_tokens(format_chunk(chunk))
         if used + cost > budget:
-            break
+            continue
         kept.append(chunk)
         used += cost
     return kept
