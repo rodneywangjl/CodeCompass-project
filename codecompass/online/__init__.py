@@ -171,9 +171,10 @@ def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None =
                   tools=config.tools)
     log["reranker"] = dataclasses.asdict(config.reranker)  # model, revision, device, dtype
     gen = TimedGenerator(generator or _default_generator(config, model), log)
-    check_round_reserve(model, tools, gen.count_tokens(system_prompt(tools_enabled=tools_on)))
-
     try:
+        # the first call to llama-server (/tokenize), so inside the try (T18.2)
+        check_round_reserve(model, tools,
+                            gen.count_tokens(system_prompt(tools_enabled=tools_on)))
         with timed(log, "ensure_current"):
             ensured = ensure_current(repo_path, config=config.offline, index_dir=index_dir,
                                      embedder=embedder)

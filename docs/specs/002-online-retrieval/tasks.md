@@ -304,6 +304,11 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - Tests first (stub re-ranker and embedder, a stub generator that raises, real stores on the fixture repository): when the generator raises `TimeoutError`, the same exception object reaches the caller and exactly one log is written with the question, `error` = `{"type", "message"}`, the retrieved chunks and a generation time above 0; an exception from `ensure_current` is logged; `KeyboardInterrupt` is logged and re-raised; when `write_log` itself raises during the error, the caller still gets the original error; a successful answer has no `error` key in the returned log or on disk; an unknown `pipeline.mode` raises and writes no log; through the CLI, a generator timeout prints one `error:` line, exits 1 and leaves a log.
 - ACs: AC-7.6, AC-7.1, AC-8.1; Article V.4. | Touches: `__init__.py`. | Depends on: T11.2, T12.1, T12.3, T17.1.
 
+**T18.2 Log a failure while counting tokens**
+- Found in a real run after T18.1 merged: with `llama-server` not answering, `ask` failed in `check_round_reserve` (the first `/tokenize` call), which ran before the T18.1 `try`, so no log was written.
+- Tests first (stub re-ranker and embedder, a stub generator whose `count_tokens` raises `GeneratorError`, real stores on the fixture repository): the same error reaches the caller, exactly one log is written with the question and `error` = `{"type": "GeneratorError", "message": ...}`, and the generator is never asked to answer. Approved tests: none change.
+- ACs: AC-7.6; Article V.4. | Touches: `__init__.py`. | Depends on: T18.1.
+
 ## S19: Test-report fixes (dev test, 2 Nov 2026)
 
 **T19.1 Code-tool results reach the model**
