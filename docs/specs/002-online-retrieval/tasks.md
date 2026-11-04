@@ -163,7 +163,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-3.3, AC-3.4. | Touches: `agent/harness.py`. | Depends on: T8.2.
 
 **T8.5 Message building**
-- Tests first: the system prompt is the first message; context chunks are in the user message; tool results are appended as separate `user` messages in the D16 `<tool_result>` wrapper (errors carry an `error` attribute); no message ever has a role other than `system`, `user` or `assistant`; the conversation history grows with each round and is append-only: every earlier message is unchanged, in the same order, in each later call (plan D13 item 10); the system prompt matches the plan's D14 template, including rule 4 (state what could not be determined) and rule 5 (say so when commit history gives no rationale; never invent one); a tool result with no commits is wrapped with the D16 `No commit history found for <path>` text, never an empty block; the D15 final-call message asks the model to state what it could not determine.
+- Tests first: the system prompt is the first message; context chunks are in the user message; tool results are appended as separate `user` messages in the D16 `<tool_result>` wrapper (errors carry an `error` attribute); no message ever has a role other than `system`, `user` or `assistant`; the conversation history grows with each round and is append-only: every earlier message is unchanged, in the same order, in each later call (plan D13 item 10); the system prompt matches the plan's D14 template, including rule 4 (state what could not be determined) and rule 5 (say so when commit history gives no rationale; never invent one); a `git_log` or `git_blame` result with no commits is wrapped with the D16 `No commit history found for <path>` text, never an empty block; the D15 final-call message asks the model to state what it could not determine.
 - ACs: AC-1.4, AC-1.3, AC-3.7, plan D14, D16. | Touches: `agent/harness.py`. | Depends on: T4.1.
 
 **T8.6 Malformed tool-call retry** (added after Sprint 2; v2 architecture E6)
@@ -303,6 +303,14 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 **T18.1 Write the audit log when a question fails**
 - Tests first (stub re-ranker and embedder, a stub generator that raises, real stores on the fixture repository): when the generator raises `TimeoutError`, the same exception object reaches the caller and exactly one log is written with the question, `error` = `{"type", "message"}`, the retrieved chunks and a generation time above 0; an exception from `ensure_current` is logged; `KeyboardInterrupt` is logged and re-raised; when `write_log` itself raises during the error, the caller still gets the original error; a successful answer has no `error` key in the returned log or on disk; an unknown `pipeline.mode` raises and writes no log; through the CLI, a generator timeout prints one `error:` line, exits 1 and leaves a log.
 - ACs: AC-7.6, AC-7.1, AC-8.1; Article V.4. | Touches: `__init__.py`. | Depends on: T11.2, T12.1, T12.3, T17.1.
+
+## S19: Test-report fixes (dev test, 2 Nov 2026)
+
+**T19.1 Code-tool results reach the model**
+- Bug (dev test B3, D2, D6, D11): `tool_result_message` sent `No commit history found for <path>` for every result without commits, so the model never saw what `open_file` and `search_again` returned, while their chunks were still added as citable evidence.
+- Tests first (stub generator, `FakeTools`, `run_agent`): an `open_file` code result reaches the model with its D3 header and code; an `open_file` outline, and the hint given when no outline exists, reach it as their text; `search_again` chunks reach it with each chunk's header and text; `search_again`'s "Nothing new found" and "too large to show" replies reach it as their text; none of these says `No commit history found`; every chunk the harness adds as evidence (`AgentRun.chunks`) is in a message the model received; a `git_log` or `git_blame` run with no commits still says `No commit history found for <path>` (plus the line range for blame); the D16 wrapper and the `user` role are unchanged.
+- **Approved tests:** none change. `test_empty_history_is_stated_plainly` (T8.5) uses `git_log` and must stay green.
+- ACs: AC-3.5, 3.7, 4.1; Article I.1, V.3, V.5, VI.1; plan D16, D18. | Touches: `agent/harness.py`, plan D16, the T8.5 entry's wording. | Depends on: T8.5, T14.1, T14.2.
 
 ---
 
