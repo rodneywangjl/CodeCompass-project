@@ -5,7 +5,8 @@ Contract under test (Spec AC-2.6, AC-5.7; Plan D4; Article V.1 as of 1.3.0):
       context_window - max_tokens - prefix_tokens
       - max_verifier_rounds * max_tool_output_tokens
   - context.fit_chunks(chunks, budget, count_tokens) keeps chunks in order
-    while each formatted block fits; the first that does not fit ends it
+    while each formatted block fits; a chunk that does not fit is skipped and
+    later chunks are still tried (T19.2)
   - context.check_round_reserve(profile, tools, system_tokens) raises a
     ValueError naming Article V.1 when the tool reserve leaves no room
   - tools.max_tool_output_tokens defaults to 768 (Plan §7)

@@ -91,7 +91,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-1.4, FR-5. | Touches: `context.py`. | Depends on: T0.1.
 
 **T4.2 Context budgeting**
-- Tests first: chunks are added in re-ranker score order until the chunk budget is exceeded; the remaining chunks are dropped; token counts come from `Generator.count_tokens`; `final_k` is capped by the budget (fewer chunks if the budget is tight); a very small budget results in zero chunks (handled gracefully); the profile's `max_tokens` and `MAX_VERIFIER_ROUNDS × max_tool_output_tokens` are reserved before chunks are added; a configured `max_verifier_rounds` whose reserve leaves no room for chunks fails loudly at startup, naming Article V.1; two profiles that differ only in `context_window` yield different chunk counts for the same input, and `context.py` names no model (the budget comes only from the active profile).
+- Tests first: chunks are added in re-ranker score order while they fit the chunk budget; a chunk that does not fit is dropped and later chunks are still tried (T19.2); token counts come from `Generator.count_tokens`; `final_k` is capped by the budget (fewer chunks if the budget is tight); a very small budget results in zero chunks (handled gracefully); the profile's `max_tokens` and `MAX_VERIFIER_ROUNDS × max_tool_output_tokens` are reserved before chunks are added; a configured `max_verifier_rounds` whose reserve leaves no room for chunks fails loudly at startup, naming Article V.1; two profiles that differ only in `context_window` yield different chunk counts for the same input, and `context.py` names no model (the budget comes only from the active profile).
 - ACs: AC-2.6, AC-5.7, plan D4. | Touches: `context.py`. | Depends on: T4.1, T3.2, T0.3.
 
 ## S5: Verifier tools
@@ -316,6 +316,12 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - Tests first (stub generator, `FakeTools`, `run_agent`): an `open_file` code result reaches the model with its D3 header and code; an `open_file` outline, and the hint given when no outline exists, reach it as their text; `search_again` chunks reach it with each chunk's header and text; `search_again`'s "Nothing new found" and "too large to show" replies reach it as their text; none of these says `No commit history found`; every chunk the harness adds as evidence (`AgentRun.chunks`) is in a message the model received; a `git_log` or `git_blame` run with no commits still says `No commit history found for <path>` (plus the line range for blame); the D16 wrapper and the `user` role are unchanged.
 - **Approved tests:** none change. `test_empty_history_is_stated_plainly` (T8.5) uses `git_log` and must stay green.
 - ACs: AC-3.5, 3.7, 4.1; Article I.1, V.3, V.5, VI.1; plan D16, D18. | Touches: `agent/harness.py`, plan D16, the T8.5 entry's wording. | Depends on: T8.5, T14.1, T14.2.
+
+**T19.2 An oversized chunk does not block the others**
+- Bug (dev test B2): `fit_chunks` stopped at the first chunk that did not fit. The top-ranked chunk was larger than the whole chunk budget, so no chunk was sent and the answer (ranked 3rd) never reached the model.
+- Tests first (`context.fit_chunks` with the stub generator's token count): when the first chunk is over budget, the later chunks that fit are kept, in order; an oversized chunk in the middle is skipped and the chunks around it are kept; a chunk too big for the room left is skipped while a later, smaller one that fits is kept; when every chunk is over budget the result is empty; the kept chunks are always in input order and their total cost never exceeds the budget.
+- **Approved test change (needs reviewer sign-off, Article IX.3):** the `test_context_budget_t42.py` module docstring said "the first that does not fit ends it"; it now describes the skip rule. Docstring only: no assertion changes.
+- ACs: AC-2.6; Article I.2, IV.2, VIII.4; plan D4. | Touches: `context.py`, plan D4, the T4.2 entry's wording. | Depends on: T4.2.
 
 ---
 
