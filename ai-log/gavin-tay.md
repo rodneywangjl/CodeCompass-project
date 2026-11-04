@@ -45,6 +45,6 @@ Added task T19.1 and scoped plan D16 and the T8.5 wording to git tools. Wrote 12
 ### What I asked for
 Fix problem 2 from the 2 Nov dev test report: `fit_chunks` stopped at the first chunk that did not fit, so in B2 one oversized top chunk meant no code was sent, and the answer ranked 3rd never reached the model.
 ### How I checked it
-TODO (member)
+Ran the T19.2 tests: 8 passed on the fix; on the test-only commit 889815f, 6 failed, including the B2 case where an oversized first chunk meant nothing was sent. The approved T4.2 budget tests still pass. Full suite: 1130 passed.
 ### What I kept or changed
 Added task T19.2 and updated plan D4 item 1 and the T4.2 wording: a chunk that does not fit is skipped and later ones are still tried, within the top final_k only. Wrote 8 tests first: 6 failed on the bug, 2 cover cases that already worked. No approved test assertion changed; the T4.2 test docstring still describes the old rule and is noted for the reviewer.
