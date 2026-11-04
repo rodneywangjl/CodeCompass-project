@@ -65,12 +65,12 @@ def _attr(value) -> str:
 
 
 def tool_result_message(call, output: ToolOutput) -> str:
-    """The D16 wrapper; an empty history is said plainly (Article V.5)."""
+    """The D16 wrapper; a git tool's empty history is said plainly (Article V.5)."""
     attrs = "".join(f' {k}="{_attr(v)}"' for k, v in {"tool": call.tool, **call.args}.items())
     if output.error:
         attrs += f' error="{_attr(output.text)}"'
         body = output.text
-    elif not output.commits:
+    elif call.tool in ("git_blame", "git_log") and not output.commits:
         body = f"No commit history found for {call.args.get('path', '')}"
         if call.args.get("lines"):
             body += f" lines {call.args['lines']}"

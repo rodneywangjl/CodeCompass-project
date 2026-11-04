@@ -148,7 +148,7 @@ Priorities: **P1** = required for the sprint to be done, **P2** = should ship, *
 - **AC-7.3** The stale-index warning, if triggered, is recorded in the log.
 - **AC-7.4** Every query that was re-ranked records the evidence gate in its log: the `min_top_score` in force, the best score seen, and whether the gate let the question through (Article V.4).
 - **AC-7.5** When the checker found unreferenced entries (AC-4.10), the log's `citation` record also lists their markers under `unreferenced`; when there are none the key is absent, so the record of an ordinary answer is unchanged.
-- **AC-7.6** A question that fails after work has started (indexing, retrieval, re-ranking, generation, or Ctrl-C) still writes its log, with `error` (the exception type and message) and the timings collected so far, so the failing stage can be found; the same error then reaches the caller unchanged. If writing the log fails as well, the caller still gets the original error. A setting that fails before any work starts writes no log, and the log of a question that succeeds has no `error` key.
+- **AC-7.6** A question that fails after work has started (counting tokens with `llama-server`, indexing, retrieval, re-ranking, generation, or Ctrl-C) still writes its log, with `error` (the exception type and message) and the timings collected so far, so the failing stage can be found; the same error then reaches the caller unchanged. If writing the log fails as well, the caller still gets the original error. A setting checked before the log is created (an empty question, an unknown `pipeline.mode` or profile) writes no log, and the log of a question that succeeds has no `error` key.
 
 ### US8 (P2): CLI entry point
 

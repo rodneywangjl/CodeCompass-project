@@ -27,6 +27,17 @@ I ran the test cases again and it passed.
 ### What I kept or changed
 Changed the fixture to write the paths with `as_posix()`. What the tests assert is unchanged. This changes an approved test (T12.3), so it needs reviewer sign-off (Article IX.3). Required suite after the fix: 448 passed.
 
+## 2026-11-03 · T19.1 code-tool results reach the model
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/harness.py, tests/online/test_tool_result_t191.py, docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/tasks.md
+- **Outcome:** Changed
+### What I asked for
+Fix problem 1 from the 2 Nov dev test report: `open_file` and `search_again` results were replaced with "No commit history found", so the model never saw the code those tools returned (B3, D2, D6, D11), while the chunks still counted as citable evidence.
+### How I checked it
+Ran the report's D11 question ("How does require_role decide whether a request is allowed?") on spm-project with the dev-7b model. Without forcing, the model answered without calling a tool, so that run did not test the fix. I then forced the first reply to be `open_file(backend/composite_auth.py, lines 116-155)` and printed the message the model receives: it got the full require_role code with its citable header, not "No commit history found". The answer was correct (401/503/403 steps, auth_user set), but it had no [n] markers or Sources, so it was marked uncited. The same chunk was also ranked 1st by retrieval, so the answer's correctness does not depend on the tool result alone. I raised the timeout to 900 s because the first run timed out at 120 s.
+### What I kept or changed
+Added task T19.1 and scoped plan D16 and the T8.5 wording to git tools. Wrote 12 tests first: 9 failed on the bug, 3 guard behaviour that must stay (the git-tool "no history" message and the D16 wrapper). No approved test was changed.
+
 ## 2026-11-04 · T19.2 an oversized chunk does not block the others
 - **Tool (model):** Claude Code (claude-opus-5-5)
 - **Files:** codecompass/online/context.py, tests/online/test_fit_chunks_t192.py, docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/tasks.md
