@@ -320,7 +320,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 **T19.2 An oversized chunk does not block the others**
 - Bug (dev test B2): `fit_chunks` stopped at the first chunk that did not fit. The top-ranked chunk was larger than the whole chunk budget, so no chunk was sent and the answer (ranked 3rd) never reached the model.
 - Tests first (`context.fit_chunks` with the stub generator's token count): when the first chunk is over budget, the later chunks that fit are kept, in order; an oversized chunk in the middle is skipped and the chunks around it are kept; a chunk too big for the room left is skipped while a later, smaller one that fits is kept; when every chunk is over budget the result is empty; the kept chunks are always in input order and their total cost never exceeds the budget.
-- **Approved tests:** no assertion changes. The `test_context_budget_t42.py` module docstring still says "the first that does not fit ends it"; changing that line needs reviewer sign-off (Article IX.3), so it is left as is and noted in the PR.
+- **Approved test change (needs reviewer sign-off, Article IX.3):** the `test_context_budget_t42.py` module docstring said "the first that does not fit ends it"; it now describes the skip rule. Docstring only: no assertion changes.
 - ACs: AC-2.6; Article I.2, IV.2, VIII.4; plan D4. | Touches: `context.py`, plan D4, the T4.2 entry's wording. | Depends on: T4.2.
 
 ---
