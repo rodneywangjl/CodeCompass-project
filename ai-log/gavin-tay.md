@@ -26,3 +26,14 @@ Fix five T12.3 CLI tests that failed on Windows (on `main` too) but pass on Linu
 I ran the test cases again and it passed.
 ### What I kept or changed
 Changed the fixture to write the paths with `as_posix()`. What the tests assert is unchanged. This changes an approved test (T12.3), so it needs reviewer sign-off (Article IX.3). Required suite after the fix: 448 passed.
+
+## 2026-11-04 · T19.2 an oversized chunk does not block the others
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/context.py, tests/online/test_fit_chunks_t192.py, docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/tasks.md
+- **Outcome:** Changed
+### What I asked for
+Fix problem 2 from the 2 Nov dev test report: `fit_chunks` stopped at the first chunk that did not fit, so in B2 one oversized top chunk meant no code was sent, and the answer ranked 3rd never reached the model.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Added task T19.2 and updated plan D4 item 1 and the T4.2 wording: a chunk that does not fit is skipped and later ones are still tried, within the top final_k only. Wrote 8 tests first: 6 failed on the bug, 2 cover cases that already worked. No approved test assertion changed; the T4.2 test docstring still describes the old rule and is noted for the reviewer.

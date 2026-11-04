@@ -173,7 +173,7 @@ budget = context_window - max_tokens - tokens(system prompt + question)
 chunk_budget = budget - max_verifier_rounds * max_tool_output_tokens
 ```
 
-1. Chunks are added in re-ranker-score order while they fit in `chunk_budget`; the rest are dropped. `final_k` is therefore capped by the budget (AC-2.6).
+1. Chunks are added in re-ranker-score order while they fit in `chunk_budget`; the rest are dropped. `final_k` is therefore capped by the budget (AC-2.6). A chunk that does not fit the room left is skipped, and the later chunks are still tried, so one oversized chunk never keeps smaller, lower-ranked ones out (T19.2). Only the top `final_k` chunks are considered; a skipped chunk is not replaced by one ranked below `final_k`.
 2. Each tool result is truncated to `max_tool_output_tokens` before it is appended, ending with a visible `[output truncated: N more lines]` line so the model knows it is partial. Together with step 1, the conversation can never exceed the context window, whatever the tools return.
 3. The reserve for the answer is the profile's `max_tokens`. A separate, smaller `generation_reserve_tokens` would let a long answer overflow the window, so that key is retired (it is not covered by an approved test).
 4. Token counts come from the generator interface (`Generator.count_tokens`), because the budget is measured in the generator's tokens, which differ from the embedder's. `LlamaServerGenerator` calls llama-server's `/tokenize` endpoint; `StubGenerator` counts whitespace-separated tokens so tests stay model-free.

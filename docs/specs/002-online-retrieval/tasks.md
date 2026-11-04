@@ -91,7 +91,7 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - ACs: AC-1.4, FR-5. | Touches: `context.py`. | Depends on: T0.1.
 
 **T4.2 Context budgeting**
-- Tests first: chunks are added in re-ranker score order until the chunk budget is exceeded; the remaining chunks are dropped; token counts come from `Generator.count_tokens`; `final_k` is capped by the budget (fewer chunks if the budget is tight); a very small budget results in zero chunks (handled gracefully); the profile's `max_tokens` and `MAX_VERIFIER_ROUNDS × max_tool_output_tokens` are reserved before chunks are added; a configured `max_verifier_rounds` whose reserve leaves no room for chunks fails loudly at startup, naming Article V.1; two profiles that differ only in `context_window` yield different chunk counts for the same input, and `context.py` names no model (the budget comes only from the active profile).
+- Tests first: chunks are added in re-ranker score order while they fit the chunk budget; a chunk that does not fit is dropped and later chunks are still tried (T19.2); token counts come from `Generator.count_tokens`; `final_k` is capped by the budget (fewer chunks if the budget is tight); a very small budget results in zero chunks (handled gracefully); the profile's `max_tokens` and `MAX_VERIFIER_ROUNDS × max_tool_output_tokens` are reserved before chunks are added; a configured `max_verifier_rounds` whose reserve leaves no room for chunks fails loudly at startup, naming Article V.1; two profiles that differ only in `context_window` yield different chunk counts for the same input, and `context.py` names no model (the budget comes only from the active profile).
 - ACs: AC-2.6, AC-5.7, plan D4. | Touches: `context.py`. | Depends on: T4.1, T3.2, T0.3.
 
 ## S5: Verifier tools
@@ -303,6 +303,14 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 **T18.1 Write the audit log when a question fails**
 - Tests first (stub re-ranker and embedder, a stub generator that raises, real stores on the fixture repository): when the generator raises `TimeoutError`, the same exception object reaches the caller and exactly one log is written with the question, `error` = `{"type", "message"}`, the retrieved chunks and a generation time above 0; an exception from `ensure_current` is logged; `KeyboardInterrupt` is logged and re-raised; when `write_log` itself raises during the error, the caller still gets the original error; a successful answer has no `error` key in the returned log or on disk; an unknown `pipeline.mode` raises and writes no log; through the CLI, a generator timeout prints one `error:` line, exits 1 and leaves a log.
 - ACs: AC-7.6, AC-7.1, AC-8.1; Article V.4. | Touches: `__init__.py`. | Depends on: T11.2, T12.1, T12.3, T17.1.
+
+## S19: Test-report fixes (dev test, 2 Nov 2026)
+
+**T19.2 An oversized chunk does not block the others**
+- Bug (dev test B2): `fit_chunks` stopped at the first chunk that did not fit. The top-ranked chunk was larger than the whole chunk budget, so no chunk was sent and the answer (ranked 3rd) never reached the model.
+- Tests first (`context.fit_chunks` with the stub generator's token count): when the first chunk is over budget, the later chunks that fit are kept, in order; an oversized chunk in the middle is skipped and the chunks around it are kept; a chunk too big for the room left is skipped while a later, smaller one that fits is kept; when every chunk is over budget the result is empty; the kept chunks are always in input order and their total cost never exceeds the budget.
+- **Approved tests:** no assertion changes. The `test_context_budget_t42.py` module docstring still says "the first that does not fit ends it"; changing that line needs reviewer sign-off (Article IX.3), so it is left as is and noted in the PR.
+- ACs: AC-2.6; Article I.2, IV.2, VIII.4; plan D4. | Touches: `context.py`, plan D4, the T4.2 entry's wording. | Depends on: T4.2.
 
 ---
 
