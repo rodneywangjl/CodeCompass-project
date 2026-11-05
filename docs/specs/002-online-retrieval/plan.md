@@ -242,31 +242,59 @@ The executor parses each result into commit records (full hash, author, date, su
 9. `count_tokens(text)` calls `/tokenize` (used by D4).
 10. **Prompt reuse across rounds.** One question makes up to five generate calls by default (D15), and each starts with the same system prompt and retrieved context, which dominate the prompt. Each request sends the profile's `cache_prompt` setting, so llama-server can reuse the already-processed prefix and only process the new messages. This only works if the conversation is **append-only**: the harness never edits, reorders or removes an earlier message, and every round adds messages at the end (D15, D16). Prefill is the slowest step on a laptop (MODEL-SETUP.md measured ~70 s for a 2.6k-token prompt), so this saves most of the per-round cost. llama.cpp documents that reusing the cache can make outputs differ slightly from a cold run, because logits are not guaranteed bit-identical across batch sizes. `cache_prompt` is therefore an explicit profile setting (default `true`), recorded in the per-query log, and an evaluation run that needs bit-for-bit reproducibility sets it to `false` (Article VII.6).
 
-**D14. System prompt.** A minimal, functional prompt (prompt engineering deferred per Article VII.1):
+**D14. System prompt.** A minimal, functional prompt (prompt engineering deferred per Article VII.1). With tools on (`rag_tools`):
 
 ```
 You are CodeCompass, a code Q&A assistant. Answer the developer's question
 using ONLY the code context provided below. Do not use your training knowledge
 about the repository.
 
+The code context is a few pieces of code found by a search. It has no commit
+history, and it can miss code the answer needs. You can call tools to get more.
+
 Rules:
-1. Cite every claim with numbered markers [1], [2], etc.
-2. End with a Sources section listing each citation, one per line. Start
+1. Before you answer, check that the code context is enough. If it is not,
+   reply with ONE tool call and nothing else:
+   <tool>search_again(query="names or words to search for")</tool> finds more code
+   <tool>open_file(path="file/path.py", lines="X-Y")</tool> reads lines of a file
+   <tool>open_file(path="file/path.py")</tool> lists a file's functions with lines
+   <tool>git_blame(path="file/path.py", lines="X-Y")</tool> shows who changed lines
+   <tool>git_log(path="file/path.py", n=10)</tool> lists recent commits of a file
+   Call a tool when:
+   - the question asks why, when or by whom code was written or changed:
+     use git_log or git_blame (the "indexed at" hash is not that commit)
+   - the answer needs a function, class or value the context does not show:
+     use search_again or open_file
+   - a piece of code you need is cut off: use open_file
+   The result comes back in a <tool_result>...</tool_result> block. It is
+   evidence you may cite, just like the code context.
+2. Cite every claim with numbered markers [1], [2], etc.
+3. End with a Sources section listing each citation, one per line. Start
    each line with its marker, with no bullet or number before it. For code,
    copy the chunk's header line exactly (the part before " | "). Example:
    Sources
    [1] file/path.py, lines X-Y (indexed at <7-char hash>)
    [2] Commit <7-char hash>, "<subject>", <author>, <date>
-3. If you need commit history to explain WHY code exists, request a tool:
-   <tool>git_blame(path="file/path.py", lines="X-Y")</tool>
-   <tool>git_log(path="file/path.py", n=10)</tool>
-   The result comes back in a <tool_result>...</tool_result> block. It is
-   evidence you may cite, just like the code context.
-4. If the evidence is insufficient, say what you could not determine.
-   Do NOT guess or make up file names, line numbers, or commit hashes.
+4. If the evidence is still insufficient after using tools, say what you
+   could not determine. Do NOT guess or make up file names, line numbers, or
+   commit hashes.
 5. If the commit history gives no reason for the code (e.g. vague commit
    messages, or no history found), say so. Do NOT invent a reason.
 ```
+
+With tools off (`rag`, `no_retrieval`, D17) the prompt is the intro paragraph and the four non-tool rules only, numbered 1-4, worded as before T20.1 (rule 3 reads "If the evidence is insufficient, say what you could not determine."), so configuration (b) of Article VII.2 is unchanged.
+
+**Tool check (T20.1).** With tools on, the first `user` message (D3) ends with one more paragraph after the code context, `TOOL_CHECK`:
+
+```
+Before you answer: if the code context above does not show everything the
+answer needs (for a why, when or who question: the commit history), reply
+with only one <tool> call instead.
+```
+
+It is part of the first message, so the conversation stays append-only (D13 item 10), and it is counted in the D4 prefix with the question. With tools off it is left out.
+
+*Why (T20.1).* With the earlier prompt the model often skipped the tools for questions about why, when or by whom code changed (2 Nov dev test: the role-cache question, B3, E1; after T19.1 and T19.2, B2 on dev-7b still answered "240 because the constant says so" with no `git_log`). Part of the poor tool use in that test was T19.1's bug, which hid code-tool results; this task is about the decision to call a tool. The causes: the tool rule was third of five, after two rules about writing the answer; rule 4 ("say what you could not determine") let the model meet a gap without a tool; nothing said the chunks carry no commit history; and the only mention of tools sat in the system message, several thousand tokens before the point where the model decides. The new prompt puts the decision first, names when each tool is needed, says the insufficient-evidence rule applies after tools, and repeats the decision at the end of the message, where a small model weighs it most. This makes the tool loop (Article V) reachable; it is a functional fix like the T8.5 Sources-format fix, not tuning against an evaluation set (none is frozen yet, Article VII.1).
 
 **D15. Round limit (Article V.1).** One tool call executes per round: the first `<tool>` block in a response; any later blocks are ignored and logged. Rounds count from 0 and the loop continues while `round < max_verifier_rounds` (config, default 3). If the response after the last allowed tool result is still a tool request, the harness makes **one final** generate call, adding a message that no more tools are available, an answer is required, and the answer must state what could not be determined (Article I.2). Any `<tool>` block in that final response is removed, and the remaining text goes to the citation checker. A question therefore makes at most `max_verifier_rounds` tool executions and at most `max_verifier_rounds + 2` generator calls (3 and 5 by default): one per tool round, the reply that still asks for a tool, and the final call. The earlier design passed the last response to the checker as the answer, but that response is a tool request, not an answer.
 

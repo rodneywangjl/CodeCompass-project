@@ -116,7 +116,7 @@ def _retrieve_and_answer(handles, repo_path, question, *, config, profile, tools
             _log_retrieved(log, ranked, rrf, set())
             return _refusal(ranked, config.retrieval.closest_files), [], []
     prefix = (generator.count_tokens(system_prompt(tools_enabled=tools_on))
-              + generator.count_tokens(user_message(question, [])))
+              + generator.count_tokens(user_message(question, [], tools_enabled=tools_on)))
     sent = fit_chunks([c for c, _ in ranked[:config.retrieval.final_k]],
                       chunk_budget(profile, tools, prefix), generator.count_tokens)
     _log_retrieved(log, ranked, rrf, {c.chunk_id for c in sent})

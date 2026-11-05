@@ -323,6 +323,13 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - **Approved test change (needs reviewer sign-off, Article IX.3):** the `test_context_budget_t42.py` module docstring said "the first that does not fit ends it"; it now describes the skip rule. Docstring only: no assertion changes.
 - ACs: AC-2.6; Article I.2, IV.2, VIII.4; plan D4. | Touches: `context.py`, plan D4, the T4.2 entry's wording. | Depends on: T4.2.
 
+## S20: Tool-use prompt (dev test, 2 Nov 2026, problem 3; plan D14, tool check)
+
+**T20.1 Tool-use prompt**
+- Tests first (stub generator, then `ask` with stubs): with tools on, the system prompt has the tool rule first, before the citation rules; it says the code context has no commit history; it names when to call a tool (why/when/who questions → `git_log` or `git_blame`; code the context does not show → `search_again` or `open_file`; cut-off code → `open_file`); it says a tool reply holds the tool call and nothing else; the insufficient-evidence rule applies after using tools; all T14.3 tool examples are still present. With tools off the system prompt is unchanged from T14.3. `user_message(question, chunks, tools_enabled=True)` ends with `TOOL_CHECK` after the code context; with tools off (and by default) the message is unchanged; `run_agent` sends the tool check only with tools on; `ask` counts the tool check in the D4 prefix. Model test (`model`, local only): on the history fixture repo, "Why does authenticate retry?" makes at least one `git_log` or `git_blame` call.
+- **Approved test changes (need reviewer sign-off, Article IX.3):** `test_harness_messages_t85.py` (D14 template) gets the new tools-on prompt. No other assertion changes.
+- ACs: AC-3.1, 3.7, 3.8; Article I.2, V.1, V.5, VII.3; plan D3, D4, D13 item 10, D14, D17. | Touches: `agent/harness.py`, `__init__.py`, plan D14, the approved test above. | Depends on: T14.3, T8.5, T19.1.
+
 ---
 
 ## Completion checklist (spec "definition of done")
