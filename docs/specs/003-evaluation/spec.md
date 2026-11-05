@@ -1,7 +1,7 @@
 # Spec 003: Evaluation Framework
 
 **Project:** CodeCompass (SE201 G1-T1) | **Sprint:** 3 | **Status:** Draft v3 for team review (2026-11-01; recommendations in §13 checked against `main` and Flask)
-**Owner:** Nicole Goh | **Constitution version:** 1.4.0 | **Constitution articles touched:** I, III, IV, V, VI, VII, VIII, IX, X, XI (see "Constitution Check")
+**Owners:** Nicole Goh and Kelsey (La Hue Van) | **Constitution version:** 1.4.0 | **Constitution articles touched:** I, III, IV, V, VI, VII, VIII, IX, X, XI (see "Constitution Check")
 
 > This spec says **what** the evaluation must measure and how we will know it is correct. It does not choose class designs, file formats or scripts beyond what the constitution fixes; those belong in the plan.
 >
@@ -86,8 +86,8 @@ Priorities: **P1** = required for the final submission, **P2** = should ship, **
 
 *As the team, we need a consistent simple vs code-tracing label to test the instructor's hypothesis.*
 
-- **AC-3.1** A written tagging rule with examples exists before any question is tagged. (Proposal: Gavin writes the rule.)
-- **AC-3.2** Every question in the core and imported sets is tagged independently by two people, and the agreement rate is reported. Disagreements are settled by discussion and recorded. (Proposal: Gavin and Kelsey.)
+- **AC-3.1** A written tagging rule with examples exists before any question is tagged. (Nicole and Kelsey write the rule.)
+- **AC-3.2** Every question in the core and imported sets is tagged independently by two people, and the agreement rate is reported. Disagreements are settled by discussion and recorded. (Nicole and Kelsey: each tags the other's questions as the second tagger.)
 - **AC-3.3** Tags are frozen with the question sets (AC-1.3).
 
 ### US4 (P1): Retrieval ablations (hit rate@k, no LLM)
@@ -132,7 +132,7 @@ Priorities: **P1** = required for the final submission, **P2** = should ship, **
 - **AC-8.1** For each answer in configurations (b) and (c), the harness produces a grading row: question, category, tag, reference answer and citations, the system answer with sources and checker outcome, the pre-filled H1, format-slip and abstention labels, and the full context the model saw.
 - **AC-8.2** The full context comes from the harness recording the messages sent to the generator (retrieved chunks and full tool results), with no change to Spec 002 code. **(recommended)** (team to confirm: §13 C8)
 - **AC-8.3** Rows are shuffled and the configuration is hidden from graders.
-- **AC-8.4** Two graders grade every row independently (proposal: Nicole grader 1, Rodney grader 2): H2, H3 (unanswerable only), the 0/1/2 score, and for every 0 a reason (`unsupported`, `fabricated-citation`, `abstained`, `wrong-but-grounded`). Agreement is reported; disagreements are settled together and recorded.
+- **AC-8.4** Two graders grade every row independently (Nicole and Kelsey): H2, H3 (unanswerable only), the 0/1/2 score, and for every 0 a reason (`unsupported`, `fabricated-citation`, `abstained`, `wrong-but-grounded`). Agreement is reported; disagreements are settled together and recorded.
 - **AC-8.5** The harness never fills in H2, H3 or the quality score.
 
 ### US9 (P1): Headline results, grouped
@@ -158,7 +158,7 @@ Priorities: **P1** = required for the final submission, **P2** = should ship, **
 
 ### US12 (P3): Held-out generalisation run
 
-- **AC-12.1** After the Flask comparison is complete and nothing is being tuned, the FastAPI set runs once in (b) and (c) under the same conditions, reported separately. (Proposal: Swen.)
+- **AC-12.1** After the Flask comparison is complete and nothing is being tuned, the FastAPI set runs once in (b) and (c) under the same conditions, reported separately. (Nicole and Kelsey.)
 
 ## 5. Definitions
 
@@ -272,7 +272,7 @@ Each needs at least one test:
 | C1 | Tag names: "simple-lookup vs multi-hop" or "simple vs code-tracing"? | `simple` / `code-tracing`, matching the instructor's wording. | Labels only. |
 | C2 | How many code-tracing questions per category? | At least 3 of 8 in each answerable category. | Labels only. |
 | C3 | Confirm the SWE-QA type → category mapping. | Why → design-rationale, Where → localisation, How → runtime-behaviour, What → architectural. | SWE-QA has exactly 12 of each type. |
-| C4 | Measure single-retriever setups in the harness rather than as pipeline flags? | Yes: no pipeline change needed; Kelsey owns the ablation runner. | All retrieval functions exist and are importable; no pipeline change. The "sent" figure needs `llama-server` running for `/tokenize`. |
+| C4 | Measure single-retriever setups in the harness rather than as pipeline flags? | Yes: no pipeline change needed; built by Nicole and Kelsey. | All retrieval functions exist and are importable; no pipeline change. The "sent" figure needs `llama-server` running for `/tokenize`. |
 | C5 | LLM subset size and selection rule? | 20 questions (4 per category, 2 simple + 2 code-tracing where possible), half core and half imported, chosen by fixed ids before any run. | Flask is small (783 chunks); re-measure time per question on the first runs. |
 | C6 | Profile and machine for reported runs? | `dev-lowmem` on Nicole's machine, CUDA build, `-ngl 12`, timeout 900 s. | Profile runs on this machine; seed 42 and temperature 0.1 are sent to the server. The 900 s timeout must go in a committed eval config (AC-5.4a). |
 | C7 | Does a format slip count as H1? | No; count separately and report a strict H1 too. | Detectable with public `parse_answer()` / `body_markers()` plus the sent chunks and captured context. |
@@ -280,15 +280,22 @@ Each needs at least one test:
 | C9 | Hallucination-rate denominator? | Abstentions included; errors excluded and reported. | `NO_EVIDENCE` / `NO_INDEX` are fixed strings; timeouts raise `GeneratorError`. |
 | C10 | Pin Flask at SWE-QA's commit `85c5d93…`? | Yes, if the SWE-QA set is adopted; otherwise Flask 3.1.3 (`22d9247…`). Then amend constitution Appendix A #13. | Full history; all 112 SWE-QA references valid; dry-run index 86 files, 783 chunks. |
 
-## 14. Ownership (from the proposal task tracker)
+## 14. Ownership
 
-| Work | Owner |
-|---|---|
-| Spec 003, dataset survey and conversion, contamination check, 8 unanswerable questions, review and freeze all questions, grader 1, results analysis (with Gavin) | Nicole |
-| 8 architectural questions, grader 2, index any extra repo | Rodney |
-| 8 runtime-behaviour questions, run budget, FastAPI held-out check | Swen |
-| 8 design-rationale questions, tagging rule, analysis by complexity (with Nicole) | Gavin |
-| 8 localisation questions, second tagger, ablation runner (resumable, cached) | Kelsey |
+Spec 003 is owned and carried out by **Nicole Goh and Kelsey (La Hue Van)** (changed 2026-11-05). This replaces the proposal's task tracker, which spread the evaluation work across all five members; Rodney, Swen and Gavin have no Spec 003 tasks, though any of them may review a Spec 003 pull request.
+
+| Work | Nicole | Kelsey |
+|---|---|---|
+| Spec 003, plan and tasks | ✓ | ✓ |
+| Core questions (40) | architectural (8), unanswerable (8), design-rationale 5-8 | localisation (8), runtime-behaviour (8), design-rationale 1-4 |
+| SWE-QA conversion (48) | What and Why (24) | Where and How (24) |
+| Tagging rule and second tagging (AC-3.1, AC-3.2) | ✓ (second-tags Kelsey's) | ✓ (second-tags Nicole's) |
+| Question-set check (T1.1) | ✓ | review |
+| Runner and retrieval ablations | ✓ | ✓ |
+| Contamination check (US10) | ✓ | |
+| Blind grading (AC-8.4) | grader 1 | grader 2 |
+| FastAPI held-out run (US12) | ✓ | ✓ |
+| Results, report and analysis by complexity | ✓ | ✓ |
 
 ## 15. Constitution Check
 
