@@ -83,7 +83,7 @@ def test_server_sent_event_framing_is_tolerated(monkeypatch):
 
 
 def test_without_a_callback_the_request_and_result_are_unchanged(monkeypatch):
-    server = FakeServer(reply="plain", stream=["never", "used"])
+    server = FakeServer(reply="plain", stream=["pla", "in"])  # T19.3: the stream is the answer
     assert make(monkeypatch, server).generate(MESSAGES) == "plain"
     (body,) = chat(server)
     assert body.pop("stream") is True  # T19.3: streamed without a callback too
