@@ -330,6 +330,15 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - **Approved test changes (need reviewer sign-off, Article IX.3):** `test_harness_messages_t85.py` (D14 template) gets the new tools-on prompt. No other assertion changes.
 - ACs: AC-3.1, 3.7, 3.8; Article I.2, V.1, V.5, VII.3; plan D3, D4, D13 item 10, D14, D17. | Touches: `agent/harness.py`, `__init__.py`, plan D14, the approved test above. | Depends on: T14.3, T8.5, T19.1.
 
+## S21: Guardrails (`docs/guardrails-todo.md`)
+
+**T21.1 `open_file` refuses files the indexer excludes**
+- Gap (guardrails #10): `validate_path` only checks that the file exists at the indexed commit, so `open_file(".env")` returned a committed secrets file to the model, and its text became citable evidence. The offline ignore list (Article III.6) kept it out of the index, but not out of the tools.
+- Rule: `open_file` refuses a path whose file name matches `files.exclude_patterns` or that has a directory in `files.exclude_dirs` (the same name and directory rules the indexer applies, read from the merged config, not hard-coded). The indexer's other skips (size, binary, non-code extension) do **not** apply, so a README stays readable. The refusal is an error result fed back to the model (D6). It says the file is excluded and contains none of the file's text. It applies with and without `lines`. `git_blame` and `git_log` are unchanged: they return commit metadata, not file text.
+- Tests first (stub embedder, re-ranker and generator; `ask` on a small fixture repo with a committed `.env`, `keys/id_rsa`, `node_modules/lib/index.js`, `config/secrets.yaml`, `README.md` and `src/app.py`): a model request for `open_file` on `.env` (with lines), on `.env` (outline), on `keys/id_rsa` and on `node_modules/lib/index.js` each gets an error tool result naming the file as excluded; no message the model receives contains the secret text; the audit log records the call as an error; no chunk of the file is citable, so citing it gives outcome G; `open_file` on `src/app.py` and on `README.md` still returns their text; a pattern added to `files.exclude_patterns` in config (`secrets.yaml`) is refused too, and with the default config the same file is readable.
+- **Approved tests:** none change.
+- ACs: Article III.6, V.2, VI.1, X.4; plan D6, D18. | Touches: `agent/tools.py`, `agent/harness.py`, `__init__.py`, plan D6, `tests/online/test_open_file_excluded_t211.py`. | Depends on: T14.3, T19.1.
+
 ---
 
 ## Completion checklist (spec "definition of done")
