@@ -280,3 +280,28 @@ Changed after Claude Code’s review:
 4. Alphabetized `import re` in `codecompass/online/__init__.py`.
 5. Added tests covering the TOML string configuration validation and the "asked" doc score gate
    check (bringing the test suite to 20 tests).
+## 2026-11-08 · T22.2 Label documentation sources
+- **Tool (model):** Antigravity (Gemini 3.8 Flash); reviewed by Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/citation/formatter.py, codecompass/online/__init__.py, tests/online/test_docs_label_t222.py, docs/specs/002-online-retrieval/tasks.md, docs/specs/002-online-retrieval/spec.md
+- **Outcome:** Kept
+### What I asked for
+Implementation of Task T22.2 (Label documentation sources): add DOCS_LABEL and DOCS_BANNER to
+formatter; implement mark_documentation to label cited documentation Sources lines and prepend the
+banner when doc_paths match; update ask() in __init__.py to invoke mark_documentation when
+docs_fallback is enabled and record labelled markers in log["citation"]["documentation_sources"].
+### How I checked it
+I asked whether documentation labelling could be enforced by the program rather than relying on
+model instructions. Review caught the wrong Sources format in test 7 and added a test ensuring
+body lines starting with markers are not labelled. I questioned whether open_file was covered,
+which uncovered that tools._language assigns "text" to docs, so doc sources opened via tools
+missed the banner and label. Added test 11, which failed first in WSL (1 failed, 10 passed), then
+passed after checking file extensions in ask(). A search for hard-coded test values in
+codecompass/ came back empty. The full suite passed in WSL with zero failures.
+### What I kept or changed
+Kept test-first implementation with 11 tests covering verified and unverified doc sources, code
+sources in the same answer, multiple doc sources with sorted markers, commit sources (never
+labelled), body lines starting with markers (never labelled), and end-to-end ask() checks with flag
+on and flag off.
+In ask(), doc_paths checks chunk language or file extension against doc_languages so docs opened
+via open_file (which have language 'text') are also labelled. Preserved CRLF line endings, line
+length limits, and module boundaries with checker.py and tools.py completely unchanged.
