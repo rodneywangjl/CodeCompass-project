@@ -84,3 +84,14 @@ Stop `ask` timing out on slow machines: the non-streaming call without a callbac
 Ran all the tests for commits to the branch and verified that all tests passed. Ran the full required suite with `pytest -m "not model"` on cluster as well as local computer.
 ### What I kept or changed
 Amended Spec 004 T2.2 and the plan, which said the request is unchanged without a callback (you chose this). Changed two approved stream tests to expect `stream: true` on every call, and one fixture so its stream matches its reply (needs reviewer sign-off, Article IX.3). The connect timeout bounds only the readiness check, because urllib cannot set a connect timeout separately from the wait for the answer. The value is set after construction so the approved TUI fakes keep their constructor. The existing `timeout_seconds` is still not validated; only the new value is.
+
+## 2026-11-07 · Repeated tool calls are not run again (T19.4)
+- **Tool (model):** Claude Code (claude-haiku-5-5)
+- **Files:** codecompass/online/agent/harness.py, tests/online/test_repeated_tool_calls_t194.py, tests/online/test_harness_round_limit_t83.py, docs/specs/002-online-retrieval/tasks.md, ai-log/swen.md
+- **Outcome:** Changed
+### What I asked for
+Re-test whether a repeated tool call (same tool and arguments in one question) still wastes a round after T19.1. If it does, stop it from running again, tell the model to use the earlier result, log the repeat, and decide whether a repeat counts against `max_verifier_rounds`.
+### How I checked it
+TODO (Swen)
+### What I kept or changed
+The probe showed the cache stopped re-execution but the repeat still used a round, and the model got the full result again. Decided a repeat counts against the limit (Article V.1: the loop must stay bounded). The round-limit test T8.3 fed the same call every round, so it had to change to distinct calls; the assertions are unchanged, and it needs reviewer sign-off (Article IX.3). Evaluation must be re-run before results are reported (Article VII.5).
