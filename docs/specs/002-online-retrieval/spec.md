@@ -232,6 +232,7 @@ Each of these needs at least one test:
 - Concurrent questions (two `ask` calls) — each gets its own context; tool cache may be shared.
 - A question with no words (`""`, `"   "`, `"?"`, `"___"`, an emoji) — rejected at once with a clear message (AC-9.3), not run through the pipeline. *Added 2026-11-03: found in the 2 Nov development test (D9, D10), where an empty question took about 2 minutes and was answered about lines containing only `}`.*
 - A question fails part-way (`llama-server` times out, the index lock times out, the user presses Ctrl-C) — the error is shown as before and the audit log is still written with the error (AC-7.6). *Added 2026-11-03: in the 2 Nov development test, two failed questions (A2 first try, B4) left no log, so the failing stage could not be found.* A process that is killed outright cannot write a log.
+- Docs as context (`docs_fallback`): when enabled, code chunks take precedence unless the question asks for docs or doc chunks score higher by `docs_margin`; when code fails the gate, doc chunks can answer alone; otherwise the standard refusal is returned. *Added 2026-11-08: S22 / T22.1.*
 
 ## 7. Non-Functional Requirements
 

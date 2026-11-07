@@ -339,6 +339,14 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - **Approved tests:** none change.
 - ACs: Article III.6, V.2, VI.1, X.4; plan D6, D18. | Touches: `agent/tools.py`, `agent/harness.py`, `__init__.py`, plan D6, `tests/online/test_open_file_excluded_t211.py`. | Depends on: T14.3, T19.1.
 
+## S22: Docs as context (dev test problem 10; guardrails #8)
+
+**T22.1 Code first, docs when asked, better or needed**
+- Tests first (stub embedder and re-ranker, `ask` on fixture repo with Python code and README.md): flag off (default) preserves existing retrieval chunks and audit log; flag on with code passing gate and doc score below code + margin sends only code chunks; flag on with question mentioning documentation keywords ("README", "docs", ".md", etc.) sends docs with code and adds DOCS_NOTE before code context; flag on with doc score >= code score + margin sends docs with code; margin boundary checks (exact margin counts as better, just below does not); flag on with code failing gate but docs passing sends only docs; flag on with neither passing refuses without generator calls; cited doc chunks are verified (outcome F); DOCS_NOTE is absent when no doc chunk is sent; D4 token prefix counts DOCS_NOTE when docs are sent; asks_about_docs checks whole words and extensions without false positives; config defaults and validation for docs_fallback, doc_languages, and docs_margin; flag on with no doc files sends only code; flag on with only docs sends doc chunks and logs code_failed with best_code=None.
+- Limitations: (1) the keyword index has no language field, so doc chunks are filtered after retrieval and can take some shortlist slots when docs are indexed; a separate doc index needs a schema change (future work). (2) search_again is unchanged. (3) docs_margin 0.2 is a starting value, to be chosen with the evaluation after the baseline (Article VII.5); the default stays off.
+- **Approved tests:** none change.
+- ACs: Spec 002 S22; Article I.1, I.2, IV.2, V.4, VI.4. | Touches: `config.py`, `agent/harness.py`, `__init__.py`, `tests/online/test_docs_fallback_t221.py`. | Depends on: T15.1, T20.1.
+
 ---
 
 ## Completion checklist (spec "definition of done")
