@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from dataclasses import dataclass, field
 
 from codecompass.online.agent.cache import ToolCache
@@ -89,9 +90,29 @@ def _attr(value) -> str:
     return str(value).replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
 
 
+def _attrs(call) -> str:
+    return "".join(f' {k}="{_attr(v)}"' for k, v in {"tool": call.tool, **call.args}.items())
+
+
+def _open_tag(call) -> str:
+    return f"<tool_result{_attrs(call)}>"
+
+
+def repeat_result_message(call, round_no: int) -> str:
+    """The D16 wrapper for a call already run in *round_no*: the model is told to use that
+    result, and no tool runs again (T19.4)."""
+    body = (f"This call was already run in round {round_no} with the same arguments; "
+            f"use the result from round {round_no} instead of asking again.")
+    return f"{_open_tag(call)}\n{body}\n</tool_result>"
+
+
+def _call_key(call) -> str:
+    return json.dumps([call.tool, call.args], sort_keys=True, default=str)
+
+
 def tool_result_message(call, output: ToolOutput) -> str:
     """The D16 wrapper; a git tool's empty history is said plainly (Article V.5)."""
-    attrs = "".join(f' {k}="{_attr(v)}"' for k, v in {"tool": call.tool, **call.args}.items())
+    attrs = _attrs(call)
     if output.error:
         attrs += f' error="{_attr(output.text)}"'
         body = output.text
@@ -204,6 +225,7 @@ def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: i
                                                          tools_enabled=tools_enabled)}]
     run = AgentRun(answer="", messages=messages)
     tool_runs = 0
+    first_round: dict[str, int] = {}  # call key -> the round it first ran in (T19.4)
     while True:
         response = _generate(generator, messages, on_draft)
         run.generator_calls += 1
@@ -234,7 +256,21 @@ def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: i
             tool_runs += 1
             continue
         call = calls[0]
+        key = _call_key(call)
+        if key in first_round:  # T19.4: already run in this question; not run again
+            entry = {"round": tool_runs, "tool": call.tool, "args": dict(call.args),
+                     "cache_hit": True, "error": False,
+                     "result_summary": f"already run in round {first_round[key]}",
+                     "repeat_of": first_round[key]}
+            if len(calls) > 1:
+                entry["ignored_calls"] = len(calls) - 1
+            run.rounds.append(entry)
+            messages.append({"role": "user",
+                             "content": repeat_result_message(call, first_round[key])})
+            tool_runs += 1
+            continue
         output, hit = _run_safely(run_tool, call)
+        first_round[key] = tool_runs
         entry = {"round": tool_runs, "tool": call.tool, "args": dict(call.args),
                  "cache_hit": hit, "error": output.error,
                  "result_summary": output.text.splitlines()[0] if output.text else ""}
