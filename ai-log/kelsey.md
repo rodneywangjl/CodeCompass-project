@@ -242,3 +242,41 @@ My 20 of the 40 core evaluation questions on Flask at commit 85c5d93: 8 localisa
 I compared my questions against the 48 SWE-QA Flask questions and replaced the one that duplicated question 46. I rewrote my answers after each review until they matched the evidence, and checked each one against the code notes (file, lines and what the code does). When Claude said an online answer wasn't in the repository, I checked why (for example the `download_name` commit gives no reason) and rewrote it to say only what the repository shows.
 ### What I kept or changed
 Changed my first drafts. Claude's check found that some questions were about CodeCompass instead of Flask, some had a wrong premise (`g['key']` does not exist, `app.py` has no `@setupmethod`, `request.is_json` is in Werkzeug, not Flask), and one duplicated SWE-QA question 46 (session lifecycle), so I replaced or dropped them. I removed wording that told the system where to look ("Look at ...", "Find the commit ..."). I wrote the reference answers myself, partly using online sources to understand the topics; Claude then found four that said things the repository does not (for example a reason for the `download_name` rename that no commit gives), and made five small factual corrections at my request. Kept all questions marked `ai_assisted: true`. Tags: 10 code-tracing, 10 simple.
+
+## 2026-11-08 · T22.1 Docs as context fallback
+- **Tool (model):** Antigravity (Gemini 3.8 Flash); reviewed by Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/config.py, codecompass/online/agent/harness.py, codecompass/online/__init__.py, tests/online/test_docs_fallback_t221.py, docs/specs/002-online-retrieval/tasks.md, docs/specs/002-online-retrieval/spec.md
+- **Outcome:** Changed
+### What I asked for
+Implementation of Task T22.1 (Docs as context): add docs_fallback, doc_languages, and docs_margin
+to RetrievalConfig with validation and TOML list-to-tuple parsing; update _retrieve_and_answer to
+prioritize code chunks and add doc chunks when asked, when docs score higher by docs_margin, or when
+code fails the evidence gate; record docs_fallback in the audit log when enabled; add
+asks_about_docs whole-word and extension checker; add DOCS_NOTE to harness and pass docs flag
+through
+user_message and run_agent, including D4 token prefix counting.
+### How I checked it
+Agreed the design with Rodney (code is the source of truth; docs added when asked
+or clearly better).
+Reviewed the red tests first and asked for two edge cases (repos with no docs, and repos with docs
+only). Had the code reviewed and fixed the TOML string parsing bug, the duplicated tail in
+`_retrieve_and_answer`, required docs on "asked" to pass the evidence gate, and sorted imports. Ran
+the test suite in WSL: all 20 task tests passed, and the full required suite passed with 1210 passed
+and 0 failed. Ran a real verification on my laptop against Flask with the real embedder and
+re-ranker (dummy model): the code question sent code only; the README question triggered "asked" and
+sent README.md; the deployment question sent code only because 0.985 - 0.808 = 0.177 < margin 0.2,
+showing the 0.2 margin is too strict and should be tuned during evaluation.
+### What I kept or changed
+Changed after Claude Code’s review:
+1. Fixed TOML string parsing in `_build_online_config` so `doc_languages` is only converted to a
+   tuple when it is a `list`. A TOML string (e.g. `doc_languages = "md"`) now correctly raises
+   `ValueError` naming `retrieval.doc_languages` instead of converting into `("m", "d")`.
+2. Refactored `_retrieve_and_answer` so flag-off and flag-on paths only select the chunk list and
+   the `docs` flag, sharing one tail for token prefix calculation, `fit_chunks`, retrieved chunk
+   logging, tool runner construction, and agent invocation. Restored Plan D7 and Article III.6
+   comments.
+3. Updated the "asked" branch to require `best_doc >= min_top_score`, preventing irrelevant
+   documentation chunks from entering context just because a question mentions a doc keyword.
+4. Alphabetized `import re` in `codecompass/online/__init__.py`.
+5. Added tests covering the TOML string configuration validation and the "asked" doc score gate
+   check (bringing the test suite to 20 tests).
