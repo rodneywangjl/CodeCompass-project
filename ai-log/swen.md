@@ -57,3 +57,14 @@ Clean up the cluster notebook using the fixes from the run, so it works in order
 Read through notebook and run it to ensure it works on GPU cluster.
 ### What I kept or changed
 Rewrote the notebook in run order: login steps, paths and config, one-time setup, server, index, questions, tool tests, checks and stop. Kept the layered config loader, so the user config file is read. Removed the config-swap test cell, which left the user config on CPU settings when a question failed. Added the account and data rules from scis_tech. Checked that the notebook has no passwords. Not committed.
+
+## 2026-11-08 · ask streams every answer, so the timeout is per wait (T19.3)
+- **Tool (model):** Claude Code (claude-haiku-5-5)
+- **Files:** codecompass/online/generator/llama.py, codecompass/online/config.py, codecompass/online/__init__.py, codecompass/online/tui.py, codecompass.toml, tests/online/test_ask_stream_timeout_t193.py, tests/online/test_stream_generator_t22.py, docs/specs/002-online-retrieval/tasks.md, docs/specs/004-tui/tasks.md, docs/specs/004-tui/plan.md, ai-log/swen.md
+- **Outcome:** Changed
+### What I asked for
+Stop `ask` timing out on slow machines: the non-streaming call without a callback capped the whole answer at `timeout_seconds`. Always stream, add a connect timeout for the first contact with the server, keep the payload and answer unchanged.
+### How I checked it
+TODO (Swen)
+### What I kept or changed
+Amended Spec 004 T2.2 and the plan, which said the request is unchanged without a callback (you chose this). Changed two approved stream tests to expect `stream: true` on every call, and one fixture so its stream matches its reply (needs reviewer sign-off, Article IX.3). The connect timeout bounds only the readiness check, because urllib cannot set a connect timeout separately from the wait for the answer. The value is set after construction so the approved TUI fakes keep their constructor. The existing `timeout_seconds` is still not validated; only the new value is.
