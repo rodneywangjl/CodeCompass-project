@@ -347,6 +347,12 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - **Approved tests:** none change.
 - ACs: Spec 002 S22; Article I.1, I.2, IV.2, V.4, VI.4. | Touches: `config.py`, `agent/harness.py`, `__init__.py`, `tests/online/test_docs_fallback_t221.py`. | Depends on: T15.1, T20.1.
 
+**T22.2 Label documentation sources**
+- Tests first (unit tests on `mark_documentation` and `ask` with fixture repo and stub reranker/generator): verified doc source gets ` (documentation)` label appended to its Sources line and `DOCS_BANNER` prepended at the top; code source in same answer is not labelled; multiple doc sources are all labelled and banner appears once with sorted markers returned; no doc sources returns text unchanged and empty list; unverified doc source in outcome G answer retains `[UNVERIFIED]` prefix, gets doc label, and retains warning banner below `DOCS_BANNER`; commit entries are never labelled; through `ask()` with `docs_fallback=True`, citing README chunk adds banner, labels line, and logs `log["citation"]["documentation_sources"] = [marker]`; citing only code produces no banner/label and no new log key; with `docs_fallback=False`, answer and log are unchanged; body lines starting with markers above Sources section are not labelled.
+- Note: `checker.py` unchanged, Article VI.3/VI.4 respected, labels only added when `docs_fallback` is on. Documentation opened with `open_file` (with chunk language 'text') is also detected and labelled via file extension matching `retrieval.doc_languages`.
+- **Approved tests:** none change.
+- ACs: Spec 002 S22; Article I.1, I.2, IV.2, V.4, VI.3, VI.4. | Touches: `citation/formatter.py`, `__init__.py`. | Depends on: T22.1, T9.4, T16.1.
+
 ---
 
 ## Completion checklist (spec "definition of done")
