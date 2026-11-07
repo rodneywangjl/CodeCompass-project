@@ -42,8 +42,10 @@ NO_INDEX = ("No index is available for this repository yet, so this question can
 
 def _default_generator(config: OnlineConfig, profile):
     from codecompass.online.generator.llama import LlamaServerGenerator
-    return LlamaServerGenerator(profile, server_url=config.generator.server_url,
-                                timeout_seconds=config.generator.timeout_seconds)
+    generator = LlamaServerGenerator(profile, server_url=config.generator.server_url,
+                                     timeout_seconds=config.generator.timeout_seconds)
+    generator.connect_timeout = config.generator.connect_timeout_seconds  # T19.3
+    return generator
 
 
 _RERANKERS: dict = {}

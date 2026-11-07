@@ -40,6 +40,8 @@ DEFAULT_RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
 DEFAULT_RERANKER_REVISION = "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
 DEFAULT_SERVER_URL = "http://127.0.0.1:8080"
 DEFAULT_TIMEOUT_SECONDS = 120
+# How long the readiness check (the first contact with llama-server) may take (T19.3).
+DEFAULT_CONNECT_TIMEOUT_SECONDS = 5
 DEFAULT_GENERATION_RESERVE_TOKENS = 1024
 DEFAULT_STOP_TOKENS = ("<|im_end|>", "<|endoftext|>")
 DEFAULT_SEED = 42
@@ -122,11 +124,18 @@ class GeneratorConfig:
     default_profile: str = "dev"
     server_url: str = DEFAULT_SERVER_URL
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
+    connect_timeout_seconds: float = DEFAULT_CONNECT_TIMEOUT_SECONDS
     generation_reserve_tokens: int = DEFAULT_GENERATION_RESERVE_TOKENS
     profiles: dict[str, ModelProfile] = field(default_factory=lambda: {
         "dev": ModelProfile(model_id="Qwen2.5-Coder-14B-Instruct"),
         "prod": ModelProfile(model_id="Qwen2.5-Coder-32B-Instruct"),
     })
+
+    def __post_init__(self) -> None:
+        value = self.connect_timeout_seconds
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+            raise ValueError("generator.connect_timeout_seconds must be a number above 0 "
+                             f"(seconds); got {value!r}")
 
 
 @dataclass(frozen=True)

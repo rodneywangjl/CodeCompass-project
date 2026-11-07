@@ -8,6 +8,8 @@
 default_profile = "dev"
 server_url = "http://127.0.0.1:8080"
 timeout_seconds = 120
+# Readiness check (first contact) only; each wait for an answer is bounded by timeout_seconds.
+connect_timeout_seconds = 5
 generation_reserve_tokens = 1024
 
 # Dev generator: Qwen2.5-Coder-14B-Instruct, Q4_K_M, run by llama.cpp

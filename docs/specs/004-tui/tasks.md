@@ -37,7 +37,7 @@ Paths are under `codecompass/online/` and `tests/online/` unless stated.
 - ACs: AC-3.1. | Touches: `online/config.py`, `tui.py`, `tests/online/test_tui_layers_t21.py`. | Depends on: T1.4.
 
 **T2.2 Streaming in the generator**
-- Tests first (mocked HTTP): with a callback, the request has `stream: true` and each delta reaches the callback in order; the returned text equals the concatenation; without a callback the request and result are unchanged; a stream that cannot be opened falls back to one normal call; a dropped stream raises a clear error.
+- Tests first (mocked HTTP): with a callback, the request has `stream: true` and each delta reaches the callback in order; the returned text equals the concatenation; without a callback the request also streams (`stream: true`, amended by T19.3 so the timeout bounds each wait, not the whole answer) and the returned text is the full answer; a stream that cannot be opened falls back to one normal call; a dropped stream raises a clear error.
 - ACs: AC-2.5. | Touches: `online/generator/llama.py`, `online/generator/server.py` if needed, `tests/support/fake_http.py`, `tests/online/test_stream_generator_t22.py`. | Depends on: none.
 
 **T2.3 Draft through the harness and `ask()`**

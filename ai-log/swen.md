@@ -72,3 +72,15 @@ Checked the result: python -m codecompass.offline.cli check ~/scratch/longline2.
 Result: the index completed with fallback=1, non_code=0, chunks added=12, and consistent: True (12 chunks agree). The tokenizer warning (42352 > 8192) appeared during counting, as expected. Indexing took about 8 minutes, mostly in the embedding step.
 ### What I kept or changed
 Before any implementation, I corrected two of my own tests (a wrong line number, and a test that reached the wrong code path) and added two tests for the long line starting its own window and for short lines before it inside a function. Added one fix beyond the list: the fallback chunker's last chunk reported an end line one past the end of the file, which the lines-after test exposed; clamped it. The tree-sitter lines-before-a-long-line test passes before the fix, so it guards behaviour rather than failing. Did not push or open a PR.
+
+## 2026-11-08 · ask streams every answer, so the timeout is per wait (T19.3)
+- **Tool (model):** Claude Code (claude-haiku-5-5)
+- **Files:** codecompass/online/generator/llama.py, codecompass/online/config.py, codecompass/online/__init__.py, codecompass/online/tui.py, codecompass.toml, tests/online/test_ask_stream_timeout_t193.py, tests/online/test_stream_generator_t22.py, docs/specs/002-online-retrieval/tasks.md, docs/specs/004-tui/tasks.md, docs/specs/004-tui/plan.md, ai-log/swen.md
+- **Outcome:** Changed
+### What I asked for
+Stop `ask` timing out on slow machines: the non-streaming call without a callback capped the whole answer at `timeout_seconds`. Always stream, add a connect timeout for the first contact with the server, keep the payload and answer unchanged.
+### How I checked it
+`pytest tests/online/test_ask_stream_timeout_t193.py tests/online/test_stream_generator_t22.py -v`
+Ran all the tests for commits to the branch and verified that all tests passed. Ran the full required suite with `pytest -m "not model"` on cluster as well as local computer.
+### What I kept or changed
+Amended Spec 004 T2.2 and the plan, which said the request is unchanged without a callback (you chose this). Changed two approved stream tests to expect `stream: true` on every call, and one fixture so its stream matches its reply (needs reviewer sign-off, Article IX.3). The connect timeout bounds only the readiness check, because urllib cannot set a connect timeout separately from the wait for the answer. The value is set after construction so the approved TUI fakes keep their constructor. The existing `timeout_seconds` is still not validated; only the new value is.
