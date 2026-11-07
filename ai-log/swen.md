@@ -57,3 +57,14 @@ Clean up the cluster notebook using the fixes from the run, so it works in order
 Read through notebook and run it to ensure it works on GPU cluster.
 ### What I kept or changed
 Rewrote the notebook in run order: login steps, paths and config, one-time setup, server, index, questions, tool tests, checks and stop. Kept the layered config loader, so the user config file is read. Removed the config-swap test cell, which left the user config on CPU settings when a question failed. Added the account and data rules from scis_tech. Checked that the notebook has no passwords. Not committed.
+
+## 2026-11-07 · Repeated tool calls are not run again (T19.4)
+- **Tool (model):** Claude Code (claude-haiku-5-5)
+- **Files:** codecompass/online/agent/harness.py, tests/online/test_repeated_tool_calls_t194.py, tests/online/test_harness_round_limit_t83.py, docs/specs/002-online-retrieval/tasks.md, ai-log/swen.md
+- **Outcome:** Changed
+### What I asked for
+Re-test whether a repeated tool call (same tool and arguments in one question) still wastes a round after T19.1. If it does, stop it from running again, tell the model to use the earlier result, log the repeat, and decide whether a repeat counts against `max_verifier_rounds`.
+### How I checked it
+TODO (Swen)
+### What I kept or changed
+The probe showed the cache stopped re-execution but the repeat still used a round, and the model got the full result again. Decided a repeat counts against the limit (Article V.1: the loop must stay bounded). The round-limit test T8.3 fed the same call every round, so it had to change to distinct calls; the assertions are unchanged, and it needs reviewer sign-off (Article IX.3). Evaluation must be re-run before results are reported (Article VII.5).
