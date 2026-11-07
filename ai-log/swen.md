@@ -80,6 +80,7 @@ Before any implementation, I corrected two of my own tests (a wrong line number,
 ### What I asked for
 Stop `ask` timing out on slow machines: the non-streaming call without a callback capped the whole answer at `timeout_seconds`. Always stream, add a connect timeout for the first contact with the server, keep the payload and answer unchanged.
 ### How I checked it
-TODO (Swen)
+`pytest tests/online/test_ask_stream_timeout_t193.py tests/online/test_stream_generator_t22.py -v`
+Ran all the tests for commits to the branch and verified that all tests passed. Ran the full required suite with `pytest -m "not model"` on cluster as well as local computer.
 ### What I kept or changed
 Amended Spec 004 T2.2 and the plan, which said the request is unchanged without a callback (you chose this). Changed two approved stream tests to expect `stream: true` on every call, and one fixture so its stream matches its reply (needs reviewer sign-off, Article IX.3). The connect timeout bounds only the readiness check, because urllib cannot set a connect timeout separately from the wait for the answer. The value is set after construction so the approved TUI fakes keep their constructor. The existing `timeout_seconds` is still not validated; only the new value is.
