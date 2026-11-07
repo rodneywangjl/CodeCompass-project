@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import re
 from dataclasses import dataclass, field
 
 from codecompass.online.agent.cache import ToolCache
@@ -89,6 +90,15 @@ def _attr(value) -> str:
     return str(value).replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
 
 
+# A "<" that would open or close a tool_result block (T21.2).
+_WRAPPER_TAG = re.compile(r"<(?=\s*/?\s*tool_result)", re.I)
+
+
+def _body(text: str) -> str:
+    """Repo text cannot end the block or forge another one; nothing else changes."""
+    return _WRAPPER_TAG.sub("&lt;", text)
+
+
 def tool_result_message(call, output: ToolOutput) -> str:
     """The D16 wrapper; a git tool's empty history is said plainly (Article V.5)."""
     attrs = "".join(f' {k}="{_attr(v)}"' for k, v in {"tool": call.tool, **call.args}.items())
@@ -101,7 +111,7 @@ def tool_result_message(call, output: ToolOutput) -> str:
             body += f" lines {call.args['lines']}"
     else:
         body = output.text
-    return f"<tool_result{attrs}>\n{body}\n</tool_result>"
+    return f"<tool_result{attrs}>\n{_body(body)}\n</tool_result>"
 
 
 def malformed_result_message(block: str) -> str:
