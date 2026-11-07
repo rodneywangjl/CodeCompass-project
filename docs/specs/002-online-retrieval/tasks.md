@@ -339,6 +339,13 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - **Approved tests:** none change.
 - ACs: Article III.6, V.2, VI.1, X.4; plan D6, D18. | Touches: `agent/tools.py`, `agent/harness.py`, `__init__.py`, plan D6, `tests/online/test_open_file_excluded_t211.py`. | Depends on: T14.3, T19.1.
 
+**T21.2 Repo text cannot close a `<tool_result>` block**
+- Gap (guardrails #5, the part that needs no prompt change): `tool_result_message` escapes the wrapper's attributes but puts the body in as it is. A file, chunk or commit message containing `</tool_result>` ends the block early, so the text after it reaches the model as if it came from outside the tool result, and a `<tool_result ...>` inside it looks like a second result the harness never produced.
+- Rule: in every tool result's body (all four tools, error results, and the "No commit history found" text), each `<` that starts `<tool_result` or `</tool_result` (any case, optional spaces after `<` and `/`) is written as `&lt;`. Nothing else in the body changes, nothing is removed, and the evidence the citation checker uses (the result's `chunks` and `commits`) is untouched. The prompt is unchanged: a rule telling the model not to follow instructions in repo text is a separate question (spec C1, `[NEEDS CLARIFICATION]`).
+- Tests first (`tool_result_message` directly, then `ask` with stubs on a small fixture repo): a body containing `</tool_result>` gives a message with exactly one closing tag, at the end, and the text after the tag is still there; a body containing `<tool_result tool="git_log">` gives a message with exactly one opening tag, at the start; upper-case and spaced variants are escaped too; the same holds for each of the four tools, for an error result and for the "No commit history found" text; ordinary code with `<`, `&`, `<toolbar>` and the bare word `tool_result` comes back unchanged; through `ask`, `open_file` on a committed file containing the tag gives one closing tag and the answer citing those lines is still F; `git_log` on a file whose commit subject contains the tag gives one closing tag.
+- **Approved tests:** none change.
+- ACs: Article I.1, V.3; plan D16. | Touches: `agent/harness.py`, plan D16, `tests/online/test_tool_result_escape_t212.py`. | Depends on: T8.5, T19.1.
+
 ---
 
 ## Completion checklist (spec "definition of done")
