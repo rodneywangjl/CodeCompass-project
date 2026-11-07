@@ -25,6 +25,9 @@ DEFAULT_FINAL_K = 8
 # (0.0014, 0.0058) and the lowest of six answerable ones (0.061). Re-check with the evaluation set.
 DEFAULT_MIN_TOP_SCORE = 0.02
 DEFAULT_CLOSEST_FILES = 3
+DEFAULT_DOCS_FALLBACK = False
+DEFAULT_DOC_LANGUAGES = ("md", "rst")
+DEFAULT_DOCS_MARGIN = 0.2
 
 # Verifier tools defaults (Article V.1, Plan §7)
 MAX_VERIFIER_ROUNDS = 3
@@ -58,6 +61,9 @@ class RetrievalConfig:
     final_k: int = DEFAULT_FINAL_K
     min_top_score: float = DEFAULT_MIN_TOP_SCORE
     closest_files: int = DEFAULT_CLOSEST_FILES
+    docs_fallback: bool = DEFAULT_DOCS_FALLBACK
+    doc_languages: tuple[str, ...] = DEFAULT_DOC_LANGUAGES
+    docs_margin: float = DEFAULT_DOCS_MARGIN
 
     def __post_init__(self) -> None:
         score = self.min_top_score
@@ -69,6 +75,19 @@ class RetrievalConfig:
         if isinstance(count, bool) or not isinstance(count, int) or count < 0:
             raise ValueError(f"retrieval.closest_files must be a whole number, 0 or more; "
                              f"got {count!r}")
+        fallback = self.docs_fallback
+        if not isinstance(fallback, bool):
+            raise ValueError(f"retrieval.docs_fallback must be a bool; got {fallback!r}")
+        langs = self.doc_languages
+        if (isinstance(langs, bool) or not isinstance(langs, tuple) or not langs
+                or not all(isinstance(x, str) and x for x in langs)):
+            raise ValueError(f"retrieval.doc_languages must be a non-empty tuple of "
+                             f"non-empty strings; got {langs!r}")
+        margin = self.docs_margin
+        if (isinstance(margin, bool) or not isinstance(margin, (int, float))
+                or not 0 <= margin <= 1):
+            raise ValueError(f"retrieval.docs_margin must be a number from 0 to 1; "
+                             f"got {margin!r}")
 
 
 RERANKER_DTYPES = ("float32", "float16")
@@ -220,7 +239,9 @@ def load_online_config(path: str | pathlib.Path | None) -> OnlineConfig:
 def _build_online_config(raw: dict[str, Any], anchor: pathlib.Path | None) -> OnlineConfig:
     """Validate parsed TOML *raw* into an :class:`OnlineConfig` (relative paths use *anchor*)."""
     # 1. Retrieval
-    retrieval_raw = raw.get("retrieval", {})
+    retrieval_raw = dict(raw.get("retrieval", {}))
+    if "doc_languages" in retrieval_raw and isinstance(retrieval_raw["doc_languages"], list):
+        retrieval_raw["doc_languages"] = tuple(retrieval_raw["doc_languages"])
     retrieval = RetrievalConfig(**retrieval_raw)
 
     # 2. Reranker

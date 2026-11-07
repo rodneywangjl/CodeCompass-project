@@ -62,6 +62,12 @@ _FORMAT_HINT = """Write one tool call on its own, with keyword arguments, exactl
 <tool>git_blame(path="file/path.py", lines="X-Y")</tool>
 <tool>git_log(path="file/path.py", n=10)</tool>"""
 
+DOCS_NOTE = (
+    "Some of the context below is documentation (marked | md or | rst), not code. Code is the "
+    "source of truth; documentation may be out of date. If documentation and code disagree, "
+    "trust the code and say so. Say when part of your answer comes from documentation."
+)
+
 FINAL_MESSAGE = ("Tool limit reached: no more tools are available. Answer now, using "
                  "only the evidence above, and state what you could not determine.")
 
@@ -78,11 +84,13 @@ def system_prompt(*, tools_enabled: bool) -> str:
     return f"{intro}\n\nRules:\n{numbered}"
 
 
-def user_message(question: str, chunks: list, *, tools_enabled: bool = False) -> str:
+def user_message(question: str, chunks: list, *, tools_enabled: bool = False,
+                 docs: bool = False) -> str:
     """The question, then the retrieved chunks as plain text (Plan D3); with
     tools, the tool check closes the message (T20.1)."""
     context = format_context(chunks) if chunks else "(none retrieved)"
-    message = f"Question: {question}\n\nCode context:\n\n{context}"
+    prefix = f"Question: {question}\n\n{DOCS_NOTE}\n\n" if docs else f"Question: {question}\n\n"
+    message = f"{prefix}Code context:\n\n{context}"
     return f"{message}\n\n{TOOL_CHECK}" if tools_enabled else message
 
 
@@ -217,7 +225,8 @@ def _generate(generator, messages: list[dict], on_draft) -> str:
 
 
 def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: int,
-              tools_enabled: bool = True, on_draft=None, on_tool=None) -> AgentRun:
+              tools_enabled: bool = True, docs: bool = False, on_draft=None,
+              on_tool=None) -> AgentRun:
     """Answer, running at most *max_rounds* tool calls, one per round (Plan D15).
 
     *on_draft*, if given, receives the model's text as it is written (Spec 004 US2).
@@ -226,7 +235,8 @@ def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: i
     """
     messages = [{"role": "system", "content": system_prompt(tools_enabled=tools_enabled)},
                 {"role": "user", "content": user_message(question, chunks,
-                                                         tools_enabled=tools_enabled)}]
+                                                         tools_enabled=tools_enabled,
+                                                         docs=docs)}]
     run = AgentRun(answer="", messages=messages)
     tool_runs = 0
     first_round: dict[str, int] = {}  # call key -> the round it first ran in (T19.4)

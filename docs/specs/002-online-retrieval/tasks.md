@@ -356,6 +356,20 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - **Approved tests:** none change.
 - ACs: Article III.6, V.2, VI.1, X.4; plan D6, D18. | Touches: `agent/tools.py`, `agent/harness.py`, `__init__.py`, plan D6, `tests/online/test_open_file_excluded_t211.py`. | Depends on: T14.3, T19.1.
 
+## S22: Docs as context (dev test problem 10; guardrails #8)
+
+**T22.1 Code first, docs when asked, better or needed**
+- Tests first (stub embedder and re-ranker, `ask` on fixture repo with Python code and README.md): flag off (default) preserves existing retrieval chunks and audit log; flag on with code passing gate and doc score below code + margin sends only code chunks; flag on with question mentioning documentation keywords ("README", "docs", ".md", etc.) sends docs with code and adds DOCS_NOTE before code context; flag on with doc score >= code score + margin sends docs with code; margin boundary checks (exact margin counts as better, just below does not); flag on with code failing gate but docs passing sends only docs; flag on with neither passing refuses without generator calls; cited doc chunks are verified (outcome F); DOCS_NOTE is absent when no doc chunk is sent; D4 token prefix counts DOCS_NOTE when docs are sent; asks_about_docs checks whole words and extensions without false positives; config defaults and validation for docs_fallback, doc_languages, and docs_margin; flag on with no doc files sends only code; flag on with only docs sends doc chunks and logs code_failed with best_code=None.
+- Limitations: (1) the keyword index has no language field, so doc chunks are filtered after retrieval and can take some shortlist slots when docs are indexed; a separate doc index needs a schema change (future work). (2) search_again is unchanged. (3) docs_margin 0.2 is a starting value, to be chosen with the evaluation after the baseline (Article VII.5); the default stays off.
+- **Approved tests:** none change.
+- ACs: Spec 002 S22; Article I.1, I.2, IV.2, V.4, VI.4. | Touches: `config.py`, `agent/harness.py`, `__init__.py`, `tests/online/test_docs_fallback_t221.py`. | Depends on: T15.1, T20.1.
+
+**T22.2 Label documentation sources**
+- Tests first (unit tests on `mark_documentation` and `ask` with fixture repo and stub reranker/generator): verified doc source gets ` (documentation)` label appended to its Sources line and `DOCS_BANNER` prepended at the top; code source in same answer is not labelled; multiple doc sources are all labelled and banner appears once with sorted markers returned; no doc sources returns text unchanged and empty list; unverified doc source in outcome G answer retains `[UNVERIFIED]` prefix, gets doc label, and retains warning banner below `DOCS_BANNER`; commit entries are never labelled; through `ask()` with `docs_fallback=True`, citing README chunk adds banner, labels line, and logs `log["citation"]["documentation_sources"] = [marker]`; citing only code produces no banner/label and no new log key; with `docs_fallback=False`, answer and log are unchanged; body lines starting with markers above Sources section are not labelled.
+- Note: `checker.py` unchanged, Article VI.3/VI.4 respected, labels only added when `docs_fallback` is on. Documentation opened with `open_file` (with chunk language 'text') is also detected and labelled via file extension matching `retrieval.doc_languages`.
+- **Approved tests:** none change.
+- ACs: Spec 002 S22; Article I.1, I.2, IV.2, V.4, VI.3, VI.4. | Touches: `citation/formatter.py`, `__init__.py`. | Depends on: T22.1, T9.4, T16.1.
+
 ---
 
 ## Completion checklist (spec "definition of done")
