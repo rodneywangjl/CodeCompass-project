@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
+import posixpath
 import re
 import time
 from pathlib import Path
@@ -273,12 +274,22 @@ def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None =
         with timed(log, "citation_check"):
             result = checker.check(answer, chunks, commits)
         rendered = formatter.render(result)
+        if config.retrieval.docs_fallback:
+            doc_paths = {c.path for c in chunks
+                         if c.language in config.retrieval.doc_languages
+                         or posixpath.splitext(c.path)[1].lstrip(".").lower()
+                            in config.retrieval.doc_languages}
+            rendered, doc_sources = formatter.mark_documentation(rendered, result, doc_paths)
+        else:
+            doc_sources = []
         if stale:
             rendered = f"{STALE_WARNING}\nReason: {reason}\n\n{rendered}"
         log["citation"] = {"outcome": result.outcome, "unverified": list(result.unverified)}
         # only when there are some: the record of an ordinary answer is pinned
         if result.unreferenced:
             log["citation"]["unreferenced"] = list(result.unreferenced)
+        if doc_sources:
+            log["citation"]["documentation_sources"] = doc_sources
     except BaseException as exc:  # also Ctrl-C: a failed question is still audited (T18.1)
         log["error"] = {"type": type(exc).__name__, "message": str(exc)}
         log["timings"]["total"] = time.perf_counter() - started
