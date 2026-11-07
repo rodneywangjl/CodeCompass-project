@@ -327,8 +327,9 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - Bug (re-test after T19.1, reproduced): the per-query cache stopped a repeated call from running twice, but the repeat still used a round, and the model got the full result again with no note that it had already been run.
 - Decision (Article V.1, plan D14): a repeat counts against `max_verifier_rounds`. V.1 says tools run at most that many times and the loop must stay bounded; a free repeat could be requested forever. This matches the malformed-call rule (a malformed attempt uses a round, T8.6). Unchanged in count, so the only behaviour change is that the repeat is not run and says so.
 - Tests first (scripted stub generator, `FakeTools`, `run_agent`): a repeated call runs once and adds no commit records; the model's next message is a `<tool_result>` saying the call was already run in round N and to use the result from round N, with no "No commit history" line; a call with different arguments still runs; the audit entry has `cache_hit` true, `result_summary` "already run in round 0" and `repeat_of` 0; a repeat uses one round of the limit (`round_limit_hit`, the other call never runs).
+- **Approved test change (needs reviewer sign-off, Article IX.3):** `test_harness_round_limit_t83.py` (T8.3) fed the same `git_log` call in every round, so the second round became a repeat and the limit was no longer tested. Each round now asks for a distinct call (`n` varies); the assertions are unchanged.
 - **Evaluation:** this changes agent behaviour. The evaluation must be re-run before any result is reported (Article VII.5).
-- ACs: AC-3.1, 3.6; Article I.2, V.1, V.4; plan D14. | Touches: `agent/harness.py`, `tests/online/test_repeated_tool_calls_t194.py`, `ai-log/swen.md`, this entry. | Depends on: T19.1, T8.2.
+- ACs: AC-3.1, 3.6; Article I.2, V.1, V.4; plan D14. | Touches: `agent/harness.py`, `tests/online/test_repeated_tool_calls_t194.py`, `tests/online/test_harness_round_limit_t83.py` (approved test, sign-off above), `ai-log/swen.md`, this entry. | Depends on: T19.1, T8.2.
 
 ## S20: Tool-use prompt (dev test, 2 Nov 2026, problem 3; plan D14, tool check)
 

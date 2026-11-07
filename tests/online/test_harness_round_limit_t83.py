@@ -8,6 +8,8 @@ Contract under test (Spec AC-3.1, AC-3.9, FR-6; Plan D15; Article V.1 as of 1.3.
     still asks for a tool, the final call); round_limit_hit is True; the log has
     every tool round plus a final_call entry
   - only the first <tool> block in a response runs; the rest are logged
+  - T19.4: each round asks for a different call (n varies), so every round runs a
+    tool; a repeat is not run again and would not test the limit
 """
 
 import pytest
@@ -21,7 +23,8 @@ FINAL = TOOL_CALL_LOG + "\nRetries come from MAX_RETRIES."
 
 @pytest.mark.parametrize("limit", [3, 1, 5])
 def test_limit_runs_that_many_tools_then_one_final_call(limit):
-    gen = StubGenerator([TOOL_CALL_LOG] * (limit + 1) + [FINAL])
+    distinct = [f'<tool>git_log(path="src/auth.py", n={n})</tool>' for n in range(1, limit + 2)]
+    gen = StubGenerator(distinct + [FINAL])
     tools = FakeTools()
     run = harness.run_agent(gen, "Why?", CHUNKS, run_tool=tools, max_rounds=limit)
     assert len(tools.calls) == limit
