@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import posixpath
 import re
 import subprocess
@@ -198,14 +199,27 @@ def _outline(commit: str, path: str, entries) -> ToolOutput:
                             f'Read code with open_file(path="{path}", lines="X-Y").'))
 
 
+def is_excluded(path: str, patterns=(), dirs=()) -> bool:
+    """The indexer's name and directory rules (Article III.6), without its
+    size, binary and non-code skips, so docs stay readable (Plan D6 item 6)."""
+    parts = path.split("/")
+    return (any(fnmatch.fnmatchcase(parts[-1], p) for p in patterns)
+            or any(part in dirs for part in parts))
+
+
 def open_file(repo, commit: str, path, lines=None, *, max_tokens: int, count_tokens,
-              symbols=None) -> ToolOutput:
+              symbols=None, exclude_patterns=(), exclude_dirs=()) -> ToolOutput:
     """Lines of *path* at *commit* as a citable chunk, or an outline (Plan D18).
 
     A range that does not fit *max_tokens* is cut to whole lines from its start,
     with a marker saying how to continue; the chunk covers only the lines shown.
+    A file the indexer excludes is refused, and none of its text is returned.
     """
     path = validate_path(repo, commit, path)
+    if is_excluded(path, exclude_patterns, exclude_dirs):
+        raise ToolArgumentError(
+            f"{path} is excluded from indexing (secrets, keys, vendored or build "
+            "files) and cannot be opened")
     if lines is None:
         return _outline(commit, path, symbols(path) if symbols else [])
     text_lines = _file_lines(repo, commit, path)
@@ -285,13 +299,16 @@ class ToolContext:
 
     handles, reranker and retrieval are None when there is no index (search_again
     is then unavailable). seen holds the chunk ids already in context; every chunk
-    a tool returns is added, so search_again never repeats one.
+    a tool returns is added, so search_again never repeats one. exclude_patterns
+    and exclude_dirs are the indexer's ignore rules, which open_file refuses.
     """
     count_tokens: object
     handles: object = None
     reranker: object = None
     retrieval: object = None
     seen: set = field(default_factory=set)
+    exclude_patterns: tuple = ()
+    exclude_dirs: tuple = ()
 
 
 # The dispatch table is the allow list (Article V.2): config cannot widen it.
@@ -346,7 +363,9 @@ def _code_tool(repo, commit: str, call, settings, context) -> ToolOutput:
         symbols = handles.vector.symbols_for_path if handles is not None else None
         return open_file(repo, commit, args.get("path"), args.get("lines"),
                          max_tokens=settings.max_tool_output_tokens,
-                         count_tokens=context.count_tokens, symbols=symbols)
+                         count_tokens=context.count_tokens, symbols=symbols,
+                         exclude_patterns=context.exclude_patterns,
+                         exclude_dirs=context.exclude_dirs)
     if handles is None or context.reranker is None or context.retrieval is None:
         return ToolOutput(text="error: search_again is not available: no index is open",
                           error=True)

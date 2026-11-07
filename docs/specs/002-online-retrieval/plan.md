@@ -195,6 +195,7 @@ The harness uses a regex to extract tool calls. If no `<tool>...</tool>` block i
 3. `lines` (if present) must be `N` or `N-M` with `1 ≤ N ≤ M ≤` the file's line count at the indexed commit.
 4. `n` (git_log) must be an integer from 1 to `git_log_limit`.
 5. Rejected arguments produce a tool-error message appended to context (the model sees the rejection and can try differently). A rejected call still uses up its round, so a model that keeps sending bad calls still terminates (Article V.1).
+6. `open_file` refuses a path whose file name matches `files.exclude_patterns` or that has a directory in `files.exclude_dirs` (the indexer's ignore list, Article III.6), with and without `lines`, and returns none of the file's text (T21.1). The indexer's size, binary and non-code skips do not apply, so docs such as a README stay readable. `git_blame` and `git_log` are not restricted: they return commit metadata, not file text.
 
 **D7. Tool execution.** Both tools run via `subprocess.run` with `capture_output=True`, `shell=False`, `cwd=repo_path`, and a timeout. The harness builds the argument list; the model never controls the command line.
 

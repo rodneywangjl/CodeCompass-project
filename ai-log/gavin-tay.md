@@ -61,3 +61,14 @@ Read the new prompt in harness.py and checked that the tool decision is now rule
 Ran B2 from the report ("Why does the hold expiry warning default to 240 hours?") with the real model: SPM_TajMahal at 4957ad2, profile dev-7b, rag_tools mode, CPU only, about 30 minutes. Before the change it made 0 tool calls. After, it made 1 (`search_again(query="hold warning default")`), and I saw the result reach the model in the `<tool_result>` block. So the model now uses tools, but it picked a code search instead of git_log for a why question. The answer was still circular ("240 because the constant is 240") and had no citations. The missing markers are report problem 4, left for T20.2. B2 is better but not fixed.
 ### What I kept or changed
 Brought back the tool-prompt work started before the test report was fixed, renumbered from T17.1 to T20.1 (task numbers agreed in the team), and updated the plan D14 rationale now that T19.1 has fixed the hidden tool results. Tests first: 16 fail on the current prompt, 8 cover behaviour that must not change (the tools-off prompt and configuration (b)). The approved T8.5 prompt test is updated to the new prompt and needs reviewer sign-off.
+
+## 2026-11-07 · T21.1 open_file refuses files the indexer excludes
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/online/agent/tools.py, codecompass/online/agent/harness.py, codecompass/online/__init__.py, tests/online/test_open_file_excluded_t211.py, docs/specs/002-online-retrieval/plan.md, docs/specs/002-online-retrieval/tasks.md
+- **Outcome:** Changed
+### What I asked for
+Start on the guardrails list (docs/guardrails-todo.md). The first real gap was item 10: `open_file` only checked that a file existed at the indexed commit, so a committed `.env` or private key was sent to the model, and citing it came out as F. The indexer's ignore list (Article III.6) kept such files out of the index but not out of the tools.
+### How I checked it
+TODO (member)
+### What I kept or changed
+Added S21 and task T21.1 to Spec 002 and item 6 to plan D6. Wrote 9 tests first, through `ask()` with stubs: 6 failed on the bug (the secret, the key and a node_modules file all reached the model, and citing `.env` was F), 3 cover behaviour that must stay (code and README still open; a file only refused when config says so). The refusal uses only the indexer's name patterns and excluded directories from config, not its size, binary or non-code skips, so docs stay readable. git_blame and git_log are unchanged because they return commit metadata, not file text. No approved test changed. Full suite: 1189 passed, 1 failed: `test_question_set_t11.py::...[not-git]` also fails without this change, because `C:\Users\gavin` is itself a git repository on this machine.

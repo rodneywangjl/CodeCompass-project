@@ -113,14 +113,18 @@ def malformed_result_message(block: str) -> str:
 
 
 def make_tool_runner(repo, commit: str, settings, count_tokens, *, handles=None,
-                     reranker=None, retrieval=None, seen=None):
+                     reranker=None, retrieval=None, seen=None, exclude_patterns=(),
+                     exclude_dirs=()):
     """execute() at the indexed commit, capped (D4) and cached per query (D8).
 
     handles, reranker and retrieval let search_again search the index; seen holds
-    the ids of chunks already in context (Plan D18).
+    the ids of chunks already in context (Plan D18). open_file refuses files that
+    match exclude_patterns or exclude_dirs (Plan D6 item 6).
     """
     context = ToolContext(count_tokens=count_tokens, handles=handles, reranker=reranker,
-                          retrieval=retrieval, seen=set(seen or ()))
+                          retrieval=retrieval, seen=set(seen or ()),
+                          exclude_patterns=tuple(exclude_patterns),
+                          exclude_dirs=tuple(exclude_dirs))
 
     def run(call):
         return cap_output(execute(repo, commit, call, settings=settings, context=context),
