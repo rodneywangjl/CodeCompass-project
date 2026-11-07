@@ -57,3 +57,14 @@ Clean up the cluster notebook using the fixes from the run, so it works in order
 Read through notebook and run it to ensure it works on GPU cluster.
 ### What I kept or changed
 Rewrote the notebook in run order: login steps, paths and config, one-time setup, server, index, questions, tool tests, checks and stop. Kept the layered config loader, so the user config file is read. Removed the config-swap test cell, which left the user config on CPU settings when a question failed. Added the account and data rules from scis_tech. Checked that the notebook has no passwords. Not committed.
+
+## 2026-11-07 · Split over-long lines in the chunkers (T11.1)
+- **Tool (model):** Claude Code (claude-haiku-5-5)
+- **Files:** codecompass/offline/chunking/sizing.py, codecompass/offline/chunking/fallback.py, codecompass/offline/chunking/treesitter.py, tests/offline/test_long_line_t111.py, docs/specs/001-offline-indexing/tasks.md, ai-log/swen.md
+- **Outcome:** Changed
+### What I asked for
+Fix the GPU cluster bug on branch `fix/chunker-long-lines`: a single source line over the hard max crashed the fallback chunker (a `TypeError` from joining the embedder's token ids) and was emitted whole by the tree-sitter chunker. Write the failing tests first, add a T11.1 entry to the Spec 001 tasks, and split such lines by characters, re-counted with the real tokenizer.
+### How I checked it
+TODO (Swen)
+### What I kept or changed
+Before any implementation, I corrected two of my own tests (a wrong line number, and a test that reached the wrong code path) and added two tests for the long line starting its own window and for short lines before it inside a function. Added one fix beyond the list: the fallback chunker's last chunk reported an end line one past the end of the file, which the lines-after test exposed; clamped it. The tree-sitter lines-before-a-long-line test passes before the fix, so it guards behaviour rather than failing. Did not push or open a PR.
