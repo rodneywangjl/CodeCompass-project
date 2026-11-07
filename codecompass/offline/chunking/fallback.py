@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .ids import chunk_id
-from .sizing import SizePolicy, classify_size, count_tokens
+from .sizing import SizePolicy, classify_size, count_tokens, split_long_line
 from codecompass.offline.models import Chunk, ChunkMode
 
 
@@ -61,19 +61,16 @@ def chunk(path: str, content: str, commit_sha: str, *,
                         break
                 nxt = break_at
                 break
-            else:  # over_hard_max: force a cut at a line boundary
+            else:  # over_hard_max: the line at nxt does not join this chunk
+                nxt = max(nxt - 1, cur)
                 break
-        if nxt == cur:
-            nxt = cur  # single line at/over hard max: split the line itself
-            words = tokenizer(lines[cur - 1])
-            if len(words) > policy.hard_max_tokens:
-                budget = policy.hard_max_tokens
-                pieces = [" ".join(words[i:i + budget])
-                          for i in range(0, len(words), budget)]
-                for piece in pieces:
-                    take(cur, cur, piece)
-                cur += 1
-                continue
+        nxt = min(nxt, total)  # when every line fits, the loop ends one past the last line
+        if nxt == cur and count_tokens(lines[cur - 1], tokenizer) > policy.hard_max_tokens:
+            # One line over the hard max: split it by characters, never by tokens (T11.1).
+            for piece in split_long_line(lines[cur - 1], tokenizer, policy.hard_max_tokens):
+                take(cur, cur, piece)
+            cur += 1
+            continue
         take(cur, nxt)
         cur = nxt + 1
     return chunks, ChunkMode.FALLBACK
