@@ -126,7 +126,10 @@ def _retrieve_and_answer(handles, repo_path, question, *, config, profile, tools
     runner = make_tool_runner(repo_path, handles.meta.indexed_commit, config.tools,
                               generator.count_tokens, handles=handles, reranker=reranker,
                               retrieval=config.retrieval,
-                              seen={c.chunk_id for c in sent})
+                              seen={c.chunk_id for c in sent},
+                              # the indexer's ignore list also binds open_file (III.6)
+                              exclude_patterns=config.offline.files.exclude_patterns,
+                              exclude_dirs=config.offline.files.exclude_dirs)
     return _agent(generator, question, sent, runner=runner, tools=tools,
                   tools_on=tools_on, log=log, on_draft=on_draft, on_tool=on_tool)
 
