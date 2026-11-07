@@ -323,6 +323,13 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - **Approved test change (needs reviewer sign-off, Article IX.3):** the `test_context_budget_t42.py` module docstring said "the first that does not fit ends it"; it now describes the skip rule. Docstring only: no assertion changes.
 - ACs: AC-2.6; Article I.2, IV.2, VIII.4; plan D4. | Touches: `context.py`, plan D4, the T4.2 entry's wording. | Depends on: T4.2.
 
+**T19.4 A repeated tool call is not run again**
+- Bug (re-test after T19.1, reproduced): the per-query cache stopped a repeated call from running twice, but the repeat still used a round, and the model got the full result again with no note that it had already been run.
+- Decision (Article V.1, plan D14): a repeat counts against `max_verifier_rounds`. V.1 says tools run at most that many times and the loop must stay bounded; a free repeat could be requested forever. This matches the malformed-call rule (a malformed attempt uses a round, T8.6). Unchanged in count, so the only behaviour change is that the repeat is not run and says so.
+- Tests first (scripted stub generator, `FakeTools`, `run_agent`): a repeated call runs once and adds no commit records; the model's next message is a `<tool_result>` saying the call was already run in round N and to use the result from round N, with no "No commit history" line; a call with different arguments still runs; the audit entry has `cache_hit` true, `result_summary` "already run in round 0" and `repeat_of` 0; a repeat uses one round of the limit (`round_limit_hit`, the other call never runs).
+- **Evaluation:** this changes agent behaviour. The evaluation must be re-run before any result is reported (Article VII.5).
+- ACs: AC-3.1, 3.6; Article I.2, V.1, V.4; plan D14. | Touches: `agent/harness.py`, `tests/online/test_repeated_tool_calls_t194.py`, `ai-log/swen.md`, this entry. | Depends on: T19.1, T8.2.
+
 ## S20: Tool-use prompt (dev test, 2 Nov 2026, problem 3; plan D14, tool check)
 
 **T20.1 Tool-use prompt**
