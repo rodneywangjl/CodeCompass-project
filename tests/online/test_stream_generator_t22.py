@@ -5,7 +5,7 @@ Contract under test (Spec 004 AC-2.5; Article VIII.2, streaming only in the wrap
   - with on_text, the chat request carries "stream": true (every other field as
     without it); each text delta reaches on_text in order and the full text is
     returned; events with no text are skipped
-  - without on_text the request and result are exactly as before
+  - without on_text the request streams too (T19.3) and the result is the full text
   - a server that ignores "stream", or refuses it with an HTTP error, falls back to
     one normal call and on_text receives the whole text once
   - a stream that ends without its [DONE] marker, a refused connection and a
@@ -49,7 +49,8 @@ def test_a_callback_makes_the_request_stream_and_changes_nothing_else(monkeypatc
     make(monkeypatch, plain).generate(MESSAGES)
     stream(monkeypatch, streamed)
     (a,), (b,) = chat(plain), chat(streamed)
-    assert b.pop("stream") is True and "stream" not in a
+    # T19.3: every call streams, so the only difference left is "stream" itself.
+    assert a.pop("stream") is True and b.pop("stream") is True
     assert a == b  # messages, temperature, max_tokens, stop, seed, cache_prompt
 
 
@@ -85,7 +86,9 @@ def test_without_a_callback_the_request_and_result_are_unchanged(monkeypatch):
     server = FakeServer(reply="plain", stream=["never", "used"])
     assert make(monkeypatch, server).generate(MESSAGES) == "plain"
     (body,) = chat(server)
-    assert "stream" not in body
+    assert body.pop("stream") is True  # T19.3: streamed without a callback too
+    assert body == {"messages": MESSAGES, "temperature": 0.2, "max_tokens": 512,
+                    "stop": ["<|im_end|>"], "seed": 7, "cache_prompt": False}
 
 
 def test_the_readiness_check_still_runs_before_the_stream(monkeypatch):
