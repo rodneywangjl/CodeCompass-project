@@ -236,6 +236,13 @@ Paths are under `codecompass/offline/` (code) and `tests/offline/` (tests) unles
 - Tests first (`model`): `ensure_current` on a small real repository twice (second run is up to date); consistency check passes; the report's timings are saved to inform the performance target (C6).
 - ACs: whole spec. | Touches: tests only. | Depends on: T10.1, T9.3.
 
+## S11: Long-line fixes (cluster test, 7 Nov 2026)
+
+**T11.1 A line over the hard max is split, never emitted whole or crashed on**
+- Bug (GPU cluster, 7 Nov 2026): (a) `chunking/fallback.py` split an over-long line by joining the tokenizer's output with spaces. With the embedder's tokenizer (`CodeEmbedder.tokenize`) that output is integer ids, so the join raises `TypeError` and indexing fails on that file. The existing test passed only because its stub tokenizer returns strings. (b) `chunking/treesitter.py` emitted a single line over the hard max as one chunk ("emit alone rather than loop"). (c) The window loops in both chunkers could emit a chunk made of short lines followed by a line over the hard max, because the over-hard-max branch did not exclude that line.
+- Tests first: in `tests/offline/test_long_line_t111.py`, using a stub tokenizer that returns ints (one id per character) and a small hard max, for both the fallback and the tree-sitter chunker on a Python file whose function holds one very long line: no `TypeError`, and every chunk counts within the hard max; the pieces of the long line, joined, equal the original line exactly; every piece keeps the long line's line number in its start and end lines; lines before and after the long line are chunked as they are when the file is chunked without them; all chunk ids in a file are unique; a string-returning tokenizer still works; a single character that cannot fit raises a clear error rather than emitting an oversize chunk.
+- ACs: 001 AC-3.3; Article VIII.1, III.4. | Touches: `chunking/sizing.py`, `chunking/fallback.py`, `chunking/treesitter.py`, `tests/offline/test_long_line_t111.py`, this tasks.md entry. | Depends on: T3.4 (oversize splitting), T3.7 (fallback chunker).
+
 ---
 
 ## Completion checklist (spec "definition of done")

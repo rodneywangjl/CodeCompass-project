@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from .ids import chunk_id
 from .registry import language_for_path, spec_for_language
-from .sizing import SizePolicy, classify_size, count_tokens
+from .sizing import SizePolicy, classify_size, count_tokens, split_long_line
 from codecompass.offline.models import Chunk, ChunkMode
 
 _parsers: dict[str, object] = {}
@@ -33,8 +33,14 @@ class _Emitter:
         self.chunks: list[Chunk] = []
 
     def take(self, start: int, end: int, symbol: str | None) -> None:
-        """Take 1-based inclusive [start, end] as one chunk."""
-        text = "\n".join(self.lines[start - 1:end])
+        """Take 1-based inclusive [start, end] as one chunk, windowed if over the hard max."""
+        if classify_size(self.tokens(start, end), self.policy) == "over_hard_max":
+            _windows(self, start, end, symbol)  # VIII.1: never one oversize chunk
+            return
+        self.take_text(start, end, symbol, "\n".join(self.lines[start - 1:end]))
+
+    def take_text(self, start: int, end: int, symbol: str | None, text: str) -> None:
+        """Take 1-based inclusive [start, end] as one chunk whose text is *text*."""
         key = symbol or ""
         index = self.occurrence.get(key, 0)
         self.occurrence[key] = index + 1
@@ -178,11 +184,17 @@ def _windows(emitter: _Emitter, start: int, end: int, symbol: str | None):
                         break
                 nxt = break_at
                 break
-            else:  # over_hard_max: force a cut
+            else:  # over_hard_max: the line at nxt does not join this chunk
+                nxt = max(nxt - 1, cur)
                 break
-        if nxt == cur:
-            nxt = cur  # single line over hard max: emit alone rather than loop
-        emitter.take(cur, nxt, symbol)
+        if nxt == cur and classify_size(emitter.tokens(cur, cur), emitter.policy) == "over_hard_max":
+            # One line over the hard max: split it by characters, never by tokens (T11.1).
+            for piece in split_long_line(emitter.lines[cur - 1], emitter.tokenizer,
+                                         emitter.policy.hard_max_tokens):
+                emitter.take_text(cur, cur, symbol, piece)
+            cur += 1
+            continue
+        emitter.take_text(cur, nxt, symbol, "\n".join(emitter.lines[cur - 1:nxt]))
         cur = nxt + 1
 
 
