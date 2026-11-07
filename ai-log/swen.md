@@ -65,6 +65,10 @@ Rewrote the notebook in run order: login steps, paths and config, one-time setup
 ### What I asked for
 Fix the GPU cluster bug on branch `fix/chunker-long-lines`: a single source line over the hard max crashed the fallback chunker (a `TypeError` from joining the embedder's token ids) and was emitted whole by the tree-sitter chunker. Write the failing tests first, add a T11.1 entry to the Spec 001 tasks, and split such lines by characters, re-counted with the real tokenizer.
 ### How I checked it
-TODO (Swen)
+Ran pytest -m "not model" on macOS (Python 3.12.6): 1,174 passed, 0 failed, 10 deselected (model-marked). The 17 long-line tests (test_long_line_t111.py) cover both the fallback and tree-sitter chunkers for both bugs. Created a scratch repo at ~/scratch/longline2 with two files, each holding one 60,000-character line of random letters and digits: a single long string inside a function, so the tree-sitter chunker handles it and a long line in a file with no tree-sitter grammar, so the fallback chunker handles it. Counted the tokens with the real Jina tokenizer. The long line is 42,352 tokens, far over the 8,192 limit.
+Indexed on a 3090 node with the real GPU embedder: python -m codecompass.offline.cli index ~/scratch/longline2 --embedder code.
+Checked the result: python -m codecompass.offline.cli check ~/scratch/longline2.
+
+Result: the index completed with fallback=1, non_code=0, chunks added=12, and consistent: True (12 chunks agree). The tokenizer warning (42352 > 8192) appeared during counting, as expected. Indexing took about 8 minutes, mostly in the embedding step.
 ### What I kept or changed
 Before any implementation, I corrected two of my own tests (a wrong line number, and a test that reached the wrong code path) and added two tests for the long line starting its own window and for short lines before it inside a function. Added one fix beyond the list: the fallback chunker's last chunk reported an end line one past the end of the file, which the lines-after test exposed; clamped it. The tree-sitter lines-before-a-long-line test passes before the fix, so it guards behaviour rather than failing. Did not push or open a PR.
