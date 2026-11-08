@@ -40,6 +40,43 @@ A deterministic check that a question-set file is in the agreed format and that 
 - **Citations may point at non-code files** (for example a README), because graders read them; **ground truth may not** (AC-1.1a), because the index does not contain them.
 - **Category counts (8 per category, 40 core) are not checked here.** They apply only to the combined, frozen set; a separate task adds them.
 
-## 2. Later sections
+## 2. Retrieval ablations (AC-4.1–4.5, AC-6.1, AC-6.2, AC-6.4)
 
-Runner, retrieval ablations, results files, grading sheet and report: to be planned after Spec 003 §13 is confirmed.
+Measures how often the right file is in the top k, for each retrieval setup, without generating answers. Nothing in `codecompass/online` or `codecompass/offline` changes (FR-3, §13 C4).
+
+### 2.1 Hit-rate maths: `codecompass/eval/hitrate.py`
+
+- A **ranked list** is a list of chunks in rank order, each `{"path", "start_line", "end_line", "score"}`.
+- **k counts chunks, not files** (decision 2026-11-08): retrieval returns chunks and the pipeline sends chunks. A list shorter than k is used as it is.
+- `file_hit(ranked, truth, k) -> bool`: at least one of the first k chunks has the same `path` as a `ground_truth_files` entry (AC-4.4 headline).
+- `line_hit(ranked, truth, k) -> bool`: at least one of the first k chunks has the same path **and** overlaps a ground-truth line range (`start <= truth_end and truth_start <= end`) (AC-4.4 secondary).
+- `hit_rates(rows, ks) -> dict`: for each setup and k, `{"n", "file_hits", "file_rate", "line_hits", "line_rate"}` overall and grouped by `set`, `category` and `complexity` (AC-4.5). A question with no ground truth (unanswerable controls, and the 2 SWE-QA questions without a `.py` file) is left out of `n` and counted under `excluded` (AC-4.1, AC-2.2). A group with `n = 0` has rate `None`, never a division by zero.
+- Standard library only.
+
+### 2.2 Runner: `codecompass/eval/retrieval_run.py`
+
+- `python -m codecompass.eval.retrieval_run FILE [FILE ...] --repo PATH [--config TOML] [--index-dir DIR] [--sent] [--reported] [--out DIR]`
+- Opens the index with `open_index`, as `ask()` does, and for each question with ground truth records four ranked lists, using the pipeline's own functions and the configured retrieval settings:
+  - `vector`: `vector_search(handles.vector, embed_question(handles, q), 10)`
+  - `bm25`: `keyword_search(handles.keyword, q, 10)`
+  - `rrf`: `retrieve(handles, q, config=config.retrieval)` (the re-rank shortlist)
+  - `rrf+rerank`: `rerank_chunks(reranker, q, <rrf chunks>, len(<rrf chunks>))`
+  - Chunk ids become paths and line ranges through `handles.vector.records_for_ids`.
+- k values (AC-4.2): `vector`, `bm25`, `rrf` at 1, 5, 10; `rrf+rerank` at 1, 5 and `sent`.
+- `sent` (only with `--sent`): the re-ranked chunks after `fit_chunks(chunk_budget(...))`, the same budgeting `ask()` applies, counting tokens through `llama-server` `/tokenize` (no generation). Without `--sent` the figure is recorded as not measured, so the rest runs with no server.
+- `--config` and `--index-dir` let the same runner measure another configuration, such as `[chunking] target_tokens = 1024` in a separate index (Rodney's chunk-size experiment), without touching the default index.
+- **Refuses to run** when the index's commit differs from the questions' `repo_commit` (AC-1.2), or when the question files fail `check_question_set`.
+- Writes one results file, `<out>/retrieval-<UTC time>.json` (default `eval/results/`, never `runs/`, AC-6.1), with:
+  - `meta`: CodeCompass commit and whether the working tree was clean; `repo_commit` and the indexed commit; embedder and re-ranker model ids, revisions, device and dtype; the retrieval and chunking settings; the config file path; each question file with its SHA-256; the k values; `label` (`dev` unless `--reported`); start and end times (AC-6.2).
+  - `questions`: per question its id, set, category, complexity, ground truth and the four ranked lists with scores.
+  - `summary`: the output of `hit_rates`.
+- `--reported` refuses to run on a working tree with uncommitted changes; without it the file is labelled `dev` and never used in a reported comparison (AC-6.4).
+
+### 2.3 Design decisions
+
+- **One runner, many configurations:** setups are measured by calling the existing functions, not by adding pipeline flags (§13 C4).
+- **Ranked lists are stored, not just hit counts,** so figures can be recomputed or checked by hand without re-running.
+
+## 3. Later sections
+
+LLM runner, grading sheet and report: to be planned next.
