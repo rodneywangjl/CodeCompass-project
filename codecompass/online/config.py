@@ -192,6 +192,22 @@ class LoggingConfig:
     query_log_dir: str = ""
 
 
+# Prompt options (T19.6). Off by default, so the system prompt is unchanged until it is
+# turned on, and a change to a prompt is a pipeline change under Article VII.5.
+DEFAULT_FORMAT_EXAMPLE = False
+
+
+@dataclass(frozen=True)
+class PromptConfig:
+    """Optional system-prompt additions (Article VIII.1, VII.3): off means today's prompt."""
+    format_example: bool = DEFAULT_FORMAT_EXAMPLE
+
+    def __post_init__(self) -> None:
+        example = self.format_example
+        if not isinstance(example, bool):
+            raise ValueError(f"prompt.format_example must be a bool; got {example!r}")
+
+
 @dataclass(frozen=True)
 class OnlineConfig:
     """Merged configuration for online retrieval and offline stores."""
@@ -201,11 +217,13 @@ class OnlineConfig:
     tools: ToolsConfig = field(default_factory=ToolsConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     pipeline: PipelineConfig = field(default_factory=PipelineConfig)
+    prompt: PromptConfig = field(default_factory=PromptConfig)
     offline: OfflineConfig = field(default_factory=OfflineConfig)
 
 
 _OFFLINE_SECTIONS = {"index", "chunking", "files", "languages", "embedder", "lock"}
-_ONLINE_SECTIONS = {"retrieval", "reranker", "generator", "tools", "logging", "pipeline"}
+_ONLINE_SECTIONS = {"retrieval", "reranker", "generator", "tools", "logging", "pipeline",
+                    "prompt"}
 
 
 def get_generator_profile(config: OnlineConfig, profile_name: str | None = None) -> ModelProfile:
@@ -286,6 +304,7 @@ def _build_online_config(raw: dict[str, Any], anchor: pathlib.Path | None) -> On
     logging = LoggingConfig(**logging_raw)
     pipeline = PipelineConfig(**raw.get("pipeline", {}))
     check_mode(pipeline.mode)
+    prompt = PromptConfig(**raw.get("prompt", {}))
 
     # 6. Offline config merge: pass the parsed sections straight through, so
     # values are never re-serialised and relative paths keep the file's anchor.
@@ -299,6 +318,7 @@ def _build_online_config(raw: dict[str, Any], anchor: pathlib.Path | None) -> On
         tools=tools,
         logging=logging,
         pipeline=pipeline,
+        prompt=prompt,
         offline=offline_cfg,
     )
 

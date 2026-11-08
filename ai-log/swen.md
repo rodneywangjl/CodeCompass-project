@@ -95,3 +95,14 @@ Re-test whether a repeated tool call (same tool and arguments in one question) s
 TODO (Swen)
 ### What I kept or changed
 The probe showed the cache stopped re-execution but the repeat still used a round, and the model got the full result again. Decided a repeat counts against the limit (Article V.1: the loop must stay bounded). The round-limit test T8.3 fed the same call every round, so it had to change to distinct calls; the assertions are unchanged, and it needs reviewer sign-off (Article IX.3). Evaluation must be re-run before results are reported (Article VII.5).
+
+## 2026-11-08 · Citation example in the system prompt behind a config flag (T19.6)
+- **Tool (model):** Claude Code (claude-haiku-5-5)
+- **Files:** codecompass/online/agent/harness.py, codecompass/online/config.py, codecompass/online/__init__.py, tests/online/test_citation_example_t196.py, docs/specs/002-online-retrieval/tasks.md, ai-log/swen.md
+- **Outcome:** Changed
+### What I asked for
+A `[prompt] format_example` flag, off by default. When on, the system prompt gets one short example answer, with `[N]` markers in the body and a Sources section in the format `citation/parser.py` reads, so the model sees the format once. The example must not name a real file. Tests first; the flag loads, layers, rejects a non-boolean, and is recorded in the audit log.
+### How I checked it
+TODO (Swen)
+### What I kept or changed
+The example names an invented file (`example/client.py`) and commit, and the prompt says they are invented. The test checks that the example parses into the entries it shows and that the file does not exist in this repository. Off by default, so the prompt is unchanged until the flag is set. Evaluation must be re-run before any result that uses the flag is reported (Article VII.5). The key is `format_example`, not `citation_example`: the approved test T9.6 (Article VI.2) rejects any config field whose name contains "citation", and the flag does not switch off the checker. I did not add the flag to `codecompass.toml`: `tests/eval/test_eval_config_t52.py` requires the eval config to match the project config, so the default lives only in code.
