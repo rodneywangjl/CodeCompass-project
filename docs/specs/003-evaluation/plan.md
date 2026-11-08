@@ -146,16 +146,23 @@ The chosen ids are written to `eval/questions/grading-subset.json` and **committ
 
 ### 3.6 Automatic labels and grading sheet: `codecompass/eval/grading.py`
 
-- `is_abstention(answer) -> bool`: true for `NO_EVIDENCE`, `NO_INDEX`, or an answer with no `Sources` that says it "could not find" or "could not determine" (AC-7.4). A pre-fill; the grader confirms it.
-- `is_format_slip(row) -> bool`: outcome G, the answer has `Sources`, and `set(unverified) == set(unreferenced)` (`unreferenced` is always a subset of `unverified`). Covers both "no markers at all" and "some markers missing" (AC-7.3).
-- `h1(row) -> bool`: outcome G, not an abstention, not a slip (AC-7.2, AC-7.3). `h1_strict(row)` counts slips too.
-- `citation_accuracy(rows)`: verified ÷ all `Sources` entries (micro average), and the share of answers that are F (AC-7.1).
-- `make_sheet(results_a, results_b, results_c, *, seed)`: one row per subset question in (b) and in (c) (20 + 20), plus one row per **answerable** subset question in (a) (16, for the contamination check, AC-10.1); 56 rows in all. Rows are shuffled together with a fixed seed, and the configuration is replaced by an opaque row id (AC-8.1, AC-8.3). The harness leaves every grader column empty (AC-8.5).
+- `is_abstention(answer) -> bool`: true for `NO_EVIDENCE`, `NO_INDEX`, or an answer with no `Sources` that says it "could not find" or "could not determine" (any case) (AC-7.4). A pre-fill; the grader confirms it. `None` (an errored question) is not an abstention.
+- `labels(row) -> dict` for one result row, all `None` for an errored row:
+  - `format_slip`: outcome G, the answer has sources, and `set(unverified) == set(unreferenced)` (`unreferenced` is always a subset of `unverified`). Covers both "no markers at all" and "some markers missing" (AC-7.3).
+  - `uncited`: no sources and not an abstention. Nothing was fabricated (Article VI.3), so it is **not H1**; the graders judge its claims under H2. **(decided 2026-11-08)**
+  - `h1`: outcome G, not an abstention, at least one unverified marker, and not a slip: a citation that matches nothing, a `[N]` with no entry, or a duplicate marker (AC-7.2, AC-7.3). `h1_strict` is `h1` or a slip.
+- `citation_accuracy(rows)`: verified ÷ all `Sources` entries (micro average), and the share of answers that are F, over the rows without an error (AC-7.1). `None` when there is nothing to divide by.
+- `summary(results)`: per run, `n` (answered), `errors`, `abstentions`, `format_slips`, `uncited`, `h1`, `h1_strict` and the citation accuracy, over **all** questions in the run (automatic metrics cover all 88).
+- `load_results(path)` reads `.json` or `.json.gz`, in case a results file is compressed for size.
+- `make_sheet(results_a, results_b, results_c, question_rows, *, seed, out_dir)`: one row per subset question in (b) and in (c) (20 + 20), plus one row per **answerable** subset question in (a) (16, for the contamination check, AC-10.1); 56 rows in all. Reference answers and citations come from `question_rows`. Rows are shuffled together with `random.Random(seed)` and numbered `R01`, `R02`, …, so the configuration is hidden (AC-8.1, AC-8.3). The harness leaves every grader column empty (AC-8.5). An errored answer is skipped and listed in `key.json`. It refuses results in the wrong slot (for example a `rag_tools` run given as (b)) or runs whose conditions differ (all `run_meta` groups except `host`, plus `docs_fallback`, `label`, the question files and the subset) (AC-5.3).
+- `python -m codecompass.eval.grading --a FILE --b FILE --c FILE --questions FILE... --seed N --out DIR` writes the sheet folder and `summary.json` (the summary for each run) and prints the folder.
+- Row files leave out the system prompt: it is the same fixed text for every answer of a configuration, and it differs when tools are on, so it would reveal the configuration (AC-8.3). Tool results in `rag_tools` rows can still reveal it; the sheet and file names never name it, and the report states this limitation.
 - (a) rows are graded for the score only: their H2 and H3 cells are pre-filled `n/a` (no retrieved context to check claims against), and their H1 / slip labels are left out of the hallucination figures, which use (b) and (c) only (§5 "Configuration (a)").
 - Output, in `eval/results/grading-<UTC time>/`:
-  - `sheet.csv`: one short row per answer: row id, question id, category, tag, pre-filled H1 / slip / abstention labels, the name of the row's Markdown file, and empty columns for each grader (H2, H3, score, reason; H2 and H3 `n/a` for (a) rows).
+  - `sheet.csv`: one short row per answer: row id, question id, category, tag, set, pre-filled abstention / slip / uncited / H1 labels (`yes`/`no`; slip and H1 `n/a` for (a) rows), the name of the row's Markdown file, and for each grader (`nicole_`, `kelsey_`) H2, H3, score and reason, empty except H2 and H3 `n/a` for (a) rows and H3 `n/a` for answerable questions.
   - `rows/<row id>.md`: everything a grader reads: the question, reference answer and citations, the system answer with its sources and checker outcome, and the full context the model saw (each message, tool results in full). A 32k-token context does not fit in a spreadsheet cell.
-  - `key.json`: row id → question id and configuration. Graders do not open it until grading is finished.
+  - `key.json`: `seed`, `rows` (row id → question id and configuration) and `skipped` (errored answers). Graders do not open it until grading is finished.
+  - `summary.json` (from the command): the automatic counts for each run.
 
 ### 3.7 Design decisions
 
