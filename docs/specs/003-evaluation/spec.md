@@ -122,7 +122,7 @@ Priorities: **P1** = required for the final submission, **P2** = should ship, **
 ### US7 (P1): Citation accuracy, H1 and format slips
 
 - **AC-7.1** Citation accuracy = `Sources` entries the checker verifies ÷ all `Sources` entries, over all answers in a configuration (micro average, proposal §6.2). The share of answers that are fully F is reported alongside. Target: more than 95% (§7).
-- **AC-7.2** H1 is pre-filled from the checker outcome (§5.2). An abstention is never H1.
+- **AC-7.2** H1 is pre-filled from the checker outcome (§5.2). An abstention is never H1. An answer that cites nothing and is not an abstention is labelled `uncited`, not H1: nothing was fabricated (Article VI.3), and its claims are judged under H2. **(decided 2026-11-08)**
 - **AC-7.3** Format slips are detected and counted separately. A format slip alone is not H1; the answer's claims are still graded for H2. A "strict H1" that counts slips is reported for transparency. A **format slip** is a G answer with `Sources` in which every unverified marker is `unreferenced`: each flagged entry matches evidence in context, but its `[N]` never appears in the text (no markers at all, or some missing). Any other unverified marker (an entry matching nothing, a `[N]` with no entry, a duplicate marker) is H1. **(decided 2026-11-08, §13 C7)**
 - **AC-7.4** Each answer is pre-labelled as a likely abstention by matching the pipeline's no-evidence message and phrases such as "could not find" or "could not determine"; a grader confirms. **(recommended)**
 
@@ -132,7 +132,7 @@ Priorities: **P1** = required for the final submission, **P2** = should ship, **
 
 - **AC-8.1** For each answer in configurations (b) and (c) to a subset question, the harness produces a grading row: question, category, tag, reference answer and citations, the system answer with sources and checker outcome, the pre-filled H1, format-slip and abstention labels, and the full context the model saw. For the contamination check (AC-10.1) it also produces a row for each answer in configuration (a) to the 16 answerable subset questions, graded for the 0/1/2 score only (with no retrieved context, H2 and H3 do not apply). Each grader therefore has 20 + 20 + 16 = 56 rows. **(decided 2026-11-08)**
 - **AC-8.2** The full context comes from the harness recording the messages sent to the generator (retrieved chunks and full tool results), with no change to Spec 002 code. **(decided 2026-11-08, §13 C8)**
-- **AC-8.3** Rows are shuffled and the configuration is hidden from graders.
+- **AC-8.3** Rows are shuffled and the configuration is hidden from graders. The blinding is partial, and the report states it as a limitation: row files leave out the system prompt, but tool results in `rag_tools` rows, and the absence of any context in (a) rows, can still hint at the configuration.
 - **AC-8.4** Two graders grade every row independently (Nicole and Kelsey): H2, H3 (unanswerable only), the 0/1/2 score, and for every 0 a reason (`unsupported`, `fabricated-citation`, `abstained`, `wrong-but-grounded`). Agreement is reported; disagreements are settled together and recorded.
 - **AC-8.5** The harness never fills in H2, H3 or the quality score.
 
@@ -168,12 +168,18 @@ Priorities: **P1** = required for the final submission, **P2** = should ship, **
 - **1:** partially correct, for example explains *what* but not *why*.
 - **0:** incorrect, or claims not supported by the retrieved evidence, or an abstention on an answerable question. Every 0 records a reason (AC-8.4).
 
+**Grading rules agreed by Nicole and Kelsey before grading (2026-11-08):**
+- An **unanswerable** control that correctly says it cannot determine the answer scores **2** (H3 no); a substantive made-up answer is H3 and scores 0.
+- **Configuration (a)** rows are scored on **correctness against the reference answer only**: with no retrieved evidence, "supported by the evidence" cannot apply. H2 and H3 are `n/a`.
+- The sheet's row order uses **seed 20261109**, fixed before the sheet is made, so the shuffle cannot be re-rolled.
+- Each grader fills only their own columns in their own copy of the sheet, and the key is not opened until both have finished.
+
 ### 5.2 Hallucinated answer (hallucination rate and Verification Gain)
 An answer is **hallucinated** if **any** of these is true:
 
 | # | Condition | Decided by |
 |---|---|---|
-| H1 | **Fabricated or unmatched citation.** The checker returns G for an answer that makes claims about the repository (Article VI), other than for a format slip alone (AC-7.3, proposed). | Automatic |
+| H1 | **Fabricated or unmatched citation.** The checker returns G because a citation matches nothing in context, a `[N]` has no entry, or a marker is duplicated (Article VI). Not H1: a format slip alone (AC-7.3) or an answer that cites nothing (`uncited`, AC-7.2), whose claims are judged under H2. The `uncited` count is reported separately. | Automatic |
 | H2 | **Unsupported claim.** At least one factual claim about the repository is not supported by the evidence in the generator's context (retrieved chunks and tool results), including claims true of the repository that came from the model's own knowledge (Article I.1–I.2). Uncited parts marked "(not cited)" (Article VI.3) count if they are unsupported. | Human |
 | H3 | **Fabricated answer to an unanswerable control.** A substantive answer instead of saying it could not determine it (Article I.2–I.3). | Human, unanswerable only |
 
