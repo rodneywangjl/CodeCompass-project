@@ -92,11 +92,11 @@ CITATION_EXAMPLE_BLOCK = (
 )
 
 
-def system_prompt(*, tools_enabled: bool, format_example: bool = False, vague_question_hint: bool = False) -> str:
+def system_prompt(*, tools_enabled: bool, vague_question_hint: bool = False,
+                  format_example: bool = False) -> str:
     """The D14 prompt: with tools, the tool decision is rule 1; without, the
     pre-T20.1 prompt, unchanged (D17, Article VII.3). With the default flags it is
-    byte-for-byte today's prompt (T19.6). With the default flags it is
-    byte-for-byte today's prompt (T19.5)."""
+    byte-for-byte today's prompt (T19.5, T19.6)."""
     if not tools_enabled:
         rules, intro = _RULES, _INTRO
     else:
@@ -262,7 +262,8 @@ def _generate(generator, messages: list[dict], on_draft) -> str:
 
 def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: int,
               tools_enabled: bool = True, docs: bool = False, on_draft=None,
-              on_tool=None, format_example: bool = False, vague_question_hint: bool = False) -> AgentRun:
+              on_tool=None, vague_question_hint: bool = False,
+              format_example: bool = False) -> AgentRun:
     """Answer, running at most *max_rounds* tool calls, one per round (Plan D15).
 
     *on_draft*, if given, receives the model's text as it is written (Spec 004 US2).
@@ -272,8 +273,8 @@ def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: i
     *vague_question_hint* is the [prompt] flag (T19.5); off, the prompt is unchanged.
     """
     messages = [{"role": "system", "content": system_prompt(
-                    
-                    tools_enabled=tools_enabled, format_example=format_example, vague_question_hint=vague_question_hint)},
+                    tools_enabled=tools_enabled, vague_question_hint=vague_question_hint,
+                    format_example=format_example)},
                 {"role": "user", "content": user_message(question, chunks,
                                                          tools_enabled=tools_enabled,
                                                          docs=docs)}]

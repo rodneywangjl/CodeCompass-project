@@ -250,9 +250,8 @@ def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None =
     log = new_log(question, profile_name=profile_name, profile=model, mode=mode,
                   tools=config.tools)
     log["reranker"] = dataclasses.asdict(config.reranker)  # model, revision, device, dtype
-    log["prompt"] = dataclasses.asdict(config.prompt)  # the [prompt] flags (T19.5)
+    log["prompt"] = dataclasses.asdict(config.prompt)  # the [prompt] flags (T19.5, T19.6)
     hint = config.prompt.vague_question_hint
-    log["prompt"] = dataclasses.asdict(config.prompt)  # the [prompt] flags (T19.6)
     example = config.prompt.format_example
     gen = TimedGenerator(generator or _default_generator(config, model), log)
     try:
