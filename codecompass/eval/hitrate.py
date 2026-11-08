@@ -41,8 +41,10 @@ def hit_rates(rows: list[dict], ks: dict) -> dict:
     """Rates per setup and k, overall and by set, category and complexity (AC-4.5).
 
     Questions without ground truth are left out of n and listed in "excluded"
-    (AC-4.1). A whole_file question counts for the file figures only, since any
-    chunk of that file would overlap it. A group with n = 0 has rates None.
+    (AC-4.1). Line figures use only real line ranges (row "line_truth", set by the
+    runner): a whole-file entry would let any chunk of that file overlap it. A question
+    with no real range (whole_file) counts for the file figures only. A group with
+    n = 0 has rates None.
     """
     counted = [r for r in rows if r["ground_truth_files"]]
     excluded = [r["id"] for r in rows if not r["ground_truth_files"]]
@@ -54,8 +56,12 @@ def hit_rates(rows: list[dict], ks: dict) -> dict:
             for r in counted:
                 ranked = r["ranked"].get(setup, [])
                 truth = r["ground_truth_files"]
-                scored[r["id"]] = (file_hit(ranked, truth, k), line_hit(ranked, truth, k),
-                                   not r.get("whole_file", False))
+                line_truth = r.get("line_truth")
+                if line_truth is None:  # no per-range split given: whole_file decides
+                    line_truth = [] if r.get("whole_file", False) else truth
+                scored[r["id"]] = (file_hit(ranked, truth, k),
+                                   bool(line_truth) and line_hit(ranked, line_truth, k),
+                                   bool(line_truth))
             groups = {"overall": _stats(list(scored.values()))}
             for field in GROUPS:
                 values = sorted({r[field] for r in rows})
