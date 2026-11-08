@@ -122,7 +122,7 @@ Priorities: **P1** = required for the final submission, **P2** = should ship, **
 ### US7 (P1): Citation accuracy, H1 and format slips
 
 - **AC-7.1** Citation accuracy = `Sources` entries the checker verifies ÷ all `Sources` entries, over all answers in a configuration (micro average, proposal §6.2). The share of answers that are fully F is reported alongside. Target: more than 95% (§7).
-- **AC-7.2** H1 is pre-filled from the checker outcome (§5.2). An abstention is never H1.
+- **AC-7.2** H1 is pre-filled from the checker outcome (§5.2). An abstention is never H1. An answer that cites nothing and is not an abstention is labelled `uncited`, not H1: nothing was fabricated (Article VI.3), and its claims are judged under H2. **(decided 2026-11-08)**
 - **AC-7.3** Format slips are detected and counted separately. A format slip alone is not H1; the answer's claims are still graded for H2. A "strict H1" that counts slips is reported for transparency. A **format slip** is a G answer with `Sources` in which every unverified marker is `unreferenced`: each flagged entry matches evidence in context, but its `[N]` never appears in the text (no markers at all, or some missing). Any other unverified marker (an entry matching nothing, a `[N]` with no entry, a duplicate marker) is H1. **(decided 2026-11-08, §13 C7)**
 - **AC-7.4** Each answer is pre-labelled as a likely abstention by matching the pipeline's no-evidence message and phrases such as "could not find" or "could not determine"; a grader confirms. **(recommended)**
 
