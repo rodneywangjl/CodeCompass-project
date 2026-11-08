@@ -1,7 +1,7 @@
 """T19.6 citation example: tests first (Spec 002 AC-1.1; Articles VI.1, VI.4, VII.3, VIII.4).
 
 Contract under test:
-  - [prompt] citation_example defaults to false. With false (or no flag), the system
+  - [prompt] format_example defaults to false. With false (or no flag), the system
     prompt is byte-for-byte today's prompt, with and without tools.
   - With true, the prompt is today's prompt plus ONE short example answer: [N] markers in
     the body and a Sources section in the format citation/parser.py reads. The example
@@ -52,13 +52,13 @@ def test_the_default_prompt_is_today_s_prompt(tools):
 
 @pytest.mark.parametrize("tools", [False, True])
 def test_flag_off_gives_today_s_prompt_byte_for_byte(tools):
-    prompt = harness.system_prompt(tools_enabled=tools, citation_example=False)
+    prompt = harness.system_prompt(tools_enabled=tools, format_example=False)
     assert prompt == _baseline(tools)
 
 
 @pytest.mark.parametrize("tools", [False, True])
 def test_flag_on_adds_the_example_and_nothing_else(tools):
-    prompt = harness.system_prompt(tools_enabled=tools, citation_example=True)
+    prompt = harness.system_prompt(tools_enabled=tools, format_example=True)
     assert prompt == f"{_baseline(tools)}\n\n{harness.CITATION_EXAMPLE_BLOCK}"
 
 
@@ -95,35 +95,35 @@ def test_the_example_names_no_file_in_this_repository():
 
 
 def test_the_default_is_off():
-    assert online_config.PromptConfig().citation_example is False
-    assert load_online_config(None).prompt.citation_example is False
+    assert online_config.PromptConfig().format_example is False
+    assert load_online_config(None).prompt.format_example is False
 
 
 @pytest.mark.parametrize("loader", LOADERS)
 def test_the_flag_loads_from_the_file(tmp_path, loader):
     path = write(tmp_path / "codecompass.toml", "[prompt]\ncitation_example = true\n")
-    assert loader(path).prompt.citation_example is True
+    assert loader(path).prompt.format_example is True
 
 
 def test_the_flag_layers_like_other_config(tmp_path):
     base = write(tmp_path / "base.toml", "[prompt]\ncitation_example = true\n")
     override = write(tmp_path / "override.toml", "[prompt]\ncitation_example = false\n")
-    assert load_online_config_layers([base, override]).prompt.citation_example is False
-    assert load_online_config_layers([override, base]).prompt.citation_example is True
-    assert load_online_config_layers([base]).prompt.citation_example is True
+    assert load_online_config_layers([base, override]).prompt.format_example is False
+    assert load_online_config_layers([override, base]).prompt.format_example is True
+    assert load_online_config_layers([base]).prompt.format_example is True
 
 
 @pytest.mark.parametrize("loader", LOADERS)
 @pytest.mark.parametrize("value", ['"yes"', '"false"', "1", "0"])
 def test_a_non_boolean_is_rejected(tmp_path, loader, value):
     path = write(tmp_path / "codecompass.toml", f"[prompt]\ncitation_example = {value}\n")
-    with pytest.raises(ValueError, match="prompt.citation_example must be a bool"):
+    with pytest.raises(ValueError, match="prompt.format_example must be a bool"):
         loader(path)
 
 
 def test_the_dataclass_rejects_a_non_boolean_too():
-    with pytest.raises(ValueError, match="prompt.citation_example must be a bool"):
-        online_config.PromptConfig(citation_example=1)
+    with pytest.raises(ValueError, match="prompt.format_example must be a bool"):
+        online_config.PromptConfig(format_example=1)
 
 
 # --- ask(): the prompt sent and the audit log (Article V.4, VII.3) ----------------------------
@@ -134,10 +134,10 @@ def test_ask_sends_the_prompt_for_the_flag_and_logs_it(tmp_path, flag):
     repo = build_history_repo(tmp_path / "repo")
     gen = CitingGenerator()
     cfg = dataclasses.replace(config(tmp_path), prompt=online_config.PromptConfig(
-        citation_example=flag))
+        format_example=flag))
     result = online.ask(repo.path, "Why does authenticate retry?", config=cfg,
                         index_dir=tmp_path / "idx", **stubs(gen))
     sent = gen.calls[0][0]
     assert sent["role"] == "system"
-    assert sent["content"] == harness.system_prompt(tools_enabled=True, citation_example=flag)
-    assert result.audit_log["prompt"]["citation_example"] is flag
+    assert sent["content"] == harness.system_prompt(tools_enabled=True, format_example=flag)
+    assert result.audit_log["prompt"]["format_example"] is flag
