@@ -1,0 +1,127 @@
+## CodeCompass evaluation config (Spec 003 AC-5.4, AC-5.4a; Plan 003 §3.2).
+## Used by every reported evaluation run, on the SCIS cluster's RTX 3090 with the
+## `dev` profile. It is a full copy of codecompass.toml with exactly five changes,
+## marked "EVAL" below; tests/eval/test_eval_config_t52.py checks that nothing else
+## differs. Do not change it after the eval-v1 tag: a change means a new tag and a
+## re-run (Article VII.5).
+
+## CodeCompass configuration (Article VIII.1: nothing tunable is hard-coded).
+## Sections and top-level keys are optional; anything omitted uses the defaults
+## in codecompass/offline/config.py and codecompass/online/config.py. A
+## [generator.profiles.X] table replaces that whole profile, so it must set
+## model_id.
+
+[generator]
+default_profile = "dev"
+server_url = "http://127.0.0.1:8080"
+# EVAL: per-wait limit; timing run 2026-11-08: longest wait 1.8 s, so the 300 s floor applies.
+timeout_seconds = 300
+# Readiness check (first contact) only; each wait for an answer is bounded by timeout_seconds.
+connect_timeout_seconds = 5
+generation_reserve_tokens = 1024
+
+# Dev generator: Qwen2.5-Coder-14B-Instruct, Q4_K_M, run by llama.cpp
+# llama-server (Article VIII.2). Pinned artifact:
+#   source repo : https://huggingface.co/Qwen/Qwen2.5-Coder-14B-Instruct-GGUF
+#   file        : qwen2.5-coder-14b-instruct-q4_k_m.gguf
+#   size        : 8,988,110,272 bytes
+#   llama.cpp   : 0.7.0 (build 11669, commit 620d2225c), Homebrew bottle
+# The file is not read by this config yet; it is passed to llama-server on the
+# command line, e.g.:
+#   llama-server -m ~/.cache/codecompass/models/qwen2.5-coder-14b-instruct-q4_k_m.gguf \
+#     --host 127.0.0.1 --port 8080 -c 32768 --jinja
+# Full 32768 context, as in plan.md. Needs roughly 8.4 GiB weights plus ~6 GiB
+# f16 KV cache, so it does not fit a 16 GiB machine; use dev-lowmem there.
+[generator.profiles.dev]
+model_id = "Qwen2.5-Coder-14B-Instruct"
+gguf_file = "qwen2.5-coder-14b-instruct-q4_k_m.gguf"
+gguf_checksum = "c1e659736d89ac1065fb495330fb824d94001974a4bfa78e7270e43476a8d940"
+quantisation = "Q4_K_M"
+context_window = 32768
+temperature = 0.1
+max_tokens = 2048
+stop_tokens = ["<|im_end|>", "<|endoftext|>"]
+
+# Same model and GGUF as dev, with an 8192 context for 16 GiB machines.
+# Select it with GENERATOR_PROFILE=dev-lowmem and start the server with -c 8192:
+#   llama-server -m ~/.cache/codecompass/models/qwen2.5-coder-14b-instruct-q4_k_m.gguf \
+#     --host 127.0.0.1 --port 8080 -c 8192 --jinja
+# On a 16 GiB M3, 16384 already exhausted GPU memory (Metal "Insufficient
+# Memory") and fell back to CPU-speed prefill. Results from this profile are
+# development signals only (Article VIII.5).
+[generator.profiles.dev-lowmem]
+model_id = "Qwen2.5-Coder-14B-Instruct"
+gguf_file = "qwen2.5-coder-14b-instruct-q4_k_m.gguf"
+gguf_checksum = "c1e659736d89ac1065fb495330fb824d94001974a4bfa78e7270e43476a8d940"
+quantisation = "Q4_K_M"
+context_window = 8192
+temperature = 0.1
+max_tokens = 2048
+stop_tokens = ["<|im_end|>", "<|endoftext|>"]
+
+# Development-only 7B profile for machines that cannot run the 14B (e.g. an
+# 8 GiB GPU). A different model from dev, so this is an Article VII.5 model
+# change: results from it are development signals only and must not be mixed
+# with 14B results (Article VIII.5). The default profile stays dev.
+# Pinned artifact:
+#   source repo : https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF
+#   file        : qwen2.5-coder-7b-instruct-q4_k_m.gguf
+#   size        : 4,683,073,536 bytes
+#   llama.cpp   : 0.6.0-dev, build 11429 (Arch `llama-cpp` 0.6.0-1, CPU-only build);
+#                 the tests and measurements for this profile used it. A GPU build
+#                 (for example b11960) is a llama.cpp change under Article VIII.2.
+# Select it with GENERATOR_PROFILE=dev-7b and start the server with -c 16384:
+#   llama-server -m ~/.cache/codecompass/models/qwen2.5-coder-7b-instruct-q4_k_m.gguf \
+#     --host 127.0.0.1 --port 8080 -c 16384 --jinja
+[generator.profiles.dev-7b]
+model_id = "Qwen2.5-Coder-7B-Instruct"
+gguf_file = "qwen2.5-coder-7b-instruct-q4_k_m.gguf"
+gguf_checksum = "509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c"
+quantisation = "Q4_K_M"
+context_window = 16384
+temperature = 0.1
+max_tokens = 2048
+stop_tokens = ["<|im_end|>", "<|endoftext|>"]
+
+# Development-only 7B profile for an 8 GB GPU that also runs the re-ranker (Spec 005).
+# A different model from dev: results are development signals only and must not be
+# mixed with 14B results (Articles VII.5, VIII.5). Same GGUF as dev-7b.
+# Smaller than dev-7b so the server and an fp16 re-ranker fit together: an 8192
+# context, a 1024-token answer cap (leaves about 4400 tokens for chunks), a q8
+# key/value cache, 26 of 29 layers on the GPU and a 256 micro-batch. Measured on an
+# RTX 3070 Ti (8 GB) with the fp16 re-ranker on the GPU and the embedder on the CPU:
+# all layers, or -ub 512, ran out of memory on the second question; this leaves about
+# 400 MiB free and does a question in about 5 s (generation 54 tok/s). Use -ngl 24 on
+# a tighter card.
+# llama.cpp (Article VIII.2): official build b11960 (`llama-server --version`:
+# 0.8.0-dev, commit 8642541b2), ubuntu-cuda-13.4-x64, from
+# https://github.com/ggml-org/llama.cpp/releases/tag/b11960
+#   llama-b11960-bin-ubuntu-cuda-13.4-x64.tar.gz
+#     sha256 0cf758b28483593a5a15e0d2c9b686c40840d1f8be9b5bb2417f04a053113907
+#   cudart-llama-b11960-bin-ubuntu-cuda-13.4-x64.tar.gz
+#     sha256 756e14988abb5daa60d25f27a9766a9a78f04c88647c4b92a88fb749488d72f7
+# Select it with --profile dev-7b-gpu. Use [reranker] device = "cuda", dtype = "float16"
+# (put them in your user-level config, not here: a machine without CUDA would fail).
+[generator.profiles.dev-7b-gpu]
+model_id = "Qwen2.5-Coder-7B-Instruct"
+gguf_file = "qwen2.5-coder-7b-instruct-q4_k_m.gguf"
+gguf_checksum = "509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c"
+quantisation = "Q4_K_M"
+context_window = 8192
+temperature = 0.1
+max_tokens = 1024
+stop_tokens = ["<|im_end|>", "<|endoftext|>"]
+server_args = ["-ngl", "26", "-ub", "256", "--cache-type-k", "q8_0", "--cache-type-v", "q8_0"]
+
+# EVAL: the models run on the cluster's GPU (Article VIII.2).
+[embedder]
+device = "cuda"
+
+# EVAL: fp16 re-ranker, the same for every reported run (agreed 2026-11-08).
+[reranker]
+device = "cuda"
+dtype = "float16"
+
+# EVAL: stated explicitly so every results file shows the default pipeline was measured.
+[retrieval]
+docs_fallback = false

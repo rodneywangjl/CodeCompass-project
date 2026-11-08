@@ -209,3 +209,25 @@ I asked Claude Code to draft review sheets for the 48 SWE-QA Flask questions (qu
 I was responsible for checking the ground truth and tags of all 48 SWE-QA questions before they were frozen. I opened the flagged references in my Flask checkout at 85c5d93 and read the code myself rather than relying on the script's output. For #3, I found that `send_static_file` in `blueprints.py` starts at line 82, so the two short ranges the answer cited were merged into the whole method (82-102). For #37, I confirmed that `FlaskGroup.get_command` is at line 609 and that the cited lines 615-616 are the branch the question asks about. I also confirmed the file references for #5, #8 and #27, and reviewed the recommended tag for each borderline question against the written rule and agreed with them. Separately, I tagged Kelsey's 20 core questions blind, from the question and reference answer only, without opening her question file. Finally, I saw the question-set checker report 88 questions with 0 problems on the combined set.
 ### What I kept or changed
 I kept the converted text unchanged from SWE-QA, including four dataset quirks (AC-2.1a). I changed the tagging rule after feedback (two independent lookups are simple, no retrieval-based test, history, class relationships, "why" examples) and replaced its examples, which had used real questions. Second-tagging agreement was 16/30 (53%); Kelsey and I settled all 17 disagreements. Removed test files from ground truth unless the question is about that test. Spec 003 now records one tagger for most questions and the sampled agreement (AC-3.2). After Kelsey's review: corrected AC-2.2 to 48/48 and added eval/questions/README.md with the SWE-QA source commit, licence and citation.
+
+## 2026-11-08 · Spec 003 LLM-run plan (§3, S5) and T5.1 run details
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** docs/specs/003-evaluation/spec.md, docs/specs/003-evaluation/plan.md, docs/specs/003-evaluation/tasks.md, codecompass/eval/run_meta.py, tests/eval/test_run_meta_t51.py
+- **Outcome:** Changed
+### What I asked for
+A plan for the LLM side of the evaluation (run details, eval config, grading subset, recording wrapper, LLM runner, grading sheet), the spec decisions for §13 C5–C9, and then T5.1: the shared `run_meta()` that both runners call to record what produced a run.
+### How I checked it
+moved run_meta out → importerror. put back → 21 passed. ran it on my flask → head 85c5d93 right, dirty true bc not committed, dev profile + checksum match, gpu A2000, index empty (no index there). full suite 1293 passed.
+### What I kept or changed
+I decided C5–C9 myself and Kelsey confirmed them: all 88 questions run in all three modes and 20 are graded, with the subset picked by `sha256(id)` rather than a seeded draw; a format slip is a G answer whose unverified markers are all `unreferenced`, and is not H1; a recording wrapper captures the full context; abstentions count in the hallucination rate. After Kelsey pointed out that AC-10.1 needs graded no-retrieval answers, we added 16 contamination rows from mode (a), so each grader has 56 rows. Changed `run_meta` from the draft to match Kelsey's plan §2.2 (reported runs use a git clone): dropped the commit fallback and added the tag, the index state and `project_dir`. The 21 tests were approved before the code was written; all pass, and the full required suite passed in WSL (1293).
+
+## 2026-11-08 · Spec 003 T5.2 evaluation config
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** eval/codecompass.eval.toml, tests/eval/test_eval_config_t52.py, docs/specs/003-evaluation/plan.md, docs/specs/003-evaluation/tasks.md
+- **Outcome:** Changed
+### What I asked for
+The committed config for every reported run (AC-5.4a): a full copy of codecompass.toml with the GPU settings, the fp16 re-ranker, `docs_fallback` stated off and the timeout from the timing run, plus tests that nothing else differs.
+### How I checked it
+diffed codecompass.toml vs eval config → only the header + the 5 EVAL changes (timeout 120→300, embedder/reranker cuda, reranker float16, docs_fallback false). moved the eval config out → 4 failed, 5 errors. put back → 9 passed. ran run_meta with the eval config on my flask → cuda for both models, float16, timeout 300, dev = Qwen 14B, 32768, pinned checksum, docs_fallback False. full suite on the merged branch 1321 passed.
+### What I kept or changed
+Kelsey ran the timing run on the cluster (5 `rag_tools` questions outside the evaluation set): the longest wait was 1.8 s, so the 300 s floor applies. She found that a copy of the user config holds only the GPU settings, so the tests now require the full `[generator]` section and the `dev` profile. While writing the tests, Claude found that `load_online_config()` returns the defaults for a missing path, so one test passed with no file; it now checks the file exists first, and I asked Kelsey to check the config path in her retrieval runner. Plan §3.5 now says the runner loads the models once, because loading them per question took about 15 of the 20 s.
