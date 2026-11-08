@@ -106,3 +106,16 @@ A `[prompt] vague_question_hint` flag, off by default. When on, the system promp
 Ran pytest tests/online/test_vague_question_hint_t195.py -v (21 passed). On the cluster, set `[prompt] vague_question_hint = true` in a local config (not committed), asked a vague question that still passes the evidence gate with `python -m codecompass.online.cli ask <repo> "<question>" --config <file>`, and checked that the answer says it could not find the answer and asks for a file or function. Then checked the newest JSON in the query log directory has `"prompt": {"vague_question_hint": true, ...}`. With the flag false, the same question gives the earlier answer and the log says false.
 ### What I kept or changed
 Kept the rule as one numbered sentence after the existing rules, so with the flag off the prompt is byte-for-byte today's (snapshot tests, with and without tools). The evidence gate (AC-1.5) refuses before the model is called, so this sentence reaches the model only for questions that pass the gate and are still not answered from the context. The gate's refusal text is unchanged; changing it would be a spec change. Off by default; the evaluation must be re-run before any result that uses the flag is reported (Article VII.5). I first added a `[prompt]` table to codecompass.toml; that broke tests/eval/test_eval_config_t52.py, which requires the eval config to match the project config, so the default lives only in code.
+
+## 2026-11-08 · Citation example in the system prompt behind a config flag (T19.6)
+- **Tool (model):** Claude Code (claude-haiku-5-5)
+- **Files:** codecompass/online/agent/harness.py, codecompass/online/config.py, codecompass/online/__init__.py, tests/online/test_citation_example_t196.py, docs/specs/002-online-retrieval/tasks.md, ai-log/swen.md
+- **Outcome:** Changed
+### What I asked for
+A `[prompt] format_example` flag, off by default. When on, the system prompt gets one short example answer, with `[N]` markers in the body and a Sources section in the format `citation/parser.py` reads, so the model sees the format once. The example must not name a real file. Tests first; the flag loads, layers, rejects a non-boolean, and is recorded in the audit log.
+### How I checked it
+Ran `pytest -m "not model"` on the cluster (Linux, Python 3.12.8): 1460 passed, 10 deselected.
+Ran `pytest -m model` on GPU: 10 passed. The dev (14B) profile was used, because GENERATOR_PROFILE was unset.
+Checked the default profile by reading codecompass/online/config.py (`default_profile = "dev"`).
+### What I kept or changed
+The example names an invented file (`example/client.py`) and commit, and the prompt says they are invented. The test checks that the example parses into the entries it shows and that the file does not exist in this repository. Off by default, so the prompt is unchanged until the flag is set. Evaluation must be re-run before any result that uses the flag is reported (Article VII.5). The key is `format_example`, not `citation_example`: the approved test T9.6 (Article VI.2) rejects any config field whose name contains "citation", and the flag does not switch off the checker. I did not add the flag to `codecompass.toml`: `tests/eval/test_eval_config_t52.py` requires the eval config to match the project config, so the default lives only in code.
