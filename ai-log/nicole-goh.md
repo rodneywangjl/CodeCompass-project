@@ -231,3 +231,14 @@ The committed config for every reported run (AC-5.4a): a full copy of codecompas
 diffed codecompass.toml vs eval config → only the header + the 5 EVAL changes (timeout 120→300, embedder/reranker cuda, reranker float16, docs_fallback false). moved the eval config out → 4 failed, 5 errors. put back → 9 passed. ran run_meta with the eval config on my flask → cuda for both models, float16, timeout 300, dev = Qwen 14B, 32768, pinned checksum, docs_fallback False. full suite on the merged branch 1321 passed.
 ### What I kept or changed
 Kelsey ran the timing run on the cluster (5 `rag_tools` questions outside the evaluation set): the longest wait was 1.8 s, so the 300 s floor applies. She found that a copy of the user config holds only the GPU settings, so the tests now require the full `[generator]` section and the `dev` profile. While writing the tests, Claude found that `load_online_config()` returns the defaults for a missing path, so one test passed with no file; it now checks the file exists first, and I asked Kelsey to check the config path in her retrieval runner. Plan §3.5 now says the runner loads the models once, because loading them per question took about 15 of the 20 s.
+
+## 2026-11-08 · Spec 003 T5.3 grading subset
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/eval/subset.py, tests/eval/test_subset_t53.py, eval/questions/grading-subset.json, docs/specs/003-evaluation/plan.md, docs/specs/003-evaluation/tasks.md
+- **Outcome:** Changed
+### What I asked for
+The rule that picks the 20 questions graded by hand (4 per category; 2 core and 2 SWE-QA with one of each tag; 4 core unanswerable), ordered by `sha256(id)` so nobody chooses them, a command that writes `eval/questions/grading-subset.json`, and tests that the committed file is what the rule gives.
+### How I checked it
+moved subset.py out → 1 error (module missing). put back → 13 passed.
+### What I kept or changed
+I chose `sha256(id)` over a seeded random draw because it has no seed that could be re-tried. While implementing, Claude found that one approved test hashed the question files' raw bytes, which differ between my Windows checkout (CRLF) and a Linux clone (LF); I approved changing that one line so the hash is taken with line endings normalised to LF, and the plan now says so. The subset file was generated once, before any LLM run, and gives 8 `simple`, 8 `code-tracing` and 4 unanswerable questions.
