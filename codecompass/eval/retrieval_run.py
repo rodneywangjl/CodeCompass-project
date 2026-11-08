@@ -180,9 +180,12 @@ def run_retrieval(
         for row in all_rows:
             row_out = dict(row)
             truth = row.get("ground_truth_files", [])
-            row_out["whole_file"] = _compute_whole_file(
-                repo_helper, row["repo_commit"], truth
-            )
+            # Line hit compares only real line ranges: a whole-file entry would let any chunk of
+            # that file count (plan §2.1). whole_file = no real range is left.
+            line_truth = [e for e in truth
+                          if not _compute_whole_file(repo_helper, row["repo_commit"], [e])]
+            row_out["line_truth"] = line_truth
+            row_out["whole_file"] = bool(truth) and not line_truth
 
             if not truth:
                 row_out["ranked"] = {}
@@ -316,35 +319,22 @@ def run_retrieval(
         if not sent:
             meta_ks["sent"] = None
 
-        embedder_obj = getattr(handles, "embedder", embedder)
+        # Settings come from the config the run used; the objects do not carry them.
+        embedder_obj = getattr(handles, "embedder", None) or embedder
+        emb_cfg = config.offline.embedder
         embedder_meta = {
-            "model_id": getattr(
-                embedder_obj,
-                "model_id",
-                getattr(embedder_obj, "model", type(embedder_obj).__name__),
-            ),
-            "revision": getattr(embedder_obj, "revision", None),
-            "device": getattr(embedder_obj, "device", None),
-            "dtype": (
-                str(getattr(embedder_obj, "dtype", None))
-                if getattr(embedder_obj, "dtype", None)
-                else None
-            ),
+            "model": emb_cfg.model,
+            "revision": emb_cfg.revision,
+            "device": emb_cfg.device,
+            "class": type(embedder_obj).__name__,
         }
-
+        rr_cfg = config.reranker
         reranker_meta = {
-            "model_id": getattr(
-                reranker,
-                "model_id",
-                getattr(reranker, "model_name", type(reranker).__name__),
-            ),
-            "revision": getattr(reranker, "revision", None),
-            "device": getattr(reranker, "device", None),
-            "dtype": (
-                str(getattr(reranker, "dtype", None))
-                if getattr(reranker, "dtype", None)
-                else None
-            ),
+            "model": rr_cfg.model,
+            "revision": rr_cfg.revision,
+            "device": rr_cfg.device,
+            "dtype": rr_cfg.dtype,
+            "class": type(reranker).__name__,
         }
 
         packages = {}
