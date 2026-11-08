@@ -340,6 +340,14 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - **Evaluation:** this changes agent behaviour. The evaluation must be re-run before any result is reported (Article VII.5).
 - ACs: AC-3.1, 3.6; Article I.2, V.1, V.4; plan D14. | Touches: `agent/harness.py`, `tests/online/test_repeated_tool_calls_t194.py`, `tests/online/test_harness_round_limit_t83.py` (approved test, sign-off above), `ai-log/swen.md`, this entry. | Depends on: T19.1, T8.2.
 
+**T19.5 Vague questions get a request for a file or function**
+- Gap (dev test, item 14): a question that names no file or function, and that the retrieved code does not answer, gets an unhelpful refusal. The model should say what it could not find and ask the developer to name a file or function (Article X.2).
+- Decision: a new `[prompt] vague_question_hint = false`. With false, the system prompt is byte-for-byte today's prompt, with and without tools. With true, one numbered rule is appended after the existing rules. The audit log records the `prompt` flags (Article VII.3, VIII.4). Off by default, so the baseline is unchanged (Article VII.5).
+- Limitation: the evidence gate (AC-1.5) refuses before the generator is called, so this rule reaches the model only for questions that pass the gate and are still not answered from the context. The gate's refusal text is unchanged.
+- Tests first (`tests/online/test_vague_question_hint_t195.py`, stub embedder, re-ranker and generator): with the flag off (and by default) the system prompt equals a snapshot of today's prompt, with and without tools; with the flag on, the prompt is that snapshot plus one numbered rule holding one sentence that asks the developer to name a file or function, and nothing else changes; `[prompt] vague_question_hint` defaults to false, loads from a file, layers in both loaders, and rejects a non-boolean; `ask` sends the flagged prompt and writes `audit_log["prompt"]["vague_question_hint"]`.
+- **Evaluation:** this changes the prompt. The evaluation must be re-run before any result is reported (Article VII.5).
+- ACs: Spec 002 AC-7.1; Article I.3, V.4, VII.3, VIII.1, VIII.4, X.2; plan D14. | Touches: `agent/harness.py`, `config.py`, `__init__.py`, `codecompass.toml`, `tests/online/test_vague_question_hint_t195.py`, `ai-log/swen.md`, this entry. | Depends on: T19.4, T20.1.
+
 ## S20: Tool-use prompt (dev test, 2 Nov 2026, problem 3; plan D14, tool check)
 
 **T20.1 Tool-use prompt**
