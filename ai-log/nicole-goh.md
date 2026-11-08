@@ -242,3 +242,25 @@ The rule that picks the 20 questions graded by hand (4 per category; 2 core and 
 moved subset.py out → 1 error (module missing). put back → 13 passed.
 ### What I kept or changed
 I chose `sha256(id)` over a seeded random draw because it has no seed that could be re-tried. While implementing, Claude found that one approved test hashed the question files' raw bytes, which differ between my Windows checkout (CRLF) and a Linux clone (LF); I approved changing that one line so the hash is taken with line endings normalised to LF, and the plan now says so. The subset file was generated once, before any LLM run, and gives 8 `simple`, 8 `code-tracing` and 4 unanswerable questions.
+
+## 2026-11-08 · Spec 003 T5.4 recording generator
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/eval/recording.py, tests/eval/test_recording_t54.py
+- **Outcome:** Kept
+### What I asked for
+A wrapper passed to `ask(generator=...)` that passes every call to the real generator and keeps a copy of each message list and each output, so graders see the full context the model saw, including full tool results (§13 C8), with no change to Spec 002 code.
+### How I checked it
+moved recording.py out → ModuleNotFoundError. put back → 11 passed (read through the 11 test names). ran ask() on the fixture repo with the wrapper → 1 call recorded, system + user messages sent, raw output kept with its Sources section, outcome F.
+### What I kept or changed
+Kept the design from plan §3.4. The wrapper passes `on_text` only when it is given, because the harness also calls `generate(messages)` without it, and it records deep copies because the harness keeps appending to its message list. The tests run `ask()` on the fixture repo with and without the wrapper and check the answer and outcome are the same.
+
+## 2026-11-08 · Spec 003 T5.5 LLM runner
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/eval/llm_run.py, tests/eval/test_llm_run_t55.py, docs/specs/003-evaluation/plan.md, docs/specs/003-evaluation/tasks.md
+- **Outcome:** Changed
+### What I asked for
+The runner that sends every question through `ask()` in one mode (`no_retrieval`, `rag` or `rag_tools`): checks before any question, models created once, a fresh recording wrapper per question, one retry, the results file rewritten after each question, `--resume`, `--reported`, and a command line.
+### How I checked it
+moved llm_run.py out → ImportError. put back → 23 passed, read through the test names: results fields, all 3 modes, models reused with a fresh recorder per question, retry once then record the error, file rewritten after each question, resume, stops before any question on a wrong HEAD/index/question set/config/mode, --reported refuses a dirty tree, CLI. I have also ran the runner on my flask clone (85c5d93) with no llama-server → stopped with "could not read llama-server … Connection refused", exit code 1, nothing written to /tmp/llm-test.
+### What I kept or changed
+The runner loads the config from `--config` itself, so the config recorded is the one that ran, and a missing file stops the run. Each question also records the mode it ran in and whether the round limit was hit. Three approved tests were wrong and I approved changing them: the test stub copies a retrieved chunk's header, so it crashes in `no_retrieval` (the runner correctly recorded that as an error), and in `rag` an ignored tool request is logged rather than run, so the test now checks that no tool ran and that the ignored request is recorded. The runner code did not change for these.
