@@ -70,6 +70,7 @@ Measures how often the right file is in the top k, for each retrieval setup, wit
 - Writes one results file, `<out>/retrieval-<UTC time>.json` (default `eval/results/`, never `runs/`, AC-6.1), with:
   - `meta`: CodeCompass commit and whether the working tree was clean; `repo_commit` and the indexed commit; embedder and re-ranker model ids, revisions, device and dtype; the retrieval and chunking settings; the config file path; each question file with its SHA-256; the k values; `label` (`dev` unless `--reported`); start and end times (AC-6.2).
   - `questions`: per question its id, set, category, complexity, ground truth and the four ranked lists with scores.
+  - `meta.run`: the shared run details from `run_meta` (§3.1), the same shape as the LLM runner's results; `None` when no config file is given. With `--sent` it also records the generator profile and the server. A `--config` path that does not exist is an error.
   - `summary`: the output of `hit_rates`.
 - `--reported` refuses to run unless CodeCompass is a git checkout with no uncommitted changes, and records the commit and tag (`git describe --tags`); without it the file is labelled `dev` and never used in a reported comparison (AC-6.4).
 - **Reported runs use a git clone, not a zip:** the cluster copy uploaded as a zip has no `.git`, so the commit cannot be read. Official runs (both runners) clone the repository on the cluster and check out the tag `eval-v1`.
@@ -120,7 +121,9 @@ A committed copy of `codecompass.toml` with these differences: `[embedder] devic
 3. For each answerable category, take one `simple` and one `code-tracing` from `core`, and the same from `swe-qa`. If a group is empty, take the next question in `sha256` order from the same category and set.
 4. Unanswerable: the first 4 core unanswerable questions in `sha256(id)` order.
 
-The chosen ids are written to `eval/questions/grading-subset.json` and **committed before the first LLM run**. The tests check the rule, not the list.
+The chosen ids are written to `eval/questions/grading-subset.json` and **committed before the first LLM run**. The tests check the rule, not the list, and also check that the committed file is what the rule gives for the frozen question files, so a hand edit fails.
+
+`python -m codecompass.eval.subset FILE [FILE ...] --out PATH` writes `{"rule": "plan 003 §3.3", "question_files": [{"path", "sha256"}], "ids": [...]}` with the ids sorted, and prints how many were chosen per category and tag. Each SHA-256 is taken with line endings normalised to LF, so it is the same on Windows and Linux checkouts.
 
 ### 3.4 Recording generator: `codecompass/eval/recording.py`
 
@@ -128,28 +131,38 @@ The chosen ids are written to `eval/questions/grading-subset.json` and **committ
 
 ### 3.5 LLM runner: `codecompass/eval/llm_run.py`
 
-`python -m codecompass.eval.llm_run FILE [FILE ...] --repo PATH --config TOML --mode {no_retrieval,rag,rag_tools} [--index-dir DIR] [--profile dev] [--reported] [--out DIR] [--resume FILE]`
+`python -m codecompass.eval.llm_run FILE [FILE ...] --repo PATH --config TOML --mode {no_retrieval,rag,rag_tools} [--subset PATH] [--index-dir DIR] [--profile dev] [--reported] [--out DIR] [--resume FILE]`
 
-- **Checks first**, refusing to start if any fails: the question files pass `check_question_set`; the repo's HEAD equals every question's `repo_commit`; the index's commit equals it too (AC-1.2); with `--reported`, a clean git checkout (AC-6.4).
-- Sets `pipeline.mode` from `--mode` on the loaded config. One results file per mode: `<out>/llm-<mode>-<UTC time>.json` (default `eval/results/`).
+`run_llm(question_files, repo_path, *, config_path, mode, subset_path, profile="dev", index_dir=None, generator=None, reranker=None, embedder=None, reported=False, project_dir=None, out_dir=Path("eval/results"), resume=None) -> Path`. `--subset` defaults to `eval/questions/grading-subset.json`. The runner **loads the config from `config_path` itself**, so the config recorded (path and SHA-256) is the config that ran; a missing file stops the run.
+
+- **Checks first**, refusing to start if any fails (`ValueError`, no file written): the mode is one of the three; the question files pass `check_question_set`; the repo's HEAD equals every question's `repo_commit`; the index's commit equals it too (AC-1.2); with `--reported`, a clean git checkout (AC-6.4).
+- Sets `pipeline.mode` from `--mode` on the loaded config. One results file per mode: `<out>/llm-<mode>-<UTC time>.json` (default `eval/results/`). A `--resume` file from another mode is refused.
+- The generator defaults to the configured `llama-server` generator for the profile; tests pass a stub.
 - Creates the embedder, re-ranker and generator **once** and passes them to every `ask()` call. In the timing run, loading them in a new process for each question took about 15 of the 20 s per question; loaded once, a question takes about 5–8 s, so 264 runs take about 30 minutes.
 - For each question: `ask()` with a fresh `RecordingGenerator`. On an exception it records the type and message and retries once; if the retry fails too, it records the error and moves on (AC-5.5).
 - Rewrites the results file after **every** question, so an interrupted run loses at most one answer. `--resume FILE` continues that file and skips ids that already have a result or a final error.
-- Per question (AC-6.3): `id`, `set`, `category`, `complexity`, `in_subset`; `answer` (rendered); `raw_text` (last generator output); `citation_outcome`; `sources` with `verified`; `unverified` and `unreferenced` (from the audit log's `citation` record); `retrieved` and `tool_calls` from the audit log; `timings`; `log_file`; `messages` (the recorded context); `error` and `attempts`.
+- Per question (AC-6.3): `id`, `set`, `category`, `complexity`, `in_subset`; `mode` (from the audit log, to show each question really ran in that mode); `answer` (rendered); `raw_text` (last generator output); `citation_outcome`; `sources` with `verified`; `unverified` and `unreferenced` (from the audit log's `citation` record); `retrieved`, `tool_calls` and `round_limit_hit` from the audit log; `timings`; `log_file`; `messages` (the recorded calls, each `{"messages", "output"}`); `error` (`{"type", "message"}` or `None`) and `attempts`. A question that failed both attempts has `None` in the answer fields.
 - `meta`: `run_meta(...)` plus `mode`, `docs_fallback`, `label` (`reported` or `dev`), each question file with its SHA-256, the subset file with its SHA-256, and start and end times.
 
 ### 3.6 Automatic labels and grading sheet: `codecompass/eval/grading.py`
 
-- `is_abstention(answer) -> bool`: true for `NO_EVIDENCE`, `NO_INDEX`, or an answer with no `Sources` that says it "could not find" or "could not determine" (AC-7.4). A pre-fill; the grader confirms it.
-- `is_format_slip(row) -> bool`: outcome G, the answer has `Sources`, and `set(unverified) == set(unreferenced)` (`unreferenced` is always a subset of `unverified`). Covers both "no markers at all" and "some markers missing" (AC-7.3).
-- `h1(row) -> bool`: outcome G, not an abstention, not a slip (AC-7.2, AC-7.3). `h1_strict(row)` counts slips too.
-- `citation_accuracy(rows)`: verified ÷ all `Sources` entries (micro average), and the share of answers that are F (AC-7.1).
-- `make_sheet(results_a, results_b, results_c, *, seed)`: one row per subset question in (b) and in (c) (20 + 20), plus one row per **answerable** subset question in (a) (16, for the contamination check, AC-10.1); 56 rows in all. Rows are shuffled together with a fixed seed, and the configuration is replaced by an opaque row id (AC-8.1, AC-8.3). The harness leaves every grader column empty (AC-8.5).
+- `is_abstention(answer) -> bool`: true for `NO_EVIDENCE`, `NO_INDEX`, or an answer with no `Sources` that says it "could not find" or "could not determine" (any case) (AC-7.4). A pre-fill; the grader confirms it. `None` (an errored question) is not an abstention.
+- `labels(row) -> dict` for one result row, all `None` for an errored row:
+  - `format_slip`: outcome G, the answer has sources, and `set(unverified) == set(unreferenced)` (`unreferenced` is always a subset of `unverified`). Covers both "no markers at all" and "some markers missing" (AC-7.3).
+  - `uncited`: no sources and not an abstention. Nothing was fabricated (Article VI.3), so it is **not H1**; the graders judge its claims under H2. **(decided 2026-11-08)**
+  - `h1`: outcome G, not an abstention, at least one unverified marker, and not a slip: a citation that matches nothing, a `[N]` with no entry, or a duplicate marker (AC-7.2, AC-7.3). `h1_strict` is `h1` or a slip.
+- `citation_accuracy(rows)`: verified ÷ all `Sources` entries (micro average), and the share of answers that are F, over the rows without an error (AC-7.1). `None` when there is nothing to divide by.
+- `summary(results)`: per run, `n` (answered), `errors`, `abstentions`, `format_slips`, `uncited`, `h1`, `h1_strict` and the citation accuracy, over **all** questions in the run (automatic metrics cover all 88).
+- `load_results(path)` reads `.json` or `.json.gz`, in case a results file is compressed for size.
+- `make_sheet(results_a, results_b, results_c, question_rows, *, seed, out_dir)`: one row per subset question in (b) and in (c) (20 + 20), plus one row per **answerable** subset question in (a) (16, for the contamination check, AC-10.1); 56 rows in all. Reference answers and citations come from `question_rows`. Rows are shuffled together with `random.Random(seed)` and numbered `R01`, `R02`, …, so the configuration is hidden (AC-8.1, AC-8.3). The harness leaves every grader column empty (AC-8.5). An errored answer is skipped and listed in `key.json`. It refuses results in the wrong slot (for example a `rag_tools` run given as (b)) or runs whose conditions differ (all `run_meta` groups except `host`, plus `docs_fallback`, `label`, the question files and the subset) (AC-5.3).
+- `python -m codecompass.eval.grading --a FILE --b FILE --c FILE --questions FILE... --seed N --out DIR` writes the sheet folder and `summary.json` (the summary for each run) and prints the folder.
+- Row files leave out the system prompt: it is the same fixed text for every answer of a configuration, and it differs when tools are on, so it would reveal the configuration (AC-8.3). Tool results in `rag_tools` rows can still reveal it; the sheet and file names never name it, and the report states this limitation.
 - (a) rows are graded for the score only: their H2 and H3 cells are pre-filled `n/a` (no retrieved context to check claims against), and their H1 / slip labels are left out of the hallucination figures, which use (b) and (c) only (§5 "Configuration (a)").
 - Output, in `eval/results/grading-<UTC time>/`:
-  - `sheet.csv`: one short row per answer: row id, question id, category, tag, pre-filled H1 / slip / abstention labels, the name of the row's Markdown file, and empty columns for each grader (H2, H3, score, reason; H2 and H3 `n/a` for (a) rows).
+  - `sheet.csv`: one short row per answer: row id, question id, category, tag, set, pre-filled abstention / slip / uncited / H1 labels (`yes`/`no`; slip and H1 `n/a` for (a) rows), the name of the row's Markdown file, and for each grader (`nicole_`, `kelsey_`) H2, H3, score and reason, empty except H2 and H3 `n/a` for (a) rows and H3 `n/a` for answerable questions.
   - `rows/<row id>.md`: everything a grader reads: the question, reference answer and citations, the system answer with its sources and checker outcome, and the full context the model saw (each message, tool results in full). A 32k-token context does not fit in a spreadsheet cell.
-  - `key.json`: row id → question id and configuration. Graders do not open it until grading is finished.
+  - `key.json`: `seed`, `rows` (row id → question id and configuration) and `skipped` (errored answers). Graders do not open it until grading is finished.
+  - `summary.json` (from the command): the automatic counts for each run.
 
 ### 3.7 Design decisions
 

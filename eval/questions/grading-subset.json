@@ -1,0 +1,39 @@
+{
+  "rule": "plan 003 \u00a73.3",
+  "question_files": [
+    {
+      "path": "eval/questions/flask-core-kelsey.jsonl",
+      "sha256": "76cf0dcfaf7d44d1949af56f6511e01a8535021d0f719924c2eb0d3380c6a77a"
+    },
+    {
+      "path": "eval/questions/flask-core-nicole.jsonl",
+      "sha256": "3449335bd0dc03bfb57518e308baa44957362779f334c0c63acc2c0e8c57fe36"
+    },
+    {
+      "path": "eval/questions/flask-swe-qa.jsonl",
+      "sha256": "9c62594655fac7f44c71b39de341bef1cd947ddad1b7a47276e48a99cf188d1d"
+    }
+  ],
+  "ids": [
+    "core-architectural-02",
+    "core-architectural-08",
+    "core-design-rationale-04",
+    "core-design-rationale-05",
+    "core-localisation-02",
+    "core-localisation-04",
+    "core-runtime-behaviour-01",
+    "core-runtime-behaviour-07",
+    "core-unanswerable-01",
+    "core-unanswerable-03",
+    "core-unanswerable-06",
+    "core-unanswerable-08",
+    "swe-qa-flask-01",
+    "swe-qa-flask-06",
+    "swe-qa-flask-17",
+    "swe-qa-flask-23",
+    "swe-qa-flask-27",
+    "swe-qa-flask-35",
+    "swe-qa-flask-40",
+    "swe-qa-flask-45"
+  ]
+}

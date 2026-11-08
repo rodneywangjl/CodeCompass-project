@@ -231,3 +231,47 @@ The committed config for every reported run (AC-5.4a): a full copy of codecompas
 diffed codecompass.toml vs eval config → only the header + the 5 EVAL changes (timeout 120→300, embedder/reranker cuda, reranker float16, docs_fallback false). moved the eval config out → 4 failed, 5 errors. put back → 9 passed. ran run_meta with the eval config on my flask → cuda for both models, float16, timeout 300, dev = Qwen 14B, 32768, pinned checksum, docs_fallback False. full suite on the merged branch 1321 passed.
 ### What I kept or changed
 Kelsey ran the timing run on the cluster (5 `rag_tools` questions outside the evaluation set): the longest wait was 1.8 s, so the 300 s floor applies. She found that a copy of the user config holds only the GPU settings, so the tests now require the full `[generator]` section and the `dev` profile. While writing the tests, Claude found that `load_online_config()` returns the defaults for a missing path, so one test passed with no file; it now checks the file exists first, and I asked Kelsey to check the config path in her retrieval runner. Plan §3.5 now says the runner loads the models once, because loading them per question took about 15 of the 20 s.
+
+## 2026-11-08 · Spec 003 T5.3 grading subset
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/eval/subset.py, tests/eval/test_subset_t53.py, eval/questions/grading-subset.json, docs/specs/003-evaluation/plan.md, docs/specs/003-evaluation/tasks.md
+- **Outcome:** Changed
+### What I asked for
+The rule that picks the 20 questions graded by hand (4 per category; 2 core and 2 SWE-QA with one of each tag; 4 core unanswerable), ordered by `sha256(id)` so nobody chooses them, a command that writes `eval/questions/grading-subset.json`, and tests that the committed file is what the rule gives.
+### How I checked it
+moved subset.py out → 1 error (module missing). put back → 13 passed.
+### What I kept or changed
+I chose `sha256(id)` over a seeded random draw because it has no seed that could be re-tried. While implementing, Claude found that one approved test hashed the question files' raw bytes, which differ between my Windows checkout (CRLF) and a Linux clone (LF); I approved changing that one line so the hash is taken with line endings normalised to LF, and the plan now says so. The subset file was generated once, before any LLM run, and gives 8 `simple`, 8 `code-tracing` and 4 unanswerable questions.
+
+## 2026-11-08 · Spec 003 T5.4 recording generator
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/eval/recording.py, tests/eval/test_recording_t54.py
+- **Outcome:** Kept
+### What I asked for
+A wrapper passed to `ask(generator=...)` that passes every call to the real generator and keeps a copy of each message list and each output, so graders see the full context the model saw, including full tool results (§13 C8), with no change to Spec 002 code.
+### How I checked it
+moved recording.py out → ModuleNotFoundError. put back → 11 passed (read through the 11 test names). ran ask() on the fixture repo with the wrapper → 1 call recorded, system + user messages sent, raw output kept with its Sources section, outcome F.
+### What I kept or changed
+Kept the design from plan §3.4. The wrapper passes `on_text` only when it is given, because the harness also calls `generate(messages)` without it, and it records deep copies because the harness keeps appending to its message list. The tests run `ask()` on the fixture repo with and without the wrapper and check the answer and outcome are the same.
+
+## 2026-11-08 · Spec 003 T5.5 LLM runner
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/eval/llm_run.py, tests/eval/test_llm_run_t55.py, docs/specs/003-evaluation/plan.md, docs/specs/003-evaluation/tasks.md
+- **Outcome:** Changed
+### What I asked for
+The runner that sends every question through `ask()` in one mode (`no_retrieval`, `rag` or `rag_tools`): checks before any question, models created once, a fresh recording wrapper per question, one retry, the results file rewritten after each question, `--resume`, `--reported`, and a command line.
+### How I checked it
+moved llm_run.py out → ImportError. put back → 23 passed, read through the test names: results fields, all 3 modes, models reused with a fresh recorder per question, retry once then record the error, file rewritten after each question, resume, stops before any question on a wrong HEAD/index/question set/config/mode, --reported refuses a dirty tree, CLI. I have also ran the runner on my flask clone (85c5d93) with no llama-server → stopped with "could not read llama-server … Connection refused", exit code 1, nothing written to /tmp/llm-test.
+### What I kept or changed
+The runner loads the config from `--config` itself, so the config recorded is the one that ran, and a missing file stops the run. Each question also records the mode it ran in and whether the round limit was hit. Three approved tests were wrong and I approved changing them: the test stub copies a retrieved chunk's header, so it crashes in `no_retrieval` (the runner correctly recorded that as an error), and in `rag` an ignored tool request is logged rather than run, so the test now checks that no tool ran and that the ignored request is recorded. The runner code did not change for these.
+
+## 2026-11-08 · Spec 003 T5.6 automatic labels and grading sheet
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/eval/grading.py, tests/eval/test_grading_t56.py, docs/specs/003-evaluation/spec.md, docs/specs/003-evaluation/plan.md, docs/specs/003-evaluation/tasks.md
+- **Outcome:** Changed
+### What I asked for
+The automatic labels (abstention, format slip, H1, strict H1), citation accuracy and per-run counts, and the blind grading sheet: a CSV with empty grader columns, one Markdown file per row with the full context, and a key file, for the 20 subset questions in `rag` and `rag_tools` plus the 16 answerable ones in `no_retrieval`.
+### How I checked it
+moved grading.py out → ImportError. put back → 26 passed (read the test names). opened R01.md from an end-to-end run (runner in 3 modes → grading sheet) → question, reference answer and citations, system answer with Sources, citation check outcome F with the source verified, full context. noticed the system prompt listed the tools, which gives away the mode → asked for it to be left out; saw the new test fail first, then 27 passed.
+### What I kept or changed
+I decided that an answer citing nothing that is not an abstention is labelled `uncited`, not H1, because nothing was fabricated (Article VI.3); graders judge its claims under H2. This is now in AC-7.2. The sheet refuses results in the wrong slot or from runs under different conditions, skips errored answers and lists them in the key, and reads `.json.gz` in case a results file has to be compressed (Kelsey's size note). When I opened a row file, its system prompt listed the tools, which gave away the configuration; I chose to leave the system prompt out of the row files (one more test, written first). Tool results in `rag_tools` rows can still reveal it, and the report will state this.

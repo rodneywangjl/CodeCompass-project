@@ -96,6 +96,17 @@ TODO (Swen)
 ### What I kept or changed
 The probe showed the cache stopped re-execution but the repeat still used a round, and the model got the full result again. Decided a repeat counts against the limit (Article V.1: the loop must stay bounded). The round-limit test T8.3 fed the same call every round, so it had to change to distinct calls; the assertions are unchanged, and it needs reviewer sign-off (Article IX.3). Evaluation must be re-run before results are reported (Article VII.5).
 
+## 2026-11-08 · Vague-question hint behind a config flag (T19.5)
+- **Tool (model):** Claude Code (claude-haiku-5-5)
+- **Files:** codecompass/online/agent/harness.py, codecompass/online/config.py, codecompass/online/__init__.py, tests/online/test_vague_question_hint_t195.py, docs/specs/002-online-retrieval/tasks.md, ai-log/swen.md
+- **Outcome:** Changed
+### What I asked for
+A `[prompt] vague_question_hint` flag, off by default. When on, the system prompt tells the model that, if the question names no file or function and the context does not answer it, it should say so and ask the developer to name a file or function. Tests first, with the flag loading, layering, rejecting a non-boolean, and being recorded in the audit log.
+### How I checked it
+Ran pytest tests/online/test_vague_question_hint_t195.py -v (21 passed). On the cluster, set `[prompt] vague_question_hint = true` in a local config (not committed), asked a vague question that still passes the evidence gate with `python -m codecompass.online.cli ask <repo> "<question>" --config <file>`, and checked that the answer says it could not find the answer and asks for a file or function. Then checked the newest JSON in the query log directory has `"prompt": {"vague_question_hint": true, ...}`. With the flag false, the same question gives the earlier answer and the log says false.
+### What I kept or changed
+Kept the rule as one numbered sentence after the existing rules, so with the flag off the prompt is byte-for-byte today's (snapshot tests, with and without tools). The evidence gate (AC-1.5) refuses before the model is called, so this sentence reaches the model only for questions that pass the gate and are still not answered from the context. The gate's refusal text is unchanged; changing it would be a spec change. Off by default; the evaluation must be re-run before any result that uses the flag is reported (Article VII.5). I first added a `[prompt]` table to codecompass.toml; that broke tests/eval/test_eval_config_t52.py, which requires the eval config to match the project config, so the default lives only in code.
+
 ## 2026-11-08 · Citation example in the system prompt behind a config flag (T19.6)
 - **Tool (model):** Claude Code (claude-haiku-5-5)
 - **Files:** codecompass/online/agent/harness.py, codecompass/online/config.py, codecompass/online/__init__.py, tests/online/test_citation_example_t196.py, docs/specs/002-online-retrieval/tasks.md, ai-log/swen.md

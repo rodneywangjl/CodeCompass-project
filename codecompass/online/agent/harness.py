@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from dataclasses import dataclass, field
 
 from codecompass.online.agent.cache import ToolCache
@@ -71,6 +72,10 @@ DOCS_NOTE = (
 FINAL_MESSAGE = ("Tool limit reached: no more tools are available. Answer now, using "
                  "only the evidence above, and state what you could not determine.")
 
+# Optional rule, on only with [prompt] vague_question_hint = true (T19.5, Article X.2).
+VAGUE_QUESTION_RULE = ("If the question names no file or function and the code context does not "
+                       "answer it, say so and ask the developer to name a file or function.")
+
 # Optional example, on only with [prompt] format_example = true (T19.6, Article VI.4).
 # It names an invented file and commit, so it cannot be cited as evidence from a repository.
 # The Sources lines use the format citation/parser.py reads (AC-1.1).
@@ -87,15 +92,18 @@ CITATION_EXAMPLE_BLOCK = (
 )
 
 
-def system_prompt(*, tools_enabled: bool, format_example: bool = False) -> str:
+def system_prompt(*, tools_enabled: bool, format_example: bool = False, vague_question_hint: bool = False) -> str:
     """The D14 prompt: with tools, the tool decision is rule 1; without, the
     pre-T20.1 prompt, unchanged (D17, Article VII.3). With the default flags it is
-    byte-for-byte today's prompt (T19.6)."""
+    byte-for-byte today's prompt (T19.6). With the default flags it is
+    byte-for-byte today's prompt (T19.5)."""
     if not tools_enabled:
         rules, intro = _RULES, _INTRO
     else:
         rules = [_TOOL_RULE, *_RULES[:2], _AFTER_TOOLS_RULE, _RULES[3]]
         intro = f"{_INTRO}\n\n{_TOOLS_INTRO}"
+    if vague_question_hint:
+        rules = [*rules, VAGUE_QUESTION_RULE]
     numbered = "\n".join(f"{i}. {rule}" for i, rule in enumerate(rules, 1))
     prompt = f"{intro}\n\nRules:\n{numbered}"
     if format_example:
@@ -137,6 +145,15 @@ def _call_key(call) -> str:
     return json.dumps([call.tool, call.args], sort_keys=True, default=str)
 
 
+# A "<" that would open or close a tool_result block (T21.2).
+_WRAPPER_TAG = re.compile(r"<(?=\s*/?\s*tool_result)", re.I)
+
+
+def _body(text: str) -> str:
+    """Repo text cannot end the block or forge another one; nothing else changes."""
+    return _WRAPPER_TAG.sub("&lt;", text)
+
+
 def tool_result_message(call, output: ToolOutput) -> str:
     """The D16 wrapper; a git tool's empty history is said plainly (Article V.5)."""
     attrs = _attrs(call)
@@ -149,7 +166,7 @@ def tool_result_message(call, output: ToolOutput) -> str:
             body += f" lines {call.args['lines']}"
     else:
         body = output.text
-    return f"<tool_result{attrs}>\n{body}\n</tool_result>"
+    return f"<tool_result{attrs}>\n{_body(body)}\n</tool_result>"
 
 
 def malformed_result_message(block: str) -> str:
@@ -245,16 +262,18 @@ def _generate(generator, messages: list[dict], on_draft) -> str:
 
 def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: int,
               tools_enabled: bool = True, docs: bool = False, on_draft=None,
-              on_tool=None, format_example: bool = False) -> AgentRun:
+              on_tool=None, format_example: bool = False, vague_question_hint: bool = False) -> AgentRun:
     """Answer, running at most *max_rounds* tool calls, one per round (Plan D15).
 
     *on_draft*, if given, receives the model's text as it is written (Spec 004 US2).
     *on_tool*, if given, is called with a deep copy of the audit record of each tool call
     that ran, in order (Spec 004 US6); it only observes.
     *format_example* is the [prompt] flag (T19.6); off, the prompt is unchanged.
+    *vague_question_hint* is the [prompt] flag (T19.5); off, the prompt is unchanged.
     """
     messages = [{"role": "system", "content": system_prompt(
-                    tools_enabled=tools_enabled, format_example=format_example)},
+                    
+                    tools_enabled=tools_enabled, format_example=format_example, vague_question_hint=vague_question_hint)},
                 {"role": "user", "content": user_message(question, chunks,
                                                          tools_enabled=tools_enabled,
                                                          docs=docs)}]

@@ -192,6 +192,22 @@ class LoggingConfig:
     query_log_dir: str = ""
 
 
+# Prompt options (T19.5). Each is off by default, so the system prompt is unchanged until
+# it is turned on, and a change to a prompt is a pipeline change under Article VII.5.
+DEFAULT_VAGUE_QUESTION_HINT = False
+
+
+@dataclass(frozen=True)
+class PromptConfig:
+    """Optional system-prompt rules (Article VIII.1, VII.3): off means today's prompt."""
+    vague_question_hint: bool = DEFAULT_VAGUE_QUESTION_HINT
+
+    def __post_init__(self) -> None:
+        hint = self.vague_question_hint
+        if not isinstance(hint, bool):
+            raise ValueError(f"prompt.vague_question_hint must be a bool; got {hint!r}")
+
+
 # Prompt options (T19.6). Off by default, so the system prompt is unchanged until it is
 # turned on, and a change to a prompt is a pipeline change under Article VII.5.
 DEFAULT_FORMAT_EXAMPLE = False

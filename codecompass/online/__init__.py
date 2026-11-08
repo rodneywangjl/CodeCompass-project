@@ -178,8 +178,10 @@ def _retrieve_and_answer(handles, repo_path, question, *, config, profile, tools
         chosen = [c for c, _ in chosen_ranked[:config.retrieval.final_k]]
         docs_flag = any(c.language in doc_langs for c in chosen)
 
+    hint = config.prompt.vague_question_hint
     example = config.prompt.format_example
     prefix = (generator.count_tokens(system_prompt(tools_enabled=tools_on,
+                                                   vague_question_hint=hint,
                                                    format_example=example))
               + generator.count_tokens(user_message(question, [], tools_enabled=tools_on,
                                                     docs=docs_flag)))
@@ -203,19 +205,21 @@ def _retrieve_and_answer(handles, repo_path, question, *, config, profile, tools
                               exclude_dirs=config.offline.files.exclude_dirs)
     return _agent(generator, question, sent, runner=runner, tools=tools,
                   tools_on=tools_on, log=log, docs=used, on_draft=on_draft, on_tool=on_tool,
+                  vague_question_hint=config.prompt.vague_question_hint,
                   format_example=config.prompt.format_example)
 
 
 def _agent(generator, question, chunks, *, runner, tools, tools_on, log, docs: bool = False,
            on_draft=None,
-           on_tool=None, format_example: bool = False):
+           on_tool=None, vague_question_hint: bool = False, format_example: bool = False):
     def run_tool(call):
         with timed(log, "tool_execution"):
             return runner(call)
 
     run = run_agent(generator, question, chunks, run_tool=run_tool,
                     max_rounds=tools.max_verifier_rounds, tools_enabled=tools_on, docs=docs,
-                    on_draft=on_draft, on_tool=on_tool, format_example=format_example)
+                    on_draft=on_draft, on_tool=on_tool,
+                    vague_question_hint=vague_question_hint, format_example=format_example)
     log.update(tool_calls=run.rounds, generator_calls=run.generator_calls,
                round_limit_hit=run.round_limit_hit)
     # the checker sees retrieved chunks plus code shown by tools (VI.1, VI.4)
@@ -246,6 +250,8 @@ def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None =
     log = new_log(question, profile_name=profile_name, profile=model, mode=mode,
                   tools=config.tools)
     log["reranker"] = dataclasses.asdict(config.reranker)  # model, revision, device, dtype
+    log["prompt"] = dataclasses.asdict(config.prompt)  # the [prompt] flags (T19.5)
+    hint = config.prompt.vague_question_hint
     log["prompt"] = dataclasses.asdict(config.prompt)  # the [prompt] flags (T19.6)
     example = config.prompt.format_example
     gen = TimedGenerator(generator or _default_generator(config, model), log)
@@ -253,6 +259,7 @@ def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None =
         # the first call to llama-server (/tokenize), so inside the try (T18.2)
         check_round_reserve(model, tools,
                             gen.count_tokens(system_prompt(tools_enabled=tools_on,
+                                                           vague_question_hint=hint,
                                                            format_example=example)))
         with timed(log, "ensure_current"):
             ensured = ensure_current(repo_path, config=config.offline, index_dir=index_dir,
@@ -268,6 +275,7 @@ def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None =
         elif mode == "no_retrieval":
             answer, chunks, commits = _agent(gen, question, [], runner=None, tools=tools,
                                              tools_on=False, log=log, on_draft=on_draft,
+                                             vague_question_hint=hint,
                                              format_example=example)
         else:
             handles = open_index(repo_path, config=config.offline, index_dir=index_dir,
