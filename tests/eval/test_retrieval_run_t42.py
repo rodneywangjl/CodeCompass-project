@@ -534,3 +534,77 @@ def test_meta_records_embedder_and_reranker_settings_from_config(test_setup, tmp
     emb = cfg.offline.embedder
     assert meta["embedder"] == {"model": emb.model, "revision": emb.revision,
                                 "device": emb.device, "class": type(s["embedder"]).__name__}
+
+
+RUN_META_GROUPS = {"codecompass", "repo", "index", "config", "embedder", "reranker",
+                   "generator", "server", "host"}
+
+
+# 19. with a config file, meta["run"] is Nicole's run_meta output (plan §3.1): every group,
+#     the config file's SHA-256, the index commit; no generator or server without --sent
+def test_meta_run_is_shared_run_meta_when_config_path_given(test_setup, tmp_path):
+    import hashlib
+    s = test_setup
+    cfg_file = tmp_path / "eval.toml"
+    cfg_file.write_text("# test config\n", encoding="utf-8")
+    q_file = _write_jsonl(tmp_path / "q.jsonl", [_make_row(s["commit"])])
+    res_path = run_retrieval([q_file], s["repo"].path, config=s["cfg"], index_dir=s["idx_dir"],
+                             embedder=s["embedder"], reranker=s["reranker"],
+                             config_path=cfg_file, out_dir=s["out_dir"])
+    run = json.loads(res_path.read_text(encoding="utf-8"))["meta"]["run"]
+    assert set(run) == RUN_META_GROUPS
+    assert run["config"]["sha256"] == hashlib.sha256(cfg_file.read_bytes()).hexdigest()
+    assert run["index"]["indexed_commit"] == s["commit"]
+    assert all(v is None for v in run["generator"].values())
+    assert all(v is None for v in run["server"].values())
+
+
+# 20. without a config file there is nothing for run_meta to read: meta["run"] is None
+def test_meta_run_is_none_without_config_path(test_setup, tmp_path):
+    s = test_setup
+    q_file = _write_jsonl(tmp_path / "q.jsonl", [_make_row(s["commit"])])
+    res_path = run_retrieval([q_file], s["repo"].path, config=s["cfg"], index_dir=s["idx_dir"],
+                             embedder=s["embedder"], reranker=s["reranker"], out_dir=s["out_dir"])
+    assert json.loads(res_path.read_text(encoding="utf-8"))["meta"]["run"] is None
+
+
+# 21. with --sent, run_meta also records the generator profile and the server
+def test_sent_passes_profile_and_server_to_run_meta(test_setup, tmp_path, monkeypatch):
+    s = test_setup
+    cfg_file = tmp_path / "eval.toml"
+    cfg_file.write_text("# test config\n", encoding="utf-8")
+    seen = {}
+
+    def fake_run_meta(config_path, repo_path, **kwargs):
+        seen.update(kwargs, config_path=config_path, repo_path=repo_path)
+        return {"fake": True}
+
+    monkeypatch.setattr("codecompass.eval.run_meta.run_meta", fake_run_meta)
+    q_file = _write_jsonl(tmp_path / "q.jsonl", [_make_row(s["commit"])])
+    res_path = run_retrieval([q_file], s["repo"].path, config=s["cfg"], index_dir=s["idx_dir"],
+                             embedder=s["embedder"], reranker=s["reranker"],
+                             generator=StubGenerator(["answer"]), sent=True,
+                             config_path=cfg_file, out_dir=s["out_dir"])
+    assert Path(seen["config_path"]) == cfg_file
+    assert Path(seen["repo_path"]) == s["repo"].path
+    from codecompass.online.generator.profiles import resolve_profile
+    assert seen["profile"] == resolve_profile(s["cfg"])[0]
+    assert seen["server_url"] == s["cfg"].generator.server_url
+    assert Path(seen["index_dir"]) == s["idx_dir"]
+    assert json.loads(res_path.read_text(encoding="utf-8"))["meta"]["run"] == {"fake": True}
+
+
+# 22. a --config path that does not exist is an error, not silently the defaults
+def test_main_refuses_a_missing_config_file(test_setup, tmp_path, capsys, monkeypatch):
+    s = test_setup
+    called = []
+    monkeypatch.setattr("codecompass.eval.retrieval_run.run_retrieval",
+                        lambda *a, **k: called.append(1))
+    missing = tmp_path / "nope.toml"
+    q_file = _write_jsonl(tmp_path / "q.jsonl", [_make_row(s["commit"])])
+    rc = main([str(q_file), "--repo", str(s["repo"].path), "--config", str(missing),
+               "--out", str(s["out_dir"])])
+    out = capsys.readouterr()
+    assert rc == 1 and not called
+    assert any(line.startswith("error:") and "nope.toml" in line
+               for line in (out.out + out.err).splitlines())
