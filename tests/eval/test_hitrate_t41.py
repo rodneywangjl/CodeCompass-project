@@ -182,3 +182,17 @@ def test_whole_file_question_is_left_out_of_line_figures():
     assert s["n"] == 2 and s["file_hits"] == 2
     assert s["line_n"] == 1 and s["line_hits"] == 1
     assert s["line_rate"] == pytest.approx(1.0)
+
+
+# 17. mixed ground truth (one whole-file entry + a real range): the line hit uses only the
+#     real ranges, so a chunk that only overlaps the whole-file entry is not a line hit
+def test_line_hit_uses_only_real_ranges_when_ground_truth_is_mixed():
+    gt = [truth("src/cli.py", 1, 1127), truth("src/a.py", 10, 20)]
+    real = [truth("src/a.py", 10, 20)]
+    only_whole = row("q1", gt=gt, ranked={"vector": [chunk("src/cli.py", 600, 640)]})
+    only_whole["line_truth"] = real
+    real_hit = row("q2", gt=gt, ranked={"vector": [chunk("src/a.py", 15, 16)]})
+    real_hit["line_truth"] = real
+    s = hit_rates([only_whole, real_hit], {"vector": [1]})["setups"]["vector"][1]["overall"]
+    assert s["n"] == 2 and s["file_hits"] == 2
+    assert s["line_n"] == 2 and s["line_hits"] == 1

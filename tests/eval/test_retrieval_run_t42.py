@@ -498,3 +498,39 @@ def test_main_cli_returns_0_and_prints_path_on_success_and_1_on_error(test_setup
     assert rc_err == 1
     err_lines = (captured_err.out + captured_err.err).splitlines()
     assert any(line.strip().startswith("error:") and "boom" in line for line in err_lines)
+
+
+# 17. a question mixing a whole-file entry with a real range records only the real range as
+#     line_truth and is not whole_file; an all-whole-file question has empty line_truth
+def test_line_truth_keeps_only_real_ranges(test_setup, tmp_path):
+    s = test_setup
+    line_count = len(subprocess.check_output(
+        ["git", "show", f"{s['commit']}:src/main.py"], cwd=s["repo"].path, text=True
+    ).splitlines())
+    whole = {"path": "src/main.py", "start_line": 1, "end_line": line_count}
+    part = {"path": "src/main.py", "start_line": 1, "end_line": 2}
+    rows = [_make_row(s["commit"], "q-mixed", ground_truth=[whole, part]),
+            _make_row(s["commit"], "q-whole", ground_truth=[whole])]
+    q_file = _write_jsonl(tmp_path / "q.jsonl", rows)
+    res_path = run_retrieval([q_file], s["repo"].path, config=s["cfg"], index_dir=s["idx_dir"],
+                             embedder=s["embedder"], reranker=s["reranker"], out_dir=s["out_dir"])
+    q = {r["id"]: r for r in json.loads(res_path.read_text(encoding="utf-8"))["questions"]}
+    assert q["q-mixed"]["line_truth"] == [part] and q["q-mixed"]["whole_file"] is False
+    assert q["q-whole"]["line_truth"] == [] and q["q-whole"]["whole_file"] is True
+
+
+# 18. embedder and re-ranker settings in meta come from the config, not from the objects
+def test_meta_records_embedder_and_reranker_settings_from_config(test_setup, tmp_path):
+    s = test_setup
+    cfg = dataclasses.replace(
+        s["cfg"], reranker=dataclasses.replace(s["cfg"].reranker, device="cuda", dtype="float16"))
+    q_file = _write_jsonl(tmp_path / "q.jsonl", [_make_row(s["commit"])])
+    res_path = run_retrieval([q_file], s["repo"].path, config=cfg, index_dir=s["idx_dir"],
+                             embedder=s["embedder"], reranker=s["reranker"], out_dir=s["out_dir"])
+    meta = json.loads(res_path.read_text(encoding="utf-8"))["meta"]
+    assert meta["reranker"] == {"model": cfg.reranker.model, "revision": cfg.reranker.revision,
+                                "device": "cuda", "dtype": "float16",
+                                "class": type(s["reranker"]).__name__}
+    emb = cfg.offline.embedder
+    assert meta["embedder"] == {"model": emb.model, "revision": emb.revision,
+                                "device": emb.device, "class": type(s["embedder"]).__name__}
