@@ -130,14 +130,17 @@ The chosen ids are written to `eval/questions/grading-subset.json` and **committ
 
 ### 3.5 LLM runner: `codecompass/eval/llm_run.py`
 
-`python -m codecompass.eval.llm_run FILE [FILE ...] --repo PATH --config TOML --mode {no_retrieval,rag,rag_tools} [--index-dir DIR] [--profile dev] [--reported] [--out DIR] [--resume FILE]`
+`python -m codecompass.eval.llm_run FILE [FILE ...] --repo PATH --config TOML --mode {no_retrieval,rag,rag_tools} [--subset PATH] [--index-dir DIR] [--profile dev] [--reported] [--out DIR] [--resume FILE]`
 
-- **Checks first**, refusing to start if any fails: the question files pass `check_question_set`; the repo's HEAD equals every question's `repo_commit`; the index's commit equals it too (AC-1.2); with `--reported`, a clean git checkout (AC-6.4).
-- Sets `pipeline.mode` from `--mode` on the loaded config. One results file per mode: `<out>/llm-<mode>-<UTC time>.json` (default `eval/results/`).
+`run_llm(question_files, repo_path, *, config_path, mode, subset_path, profile="dev", index_dir=None, generator=None, reranker=None, embedder=None, reported=False, project_dir=None, out_dir=Path("eval/results"), resume=None) -> Path`. `--subset` defaults to `eval/questions/grading-subset.json`. The runner **loads the config from `config_path` itself**, so the config recorded (path and SHA-256) is the config that ran; a missing file stops the run.
+
+- **Checks first**, refusing to start if any fails (`ValueError`, no file written): the mode is one of the three; the question files pass `check_question_set`; the repo's HEAD equals every question's `repo_commit`; the index's commit equals it too (AC-1.2); with `--reported`, a clean git checkout (AC-6.4).
+- Sets `pipeline.mode` from `--mode` on the loaded config. One results file per mode: `<out>/llm-<mode>-<UTC time>.json` (default `eval/results/`). A `--resume` file from another mode is refused.
+- The generator defaults to the configured `llama-server` generator for the profile; tests pass a stub.
 - Creates the embedder, re-ranker and generator **once** and passes them to every `ask()` call. In the timing run, loading them in a new process for each question took about 15 of the 20 s per question; loaded once, a question takes about 5–8 s, so 264 runs take about 30 minutes.
 - For each question: `ask()` with a fresh `RecordingGenerator`. On an exception it records the type and message and retries once; if the retry fails too, it records the error and moves on (AC-5.5).
 - Rewrites the results file after **every** question, so an interrupted run loses at most one answer. `--resume FILE` continues that file and skips ids that already have a result or a final error.
-- Per question (AC-6.3): `id`, `set`, `category`, `complexity`, `in_subset`; `answer` (rendered); `raw_text` (last generator output); `citation_outcome`; `sources` with `verified`; `unverified` and `unreferenced` (from the audit log's `citation` record); `retrieved` and `tool_calls` from the audit log; `timings`; `log_file`; `messages` (the recorded context); `error` and `attempts`.
+- Per question (AC-6.3): `id`, `set`, `category`, `complexity`, `in_subset`; `mode` (from the audit log, to show each question really ran in that mode); `answer` (rendered); `raw_text` (last generator output); `citation_outcome`; `sources` with `verified`; `unverified` and `unreferenced` (from the audit log's `citation` record); `retrieved`, `tool_calls` and `round_limit_hit` from the audit log; `timings`; `log_file`; `messages` (the recorded calls, each `{"messages", "output"}`); `error` (`{"type", "message"}` or `None`) and `attempts`. A question that failed both attempts has `None` in the answer fields.
 - `meta`: `run_meta(...)` plus `mode`, `docs_fallback`, `label` (`reported` or `dev`), each question file with its SHA-256, the subset file with its SHA-256, and start and end times.
 
 ### 3.6 Automatic labels and grading sheet: `codecompass/eval/grading.py`
