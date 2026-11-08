@@ -1,6 +1,6 @@
 # AI Use Declaration: SE201 G1-T1 (CodeCompass)
 
-**Status:** DRAFT for the checkpoint (due 2026-10-18, 23:59). Last updated 2026-10-07 by Nicole Goh.
+**Status:** DRAFT for the checkpoint (due 2026-10-18, 23:59). Last updated 2026-10-07 by Nicole Goh. Kept as a record of the checkpoint; the final submission uses `docs/final/ai-use-declaration.md`.
 
 Format follows SE201 AI Use Disclosure Policy v1.00, §5.1: a short declaration, **one per team**, placed **in the checkpoint document**, that summarises the AI use logs and states which tools were used, for what purpose, and how their output was checked. Copy the declaration below into the checkpoint document. Everything after it is working notes for keeping it accurate, not part of the submission.
 

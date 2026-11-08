@@ -77,7 +77,8 @@ Priorities: **P1** = required for the final submission, **P2** = should ship, **
 *As the team, we need more than 40 questions (instructor feedback) without writing them all by hand.*
 
 - **AC-2.1** The 48 Flask questions from SWE-QA (Peng et al., ACL 2026 Findings; `peng-weihan/SWE-QA-Bench`, `Benchmark/flask.jsonl`) are converted to our format with their original question and reference answer unchanged, and their source and dataset version recorded.
-- **AC-2.2** Ground-truth files are taken from the code-file paths and line ranges cited in each reference answer and checked by hand at the pinned commit. Cited `docs/*.rst` files (9 citations, always alongside a `.py` file) are not used as ground truth (AC-1.1a). 46 of 48 questions have a usable `.py` ground truth; the 2 with none are kept for answer grading but excluded from hit rate.
+- **AC-2.1a** Dataset quirks are kept as they are, so the text still matches the source: the reference answers of `swe-qa-flask-19`, `-38` and `-47` end with a stray `</start_of_answer>`, and `-33` starts with "Yes," although the question asks "Why". Graders ignore these (decided 2026-11-08).
+- **AC-2.2** Ground-truth files are taken from the code-file paths and line ranges cited in each reference answer and checked by hand at the pinned commit. Cited `docs/*.rst` files (9 citations, always alongside a `.py` file) are not used as ground truth (AC-1.1a). All 48 questions have a usable `.py` ground truth, so hit rate counts all 48. (An earlier draft estimated 46; after conversion, every question cites at least one `.py` file. Where an answer names a bare file such as `app.py`, the path was resolved to `src/flask/...` and checked by hand; where it gives no line numbers, the whole file is the ground truth.)
 - **AC-2.3** Each imported question gets a category and a complexity tag by the same rules as the core set. SWE-QA's question types map as: `Why` → design-rationale, `Where` → localisation, `How` → runtime-behaviour, `What` → architectural. **(recommended, team to confirm: §13 C3)** The imported set has no unanswerable controls.
 - **AC-2.4** The licence and citation are recorded (the repository is Apache-2.0). Imported results are reported separately from the core set and combined only where stated.
 - **AC-2.5** If the conversion is done with AI help, it is marked and logged (AC-1.5).
@@ -87,7 +88,7 @@ Priorities: **P1** = required for the final submission, **P2** = should ship, **
 *As the team, we need a consistent simple vs code-tracing label to test the instructor's hypothesis.*
 
 - **AC-3.1** A written tagging rule with examples exists before any question is tagged. (Nicole and Kelsey write the rule.)
-- **AC-3.2** Every question in the core and imported sets is tagged independently by two people, and the agreement rate is reported. Disagreements are settled by discussion and recorded. (Nicole and Kelsey: each tags the other's questions as the second tagger.)
+- **AC-3.2** A second person independently tags Kelsey's 20 core questions (Nicole) and a fixed sample of 20 others (Kelsey): 10 of Nicole's 12 answerable core questions (all except every 6th) and 10 SWE-QA questions (every 5th, starting at #3). The agreement rate is reported on those questions. Disagreements are settled by discussion and recorded in `eval/questions/tagging.md`. Tags on the remaining questions have one tagger, which the report states as a limitation. The sample was reduced from all 68 for time (2026-11-08). Questions exposed before tagging (4 in Kelsey's sample, 6 in Nicole's; listed in `eval/questions/tagging.md`) are tagged but left out of the agreement rate.
 - **AC-3.3** Tags are frozen with the question sets (AC-1.3).
 
 ### US4 (P1): Retrieval ablations (hit rate@k, no LLM)
@@ -288,8 +289,8 @@ Spec 003 is owned and carried out by **Nicole Goh and Kelsey (La Hue Van)** (cha
 |---|---|---|
 | Spec 003, plan and tasks | ✓ | ✓ |
 | Core questions (40) | architectural (8), unanswerable (8), design-rationale 5-8 | localisation (8), runtime-behaviour (8), design-rationale 1-4 |
-| SWE-QA conversion (48) | What and Why (24) | Where and How (24) |
-| Tagging rule and second tagging (AC-3.1, AC-3.2) | ✓ (second-tags Kelsey's) | ✓ (second-tags Nicole's) |
+| SWE-QA conversion (48) | all 48 (Where and How transferred from Kelsey, 2026-11-07) | second-tags 10 of the 48 |
+| Tagging rule and second tagging (AC-3.1, AC-3.2) | ✓ (second-tags Kelsey's 20) | ✓ (second-tags 10 of Nicole's core) |
 | Question-set check (T1.1) | ✓ | review |
 | Runner and retrieval ablations | ✓ | ✓ |
 | Contamination check (US10) | ✓ | |
