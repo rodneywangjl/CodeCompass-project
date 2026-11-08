@@ -18,6 +18,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from codecompass.eval import run_meta as run_meta_module
 from codecompass.eval.hitrate import hit_rates
 from codecompass.eval.questions import _Repo, check_question_set, load_question_set
 from codecompass.offline import _base_dir, open_index
@@ -127,6 +128,15 @@ def run_retrieval(
 
     if sent and getattr(config.retrieval, "docs_fallback", False):
         raise ValueError("--sent measures the docs_fallback-off path only")
+    # Shared run details (plan §3.1), the same shape as the LLM runner's. They need the
+    # config file; a missing file fails here, before any work.
+    run_info = None
+    if config_path is not None:
+        run_info = run_meta_module.run_meta(
+            config_path, repo_path, index_dir=index_dir,
+            profile=resolve_profile(config)[0] if sent else None,
+            server_url=config.generator.server_url if sent else None,
+            project_dir=codecompass_dir)
 
     cc_commit, cc_clean, cc_tag = _check_clean_git(cc_dir)
     label = "reported" if reported else "dev"
@@ -391,6 +401,7 @@ def run_retrieval(
             "ended_at": ended_at,
             "platform": platform.platform(),
             "python": sys.version,
+            "run": run_info,
         }
 
         results = {
@@ -433,6 +444,9 @@ def main(argv=None) -> int:
 
     args = parser.parse_args(argv)
     try:
+        if args.config is not None and not Path(args.config).is_file():
+            # load_online_config would silently use the defaults for a wrong path
+            raise ValueError(f"config file not found: {args.config}")
         cfg = load_online_config(args.config) if args.config else load_online_config(None)
         res_path = run_retrieval(
             args.files,
