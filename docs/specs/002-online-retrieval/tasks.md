@@ -340,6 +340,14 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - **Evaluation:** this changes agent behaviour. The evaluation must be re-run before any result is reported (Article VII.5).
 - ACs: AC-3.1, 3.6; Article I.2, V.1, V.4; plan D14. | Touches: `agent/harness.py`, `tests/online/test_repeated_tool_calls_t194.py`, `tests/online/test_harness_round_limit_t83.py` (approved test, sign-off above), `ai-log/swen.md`, this entry. | Depends on: T19.1, T8.2.
 
+**T19.6 Show the model the citation format once**
+- Gap (dev test, item 4): the model often omits the `[N]` markers, so most answers come back flagged (G). The rules describe the format but show no example.
+- Decision: a new `[prompt] citation_example = false`. With false, the system prompt is byte-for-byte today's prompt, with and without tools. With true, one short example answer is appended after the rules: `[N]` markers in the body and a `Sources` section in the format `citation/parser.py` reads. The example names only an invented file (`example/client.py`) and an invented commit, and says so, so it cannot be cited as evidence from a repository. The audit log records the `prompt` flags (Article VII.3, VIII.4). Off by default (Article VII.5).
+- Tests first (`tests/online/test_citation_example_t196.py`, stub embedder, re-ranker and generator): with the flag off (and by default) the system prompt equals a snapshot of today's prompt, with and without tools; with the flag on, the prompt is that snapshot plus the example block and nothing else; the example parses with `citation/parser.py` into the two entries it shows (one code, one commit, markers 1 and 2); the example names no file that exists in this repository; `[prompt] citation_example` defaults to false, loads from a file, layers in both loaders, and rejects a non-boolean; `ask` sends the flagged prompt and writes `audit_log["prompt"]["citation_example"]`.
+- Note: the flag is not added to `codecompass.toml`. `tests/eval/test_eval_config_t52.py` requires the eval config to equal the project config except for the planned differences, so a new `[prompt]` table in the project file fails that test. The default is set in code (`PromptConfig`).
+- **Evaluation:** this changes the prompt, and the example may change citation rates. The evaluation must be re-run before any result is reported (Article VII.5).
+- ACs: Spec 002 AC-1.1; Article VI.1, VI.4, VII.3, VIII.1, VIII.4; plan D14. | Touches: `agent/harness.py`, `config.py`, `__init__.py`, `tests/online/test_citation_example_t196.py`, `ai-log/swen.md`, this entry. | Depends on: T20.1, T9.4.
+
 ## S20: Tool-use prompt (dev test, 2 Nov 2026, problem 3; plan D14, tool check)
 
 **T20.1 Tool-use prompt**
