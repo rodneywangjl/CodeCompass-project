@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
+import posixpath
+import re
 import time
 from pathlib import Path
 
@@ -26,7 +28,7 @@ from codecompass.online.retrieval.hybrid import retrieve
 from codecompass.online.retrieval.reranker import rerank_chunks
 
 __version__ = "0.1.0"
-__all__ = ["ask", "warm_up"]
+__all__ = ["ask", "warm_up", "asks_about_docs"]
 
 STALE_WARNING = ("⚠ WARNING: The index may be out of date. The answer below is based "
                  "on an older version of the codebase.")
@@ -38,12 +40,29 @@ EMPTY_QUESTION = ("The question has no words in it. Each question is answered on
                   "in simpler words\".")
 NO_INDEX = ("No index is available for this repository yet, so this question cannot "
             "be answered.")
+DOC_WORDS = frozenset({"readme", "docs", "doc", "documentation", "documented",
+                       "changelog", "guide", "tutorial"})
+DOC_SUBSTRINGS = (".md", ".rst")
+_DOC_WORD_RE = re.compile(
+    r"\b(" + "|".join(sorted(DOC_WORDS, key=len, reverse=True)) + r")\b",
+    re.IGNORECASE,
+)
+
+
+def asks_about_docs(question: str) -> bool:
+    """Case-insensitive whole-word and extension check for doc queries (T22.1)."""
+    lower = question.lower()
+    if any(sub in lower for sub in DOC_SUBSTRINGS):
+        return True
+    return bool(_DOC_WORD_RE.search(lower))
 
 
 def _default_generator(config: OnlineConfig, profile):
     from codecompass.online.generator.llama import LlamaServerGenerator
-    return LlamaServerGenerator(profile, server_url=config.generator.server_url,
-                                timeout_seconds=config.generator.timeout_seconds)
+    generator = LlamaServerGenerator(profile, server_url=config.generator.server_url,
+                                     timeout_seconds=config.generator.timeout_seconds)
+    generator.connect_timeout = config.generator.connect_timeout_seconds  # T19.3
+    return generator
 
 
 _RERANKERS: dict = {}
@@ -108,18 +127,68 @@ def _retrieve_and_answer(handles, repo_path, question, *, config, profile, tools
     with timed(log, "reranking"):
         ranked = rerank_chunks(reranker, question, chunks, len(chunks))
     rrf = dict(shortlist)
-    if ranked:  # the evidence gate (AC-1.5, Plan D19): poor matches are not evidence
-        top, minimum = max(score for _, score in ranked), config.retrieval.min_top_score
-        log["evidence_gate"] = {"min_top_score": minimum, "top_score": top,
-                                "passed": top >= minimum}
-        if top < minimum:
-            _log_retrieved(log, ranked, rrf, set())
-            return _refusal(ranked, config.retrieval.closest_files), [], []
+
+    if not config.retrieval.docs_fallback:
+        if ranked:  # the evidence gate (AC-1.5, Plan D19): poor matches are not evidence
+            top, minimum = max(score for _, score in ranked), config.retrieval.min_top_score
+            log["evidence_gate"] = {"min_top_score": minimum, "top_score": top,
+                                    "passed": top >= minimum}
+            if top < minimum:
+                _log_retrieved(log, ranked, rrf, set())
+                return _refusal(ranked, config.retrieval.closest_files), [], []
+        chosen = [c for c, _ in ranked[:config.retrieval.final_k]]
+        docs_flag = False
+        doc_langs = ()
+    else:
+        # Docs as context (T22.1): code is the source of truth, docs add context when needed
+        doc_langs = set(config.retrieval.doc_languages)
+        code_ranked = [(c, s) for c, s in ranked if c.language not in doc_langs]
+        doc_ranked = [(c, s) for c, s in ranked if c.language in doc_langs]
+        best_code = max((s for _, s in code_ranked), default=None)
+        best_doc = max((s for _, s in doc_ranked), default=None)
+        minimum = config.retrieval.min_top_score
+        code_passed = best_code is not None and best_code >= minimum
+        doc_passed = best_doc is not None and best_doc >= minimum
+
+        log["evidence_gate"] = {"min_top_score": minimum, "top_score": best_code,
+                                "passed": code_passed}
+
+        reason: str | None = None
+        if code_passed:
+            margin = config.retrieval.docs_margin
+            if doc_passed and asks_about_docs(question):
+                reason = "asked"
+                chosen_ranked = ranked
+            elif best_doc is not None and best_doc >= best_code + margin:
+                reason = "better"
+                chosen_ranked = ranked
+            else:
+                reason = None
+                chosen_ranked = code_ranked
+        else:
+            if doc_passed:
+                reason = "code_failed"
+                chosen_ranked = doc_ranked
+            else:
+                _log_retrieved(log, ranked, rrf, set())
+                log["docs_fallback"] = {"used": False, "reason": None,
+                                        "best_code": best_code, "best_doc": best_doc}
+                return _refusal(ranked, config.retrieval.closest_files), [], []
+
+        chosen = [c for c, _ in chosen_ranked[:config.retrieval.final_k]]
+        docs_flag = any(c.language in doc_langs for c in chosen)
+
     prefix = (generator.count_tokens(system_prompt(tools_enabled=tools_on))
-              + generator.count_tokens(user_message(question, [], tools_enabled=tools_on)))
-    sent = fit_chunks([c for c, _ in ranked[:config.retrieval.final_k]],
-                      chunk_budget(profile, tools, prefix), generator.count_tokens)
+              + generator.count_tokens(user_message(question, [], tools_enabled=tools_on,
+                                                    docs=docs_flag)))
+    sent = fit_chunks(chosen, chunk_budget(profile, tools, prefix), generator.count_tokens)
     _log_retrieved(log, ranked, rrf, {c.chunk_id for c in sent})
+    if config.retrieval.docs_fallback:
+        used = any(c.language in doc_langs for c in sent)
+        log["docs_fallback"] = {"used": used, "reason": reason if used else None,
+                                "best_code": best_code, "best_doc": best_doc}
+    else:
+        used = False
     if not sent:
         return NO_EVIDENCE, [], []
     # tools run at the indexed commit, the version the chunks came from (Plan D7)
@@ -131,17 +200,18 @@ def _retrieve_and_answer(handles, repo_path, question, *, config, profile, tools
                               exclude_patterns=config.offline.files.exclude_patterns,
                               exclude_dirs=config.offline.files.exclude_dirs)
     return _agent(generator, question, sent, runner=runner, tools=tools,
-                  tools_on=tools_on, log=log, on_draft=on_draft, on_tool=on_tool)
+                  tools_on=tools_on, log=log, docs=used, on_draft=on_draft, on_tool=on_tool)
 
 
-def _agent(generator, question, chunks, *, runner, tools, tools_on, log, on_draft=None,
+def _agent(generator, question, chunks, *, runner, tools, tools_on, log, docs: bool = False,
+           on_draft=None,
            on_tool=None):
     def run_tool(call):
         with timed(log, "tool_execution"):
             return runner(call)
 
     run = run_agent(generator, question, chunks, run_tool=run_tool,
-                    max_rounds=tools.max_verifier_rounds, tools_enabled=tools_on,
+                    max_rounds=tools.max_verifier_rounds, tools_enabled=tools_on, docs=docs,
                     on_draft=on_draft, on_tool=on_tool)
     log.update(tool_calls=run.rounds, generator_calls=run.generator_calls,
                round_limit_hit=run.round_limit_hit)
@@ -206,12 +276,22 @@ def ask(repo_path, question: str, *, config: OnlineConfig, profile: str | None =
         with timed(log, "citation_check"):
             result = checker.check(answer, chunks, commits)
         rendered = formatter.render(result)
+        if config.retrieval.docs_fallback:
+            doc_paths = {c.path for c in chunks
+                         if c.language in config.retrieval.doc_languages
+                         or posixpath.splitext(c.path)[1].lstrip(".").lower()
+                            in config.retrieval.doc_languages}
+            rendered, doc_sources = formatter.mark_documentation(rendered, result, doc_paths)
+        else:
+            doc_sources = []
         if stale:
             rendered = f"{STALE_WARNING}\nReason: {reason}\n\n{rendered}"
         log["citation"] = {"outcome": result.outcome, "unverified": list(result.unverified)}
         # only when there are some: the record of an ordinary answer is pinned
         if result.unreferenced:
             log["citation"]["unreferenced"] = list(result.unreferenced)
+        if doc_sources:
+            log["citation"]["documentation_sources"] = doc_sources
     except BaseException as exc:  # also Ctrl-C: a failed question is still audited (T18.1)
         log["error"] = {"type": type(exc).__name__, "message": str(exc)}
         log["timings"]["total"] = time.perf_counter() - started

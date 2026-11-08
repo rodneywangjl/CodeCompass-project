@@ -380,6 +380,7 @@ def main(argv=None, *, stdin=None, stdout=None, stderr=None) -> int:
         name, profile = resolve_profile(config, args.profile)
         generator = LlamaServerGenerator(profile, server_url=config.generator.server_url,
                                          timeout_seconds=config.generator.timeout_seconds)
+        generator.connect_timeout = config.generator.connect_timeout_seconds  # T19.3
     except Exception as exc:  # noqa: BLE001 (startup problems are reported, not traced)
         _say(stderr, f"{_paint(chrome, 'error:', 'danger')} {exc}\n")
         return 1

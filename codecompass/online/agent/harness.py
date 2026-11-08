@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import re
 from dataclasses import dataclass, field
 
@@ -62,6 +63,12 @@ _FORMAT_HINT = """Write one tool call on its own, with keyword arguments, exactl
 <tool>git_blame(path="file/path.py", lines="X-Y")</tool>
 <tool>git_log(path="file/path.py", n=10)</tool>"""
 
+DOCS_NOTE = (
+    "Some of the context below is documentation (marked | md or | rst), not code. Code is the "
+    "source of truth; documentation may be out of date. If documentation and code disagree, "
+    "trust the code and say so. Say when part of your answer comes from documentation."
+)
+
 FINAL_MESSAGE = ("Tool limit reached: no more tools are available. Answer now, using "
                  "only the evidence above, and state what you could not determine.")
 
@@ -78,16 +85,38 @@ def system_prompt(*, tools_enabled: bool) -> str:
     return f"{intro}\n\nRules:\n{numbered}"
 
 
-def user_message(question: str, chunks: list, *, tools_enabled: bool = False) -> str:
+def user_message(question: str, chunks: list, *, tools_enabled: bool = False,
+                 docs: bool = False) -> str:
     """The question, then the retrieved chunks as plain text (Plan D3); with
     tools, the tool check closes the message (T20.1)."""
     context = format_context(chunks) if chunks else "(none retrieved)"
-    message = f"Question: {question}\n\nCode context:\n\n{context}"
+    prefix = f"Question: {question}\n\n{DOCS_NOTE}\n\n" if docs else f"Question: {question}\n\n"
+    message = f"{prefix}Code context:\n\n{context}"
     return f"{message}\n\n{TOOL_CHECK}" if tools_enabled else message
 
 
 def _attr(value) -> str:
     return str(value).replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
+
+
+def _attrs(call) -> str:
+    return "".join(f' {k}="{_attr(v)}"' for k, v in {"tool": call.tool, **call.args}.items())
+
+
+def _open_tag(call) -> str:
+    return f"<tool_result{_attrs(call)}>"
+
+
+def repeat_result_message(call, round_no: int) -> str:
+    """The D16 wrapper for a call already run in *round_no*: the model is told to use that
+    result, and no tool runs again (T19.4)."""
+    body = (f"This call was already run in round {round_no} with the same arguments; "
+            f"use the result from round {round_no} instead of asking again.")
+    return f"{_open_tag(call)}\n{body}\n</tool_result>"
+
+
+def _call_key(call) -> str:
+    return json.dumps([call.tool, call.args], sort_keys=True, default=str)
 
 
 # A "<" that would open or close a tool_result block (T21.2).
@@ -101,7 +130,7 @@ def _body(text: str) -> str:
 
 def tool_result_message(call, output: ToolOutput) -> str:
     """The D16 wrapper; a git tool's empty history is said plainly (Article V.5)."""
-    attrs = "".join(f' {k}="{_attr(v)}"' for k, v in {"tool": call.tool, **call.args}.items())
+    attrs = _attrs(call)
     if output.error:
         attrs += f' error="{_attr(output.text)}"'
         body = output.text
@@ -206,7 +235,8 @@ def _generate(generator, messages: list[dict], on_draft) -> str:
 
 
 def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: int,
-              tools_enabled: bool = True, on_draft=None, on_tool=None) -> AgentRun:
+              tools_enabled: bool = True, docs: bool = False, on_draft=None,
+              on_tool=None) -> AgentRun:
     """Answer, running at most *max_rounds* tool calls, one per round (Plan D15).
 
     *on_draft*, if given, receives the model's text as it is written (Spec 004 US2).
@@ -215,9 +245,11 @@ def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: i
     """
     messages = [{"role": "system", "content": system_prompt(tools_enabled=tools_enabled)},
                 {"role": "user", "content": user_message(question, chunks,
-                                                         tools_enabled=tools_enabled)}]
+                                                         tools_enabled=tools_enabled,
+                                                         docs=docs)}]
     run = AgentRun(answer="", messages=messages)
     tool_runs = 0
+    first_round: dict[str, int] = {}  # call key -> the round it first ran in (T19.4)
     while True:
         response = _generate(generator, messages, on_draft)
         run.generator_calls += 1
@@ -248,7 +280,21 @@ def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: i
             tool_runs += 1
             continue
         call = calls[0]
+        key = _call_key(call)
+        if key in first_round:  # T19.4: already run in this question; not run again
+            entry = {"round": tool_runs, "tool": call.tool, "args": dict(call.args),
+                     "cache_hit": True, "error": False,
+                     "result_summary": f"already run in round {first_round[key]}",
+                     "repeat_of": first_round[key]}
+            if len(calls) > 1:
+                entry["ignored_calls"] = len(calls) - 1
+            run.rounds.append(entry)
+            messages.append({"role": "user",
+                             "content": repeat_result_message(call, first_round[key])})
+            tool_runs += 1
+            continue
         output, hit = _run_safely(run_tool, call)
+        first_round[key] = tool_runs
         entry = {"round": tool_runs, "tool": call.tool, "args": dict(call.args),
                  "cache_hit": hit, "error": output.error,
                  "result_summary": output.text.splitlines()[0] if output.text else ""}
