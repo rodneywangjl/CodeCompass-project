@@ -33,7 +33,7 @@ Order: T5.1 first (T4.2 needs it), then T5.2–T5.4 in any order, then T5.5. Tag
 - ACs: AC-5.4, AC-5.4a. | Touches: `eval/codecompass.eval.toml`, `tests/eval/test_eval_config_t52.py`. | Depends on: none.
 
 **T5.3 Grading subset**
-- Tests first: the same input gives the same 20 ids; 4 per category; in each answerable category 2 core and 2 SWE-QA, one of each tag where available; an empty group falls back by the rule; unanswerable picks come from core only; changing a question's text does not change the pick (ids only).
+- Tests first: the same input gives the same 20 ids; 4 per category; in each answerable category 2 core and 2 SWE-QA, one of each tag where available; an empty group falls back by the rule; unanswerable picks come from core only; changing a question's text does not change the pick (ids only); the frozen set gives 8 `simple`, 8 `code-tracing` and 4 unanswerable; the committed `grading-subset.json` equals what the rule gives for the frozen files and records their SHA-256; the command writes the file, and a missing question file gives an error and writes nothing.
 - ACs: AC-5.1. | Touches: `codecompass/eval/subset.py`, `tests/eval/test_subset_t53.py`, `eval/questions/grading-subset.json`. | Depends on: none.
 
 **T5.4 Recording generator**
@@ -41,7 +41,7 @@ Order: T5.1 first (T4.2 needs it), then T5.2–T5.4 in any order, then T5.5. Tag
 - ACs: AC-8.2. | Touches: `codecompass/eval/recording.py`, `tests/eval/test_recording_t54.py`. | Depends on: none.
 
 **T5.5 LLM runner**
-- Tests first (fixture repo, stub generator, stub re-ranker): the embedder, re-ranker and generator are created once and the same objects are passed to every `ask()` call; each mode writes one results file with every per-question field of plan §3.5; `meta` contains `run_meta` and the mode; a question whose `ask()` raises is retried once and then recorded with its error, and the run continues; `--resume` skips answered ids; the file is rewritten after each question; a repo HEAD or index commit different from `repo_commit` stops the run before any question; `--reported` refuses a dirty tree; nothing under `codecompass/online` or `codecompass/offline` changes.
+- Tests first (fixture repo, stub generator, stub re-ranker): the embedder, re-ranker and generator are created once and the same objects are passed to every `ask()` call; each mode writes one results file with every per-question field of plan §3.5, and each question records the mode it ran in; `no_retrieval` sends no chunks and tools run in `rag_tools` only; `in_subset` comes from the subset file; `meta` contains `run_meta` and the run fields; a question whose `ask()` raises is retried once and then recorded with its error, and the run continues; `--resume` skips ids with a result or a final error, and refuses a file from another mode; the file is rewritten after each question; a repo HEAD or index commit different from `repo_commit`, a question set with problems, a missing config file or an unknown mode stops the run before any question; `--reported` refuses a dirty tree and labels a clean run `reported`; the command maps its arguments and prints the path, or `error:` and exits 1.
 - ACs: AC-5.2, AC-5.3, AC-5.5, AC-6.1–6.4. | Touches: `codecompass/eval/llm_run.py`, `tests/eval/test_llm_run_t55.py`. | Depends on: T5.1, T5.4.
 
 **T5.6 Automatic labels and grading sheet**
