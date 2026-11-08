@@ -228,6 +228,6 @@ I decided C5–C9 myself and Kelsey confirmed them: all 88 questions run in all 
 ### What I asked for
 The committed config for every reported run (AC-5.4a): a full copy of codecompass.toml with the GPU settings, the fp16 re-ranker, `docs_fallback` stated off and the timeout from the timing run, plus tests that nothing else differs.
 ### How I checked it
-TODO (Nicole)
+diffed codecompass.toml vs eval config → only the header + the 5 EVAL changes (timeout 120→300, embedder/reranker cuda, reranker float16, docs_fallback false). moved the eval config out → 4 failed, 5 errors. put back → 9 passed. ran run_meta with the eval config on my flask → cuda for both models, float16, timeout 300, dev = Qwen 14B, 32768, pinned checksum, docs_fallback False. full suite on the merged branch 1321 passed.
 ### What I kept or changed
 Kelsey ran the timing run on the cluster (5 `rag_tools` questions outside the evaluation set): the longest wait was 1.8 s, so the 300 s floor applies. She found that a copy of the user config holds only the GPU settings, so the tests now require the full `[generator]` section and the `dev` profile. While writing the tests, Claude found that `load_online_config()` returns the defaults for a missing path, so one test passed with no file; it now checks the file exists first, and I asked Kelsey to check the config path in her retrieval runner. Plan §3.5 now says the runner loads the models once, because loading them per question took about 15 of the 20 s.
