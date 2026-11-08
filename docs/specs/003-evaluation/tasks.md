@@ -13,7 +13,7 @@ Each task starts with its tests (Article IX.3): write them, run them red for the
 ## S4: Retrieval ablations
 
 **T4.1 Hit-rate maths**
-- Tests first: `file_hit` is true when a ground-truth path is in the first k chunks and false when it only appears at rank k+1; `line_hit` needs the same path and an overlapping range (touching ranges count, a range ending one line before does not); a ranked list shorter than k is used as it is; `hit_rates` gives the rate overall and per set, category and complexity; questions with no ground truth are left out of `n` and counted as excluded; an empty group has rate `None`.
+- Tests first: `file_hit` is true when a ground-truth path is in the first k chunks and false when it only appears at rank k+1; `line_hit` needs the same path and an overlapping range (touching ranges count, a range ending one line before does not); a ranked list shorter than k is used as it is; `hit_rates` gives the rate overall and per set, category and complexity; questions with no ground truth are left out of `n` and counted as excluded; a `whole_file` question counts for the file rate but not in `line_n`; an empty group has rate `None`.
 - ACs: AC-4.1, AC-4.4, AC-4.5. | Touches: `codecompass/eval/hitrate.py`, `tests/eval/test_hitrate_t41.py`. | Depends on: none.
 
 **T4.2 Retrieval runner**

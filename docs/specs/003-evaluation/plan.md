@@ -50,7 +50,8 @@ Measures how often the right file is in the top k, for each retrieval setup, wit
 - **k counts chunks, not files** (decision 2026-11-08): retrieval returns chunks and the pipeline sends chunks. A list shorter than k is used as it is.
 - `file_hit(ranked, truth, k) -> bool`: at least one of the first k chunks has the same `path` as a `ground_truth_files` entry (AC-4.4 headline).
 - `line_hit(ranked, truth, k) -> bool`: at least one of the first k chunks has the same path **and** overlaps a ground-truth line range (`start <= truth_end and truth_start <= end`) (AC-4.4 secondary).
-- `hit_rates(rows, ks) -> dict`: for each setup and k, `{"n", "file_hits", "file_rate", "line_hits", "line_rate"}` overall and grouped by `set`, `category` and `complexity` (AC-4.5). A question with no ground truth (unanswerable controls, and the 2 SWE-QA questions without a `.py` file) is left out of `n` and counted under `excluded` (AC-4.1, AC-2.2). A group with `n = 0` has rate `None`, never a division by zero.
+- **Whole-file ground truth** (24 SWE-QA questions whose answers name a file but no lines, for example `swe-qa-flask-37`, all of `cli.py`): any chunk of that file would overlap it, so such a question counts for `file_hit` but is left out of the line figure. The runner marks it `whole_file: true` when every ground-truth range starts at line 1 and ends at the file's last line at `repo_commit`.
+- `hit_rates(rows, ks) -> dict`: for each setup and k, `{"n", "file_hits", "file_rate", "line_n", "line_hits", "line_rate"}` (`line_n` counts only questions that are not `whole_file`) overall and grouped by `set`, `category` and `complexity` (AC-4.5). A question with no ground truth (the 8 unanswerable controls; all 48 SWE-QA questions have one, AC-2.2) is left out of `n` and counted under `excluded` (AC-4.1, AC-2.2). A group with `n = 0` has rate `None`, never a division by zero.
 - Standard library only.
 
 ### 2.2 Runner: `codecompass/eval/retrieval_run.py`
@@ -70,7 +71,8 @@ Measures how often the right file is in the top k, for each retrieval setup, wit
   - `meta`: CodeCompass commit and whether the working tree was clean; `repo_commit` and the indexed commit; embedder and re-ranker model ids, revisions, device and dtype; the retrieval and chunking settings; the config file path; each question file with its SHA-256; the k values; `label` (`dev` unless `--reported`); start and end times (AC-6.2).
   - `questions`: per question its id, set, category, complexity, ground truth and the four ranked lists with scores.
   - `summary`: the output of `hit_rates`.
-- `--reported` refuses to run on a working tree with uncommitted changes; without it the file is labelled `dev` and never used in a reported comparison (AC-6.4).
+- `--reported` refuses to run unless CodeCompass is a git checkout with no uncommitted changes, and records the commit and tag (`git describe --tags`); without it the file is labelled `dev` and never used in a reported comparison (AC-6.4).
+- **Reported runs use a git clone, not a zip:** the cluster copy uploaded as a zip has no `.git`, so the commit cannot be read. Official runs (both runners) clone the repository on the cluster and check out the tag `eval-v1`.
 
 ### 2.3 Design decisions
 
