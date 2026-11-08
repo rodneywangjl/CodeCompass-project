@@ -33,7 +33,7 @@ Order: T5.1 first (T4.2 needs it), then T5.2–T5.4 in any order, then T5.5. Tag
 - ACs: AC-5.4, AC-5.4a. | Touches: `eval/codecompass.eval.toml`, `tests/eval/test_eval_config_t52.py`. | Depends on: none.
 
 **T5.3 Grading subset**
-- Tests first: the same input gives the same 20 ids; 4 per category; in each answerable category 2 core and 2 SWE-QA, one of each tag where available; an empty group falls back by the rule; unanswerable picks come from core only; changing a question's text does not change the pick (ids only).
+- Tests first: the same input gives the same 20 ids; 4 per category; in each answerable category 2 core and 2 SWE-QA, one of each tag where available; an empty group falls back by the rule; unanswerable picks come from core only; changing a question's text does not change the pick (ids only); the frozen set gives 8 `simple`, 8 `code-tracing` and 4 unanswerable; the committed `grading-subset.json` equals what the rule gives for the frozen files and records their SHA-256; the command writes the file, and a missing question file gives an error and writes nothing.
 - ACs: AC-5.1. | Touches: `codecompass/eval/subset.py`, `tests/eval/test_subset_t53.py`, `eval/questions/grading-subset.json`. | Depends on: none.
 
 **T5.4 Recording generator**

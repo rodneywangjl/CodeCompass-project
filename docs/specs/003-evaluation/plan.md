@@ -120,7 +120,9 @@ A committed copy of `codecompass.toml` with these differences: `[embedder] devic
 3. For each answerable category, take one `simple` and one `code-tracing` from `core`, and the same from `swe-qa`. If a group is empty, take the next question in `sha256` order from the same category and set.
 4. Unanswerable: the first 4 core unanswerable questions in `sha256(id)` order.
 
-The chosen ids are written to `eval/questions/grading-subset.json` and **committed before the first LLM run**. The tests check the rule, not the list.
+The chosen ids are written to `eval/questions/grading-subset.json` and **committed before the first LLM run**. The tests check the rule, not the list, and also check that the committed file is what the rule gives for the frozen question files, so a hand edit fails.
+
+`python -m codecompass.eval.subset FILE [FILE ...] --out PATH` writes `{"rule": "plan 003 §3.3", "question_files": [{"path", "sha256"}], "ids": [...]}` with the ids sorted, and prints how many were chosen per category and tag. Each SHA-256 is taken with line endings normalised to LF, so it is the same on Windows and Linux checkouts.
 
 ### 3.4 Recording generator: `codecompass/eval/recording.py`
 
