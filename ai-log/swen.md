@@ -114,6 +114,8 @@ Kept the rule as one numbered sentence after the existing rules, so with the fla
 ### What I asked for
 A `[prompt] format_example` flag, off by default. When on, the system prompt gets one short example answer, with `[N]` markers in the body and a Sources section in the format `citation/parser.py` reads, so the model sees the format once. The example must not name a real file. Tests first; the flag loads, layers, rejects a non-boolean, and is recorded in the audit log.
 ### How I checked it
-TODO (Swen)
+Ran `pytest -m "not model"` on the cluster (Linux, Python 3.12.8): 1460 passed, 10 deselected.
+Ran `pytest -m model` on GPU: 10 passed. The dev (14B) profile was used, because GENERATOR_PROFILE was unset.
+Checked the default profile by reading codecompass/online/config.py (`default_profile = "dev"`).
 ### What I kept or changed
 The example names an invented file (`example/client.py`) and commit, and the prompt says they are invented. The test checks that the example parses into the entries it shows and that the file does not exist in this repository. Off by default, so the prompt is unchanged until the flag is set. Evaluation must be re-run before any result that uses the flag is reported (Article VII.5). The key is `format_example`, not `citation_example`: the approved test T9.6 (Article VI.2) rejects any config field whose name contains "citation", and the flag does not switch off the checker. I did not add the flag to `codecompass.toml`: `tests/eval/test_eval_config_t52.py` requires the eval config to match the project config, so the default lives only in code.
