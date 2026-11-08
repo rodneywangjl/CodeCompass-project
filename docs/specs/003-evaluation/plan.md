@@ -70,6 +70,7 @@ Measures how often the right file is in the top k, for each retrieval setup, wit
 - Writes one results file, `<out>/retrieval-<UTC time>.json` (default `eval/results/`, never `runs/`, AC-6.1), with:
   - `meta`: CodeCompass commit and whether the working tree was clean; `repo_commit` and the indexed commit; embedder and re-ranker model ids, revisions, device and dtype; the retrieval and chunking settings; the config file path; each question file with its SHA-256; the k values; `label` (`dev` unless `--reported`); start and end times (AC-6.2).
   - `questions`: per question its id, set, category, complexity, ground truth and the four ranked lists with scores.
+  - `meta.run`: the shared run details from `run_meta` (§3.1), the same shape as the LLM runner's results; `None` when no config file is given. With `--sent` it also records the generator profile and the server. A `--config` path that does not exist is an error.
   - `summary`: the output of `hit_rates`.
 - `--reported` refuses to run unless CodeCompass is a git checkout with no uncommitted changes, and records the commit and tag (`git describe --tags`); without it the file is labelled `dev` and never used in a reported comparison (AC-6.4).
 - **Reported runs use a git clone, not a zip:** the cluster copy uploaded as a zip has no `.git`, so the commit cannot be read. Official runs (both runners) clone the repository on the cluster and check out the tag `eval-v1`.
