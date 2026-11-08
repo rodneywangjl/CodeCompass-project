@@ -346,7 +346,8 @@ Paths are under `codecompass/online/` (code) and `tests/online/` (tests) unless 
 - Limitation: the evidence gate (AC-1.5) refuses before the generator is called, so this rule reaches the model only for questions that pass the gate and are still not answered from the context. The gate's refusal text is unchanged.
 - Tests first (`tests/online/test_vague_question_hint_t195.py`, stub embedder, re-ranker and generator): with the flag off (and by default) the system prompt equals a snapshot of today's prompt, with and without tools; with the flag on, the prompt is that snapshot plus one numbered rule holding one sentence that asks the developer to name a file or function, and nothing else changes; `[prompt] vague_question_hint` defaults to false, loads from a file, layers in both loaders, and rejects a non-boolean; `ask` sends the flagged prompt and writes `audit_log["prompt"]["vague_question_hint"]`.
 - **Evaluation:** this changes the prompt. The evaluation must be re-run before any result is reported (Article VII.5).
-- ACs: Spec 002 AC-7.1; Article I.3, V.4, VII.3, VIII.1, VIII.4, X.2; plan D14. | Touches: `agent/harness.py`, `config.py`, `__init__.py`, `codecompass.toml`, `tests/online/test_vague_question_hint_t195.py`, `ai-log/swen.md`, this entry. | Depends on: T19.4, T20.1.
+- ACs: Spec 002 AC-7.1; Article I.3, V.4, VII.3, VIII.1, VIII.4, X.2; plan D14. | Touches: `agent/harness.py`, `config.py`, `__init__.py`, `tests/online/test_vague_question_hint_t195.py`, `ai-log/swen.md`, this entry. | Depends on: T19.4, T20.1.
+- Note: the flag is not added to `codecompass.toml`. `tests/eval/test_eval_config_t52.py` requires the eval config to equal the project config except for the planned differences, so a new `[prompt]` table in the project file fails that test. The default is set in code (`PromptConfig`).
 
 ## S20: Tool-use prompt (dev test, 2 Nov 2026, problem 3; plan D14, tool check)
 

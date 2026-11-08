@@ -71,15 +71,22 @@ DOCS_NOTE = (
 FINAL_MESSAGE = ("Tool limit reached: no more tools are available. Answer now, using "
                  "only the evidence above, and state what you could not determine.")
 
+# Optional rule, on only with [prompt] vague_question_hint = true (T19.5, Article X.2).
+VAGUE_QUESTION_RULE = ("If the question names no file or function and the code context does not "
+                       "answer it, say so and ask the developer to name a file or function.")
 
-def system_prompt(*, tools_enabled: bool) -> str:
+
+def system_prompt(*, tools_enabled: bool, vague_question_hint: bool = False) -> str:
     """The D14 prompt: with tools, the tool decision is rule 1; without, the
-    pre-T20.1 prompt, unchanged (D17, Article VII.3)."""
+    pre-T20.1 prompt, unchanged (D17, Article VII.3). With the default flags it is
+    byte-for-byte today's prompt (T19.5)."""
     if not tools_enabled:
         rules, intro = _RULES, _INTRO
     else:
         rules = [_TOOL_RULE, *_RULES[:2], _AFTER_TOOLS_RULE, _RULES[3]]
         intro = f"{_INTRO}\n\n{_TOOLS_INTRO}"
+    if vague_question_hint:
+        rules = [*rules, VAGUE_QUESTION_RULE]
     numbered = "\n".join(f"{i}. {rule}" for i, rule in enumerate(rules, 1))
     return f"{intro}\n\nRules:\n{numbered}"
 
@@ -226,14 +233,16 @@ def _generate(generator, messages: list[dict], on_draft) -> str:
 
 def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: int,
               tools_enabled: bool = True, docs: bool = False, on_draft=None,
-              on_tool=None) -> AgentRun:
+              on_tool=None, vague_question_hint: bool = False) -> AgentRun:
     """Answer, running at most *max_rounds* tool calls, one per round (Plan D15).
 
     *on_draft*, if given, receives the model's text as it is written (Spec 004 US2).
     *on_tool*, if given, is called with a deep copy of the audit record of each tool call
     that ran, in order (Spec 004 US6); it only observes.
+    *vague_question_hint* is the [prompt] flag (T19.5); off, the prompt is unchanged.
     """
-    messages = [{"role": "system", "content": system_prompt(tools_enabled=tools_enabled)},
+    messages = [{"role": "system", "content": system_prompt(
+                    tools_enabled=tools_enabled, vague_question_hint=vague_question_hint)},
                 {"role": "user", "content": user_message(question, chunks,
                                                          tools_enabled=tools_enabled,
                                                          docs=docs)}]
