@@ -101,13 +101,13 @@ def test_the_default_is_off():
 
 @pytest.mark.parametrize("loader", LOADERS)
 def test_the_flag_loads_from_the_file(tmp_path, loader):
-    path = write(tmp_path / "codecompass.toml", "[prompt]\ncitation_example = true\n")
+    path = write(tmp_path / "codecompass.toml", "[prompt]\nformat_example = true\n")
     assert loader(path).prompt.format_example is True
 
 
 def test_the_flag_layers_like_other_config(tmp_path):
-    base = write(tmp_path / "base.toml", "[prompt]\ncitation_example = true\n")
-    override = write(tmp_path / "override.toml", "[prompt]\ncitation_example = false\n")
+    base = write(tmp_path / "base.toml", "[prompt]\nformat_example = true\n")
+    override = write(tmp_path / "override.toml", "[prompt]\nformat_example = false\n")
     assert load_online_config_layers([base, override]).prompt.format_example is False
     assert load_online_config_layers([override, base]).prompt.format_example is True
     assert load_online_config_layers([base]).prompt.format_example is True
@@ -116,7 +116,7 @@ def test_the_flag_layers_like_other_config(tmp_path):
 @pytest.mark.parametrize("loader", LOADERS)
 @pytest.mark.parametrize("value", ['"yes"', '"false"', "1", "0"])
 def test_a_non_boolean_is_rejected(tmp_path, loader, value):
-    path = write(tmp_path / "codecompass.toml", f"[prompt]\ncitation_example = {value}\n")
+    path = write(tmp_path / "codecompass.toml", f"[prompt]\nformat_example = {value}\n")
     with pytest.raises(ValueError, match="prompt.format_example must be a bool"):
         loader(path)
 
