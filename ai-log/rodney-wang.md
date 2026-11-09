@@ -515,7 +515,7 @@ Pass the streamed text up through `ask()` to an optional callback, never forward
 ### How I checked it
 Tried a model reply with a `<tool>` tag in the middle. Only the text before the tag got forwarded. I also did a final manual review at the end, though a light one given the volume of changes.
 ### What I kept or changed
-Added a small filter that stops forwarding at a tool tag. From here on I told the assistant to treat test approval as given for the rest of the TUI tasks, which were reviewed and merged by Gavin in PR #23 (no review comments).
+Added a small filter that stops forwarding at a tool tag. From here on I told the assistant to treat test approval as given for the rest of the TUI tasks (T2.4 to T2.6). They were low risk: terminal display, background warm-up and docs, none of which change retrieval or citation checking. They were reviewed and merged by Gavin in PR #23 (no review comments).
 
 ## 2026-11-01 · T2.4 The draft in the terminal
 - **Tool (model):** Claude Code (claude-sonnet-5-5)
@@ -650,6 +650,6 @@ Went through it in a real terminal: the tool count, `/tools`, both themes, `/the
 - Claude asked me to settle a few spec conflicts first, so clicking became a `/tools` command and the flagged banner keeps its exact wording. The spec was updated before any code.
 - Added colour themes (dark and a light version), with contrast checked so text stays readable. Colour is only used on a real terminal, so piped output stays plain.
 - Added a `/theme` command to switch colour on or off for the session.
-- For the Claude Code-style look (boxed prompt, spinner, live tool lines, styled markdown), I let Claude do T4.2 to T4.5 without stopping for approval. It still wrote tests first and fixed its own code instead of an approved test when one failed.
+- For the Claude Code-style look (boxed prompt, spinner, live tool lines, styled markdown), I let Claude do T4.2 to T4.5 without stopping for approval, since this was low-risk display work that doesn't touch retrieval or citation checking. It still wrote tests first and fixed its own code instead of an approved test when one failed.
 - A real-terminal check found two small spinner glitches, which were fixed with a new test. Everything went through PR #27, which Nicole reviewed and Gavin merged.
 
