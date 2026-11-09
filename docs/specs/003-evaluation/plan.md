@@ -207,7 +207,7 @@ Reads the graded sheets, the key, and the results files. Writes versioned figure
 | Hit rate@k | copied from the retrieval results file's `summary` (file and line rates, with n) | retrieval file | AC-4.x |
 | Failure-example candidates | rows with final H2 or H3 yes, or H1, with question id, configuration and audit-log path; the 3–5 examples are **chosen by hand** | merged sheet + results | AC-9.6 |
 
-- The contamination flag threshold (≥ 0.5) was fixed on 2026-11-09, before any results existed (§4.4).
+- The contamination flag threshold (≥ 0.5) was fixed on 2026-11-09 before anyone saw any results (§4.4).
 - Output:
   - `report.json`: every figure, with n, plus the run details (`meta`) of the three results files and the agreement figures;
   - `report.md`: the same as tables, ready to copy into the slides and the report;
@@ -219,7 +219,9 @@ Reads the graded sheets, the key, and the results files. Writes versioned figure
 - **No significance tests** (AC-9.5): n is small (20 per configuration); every figure states its n.
 - **The figures are computed, not typed:** the slides and the report copy from `report.md`, so the numbers can be traced back to the files.
 
-### 4.4 Decisions (Nicole, 2026-11-09, before any results existed)
+### 4.4 Decisions (Nicole, 2026-11-09, before anyone saw the results)
+
+Decided around 01:00 on 9 Nov in a draft, before the official runs (09:03–09:23); committed at 10:10, after the runs had finished but before anyone had looked at any results.
 
 1. **Contamination flag:** flagged when the (a) mean score on SWE-QA is **≥ 0.5 above** core (fixed now, before the numbers, so it cannot be tuned). The report also shows the difference, both score distributions and n (8 + 8), with the caveat that the two sets differ in style and difficulty, so a gap suggests memorisation but does not prove it.
 2. **Agreement:** % agreement for every field (score, H2, H3, 0-reason), **plus Cohen's kappa for the score and for H2**, each with n. Kappa is shown next to the %, never alone (it is unstable at n = 56).

@@ -53,6 +53,7 @@ Order: T5.1 first (T4.2 needs it), then T5.2–T5.4 in any order, then T5.5. Tag
 **T6.1 Merge and agreement**
 - Tests first:
   - each grader's columns come only from their own file;
+  - a sheet saved with a byte-order mark (Excel's "CSV UTF-8") reads correctly (bug fix, 2026-11-09, from Kelsey's review of #53);
   - a changed row id or pre-filled cell is refused;
   - an empty grader cell is refused with its row id;
   - an invalid value, a 0 with no reason, and H2 yes with a non-zero score are refused;
