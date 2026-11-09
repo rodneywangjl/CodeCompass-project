@@ -338,3 +338,15 @@ Supporting documents for the final submission: sample run logs, a test-results s
 I compared two of the sample answers with the results file and the four grades with sheet-merged.csv, and checked the test-results file against my own WSL run. I previewed the README, clicked the new links and checked the headline figures against report.md. I read the git diff to confirm only the Evaluation section, the three out-of-date lines and the Reference list changed.
 ### What I kept or changed
 Kept the five sample answers, copied verbatim from the eval-v1 rag_tools results file by a script, one per outcome (F, format slip, H1, evidence-gate abstention, unanswerable control at the round limit), with the final grades from sheet-merged.csv. Example 4 is an answerable question, so it is described as a missed answer, not a success. Added the evaluation section to the README between Testing and Development process, with a table-of-contents entry; its figures were checked against report.md, report.json, agreement.json and the experiments README, and it states that H1 rose from 2 to 4 in experiment C. Also updated three of Rodney's README lines that were out of date (the test count under Testing, the evaluation item in Roadmap plus an unticked FastAPI generalisation item, and the performance line in Known limitations), for him to check in review. Added the missing documents (Specs 003 to 005, the question and results READMEs, MODEL-SETUP, GPU-CLUSTER, AGENTS, ai-log and docs/final) to the README's Reference section. The test-results file records my own run of the required suite in WSL on main at 0518a82 (1502 passed).
+
+## 2026-11-10 · Final AI use declaration and presentation slides 20-23
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** docs/final/ai-use-declaration.md, ai-log/nicole-goh.md
+- **Outcome:** Changed
+### What I asked for
+Bring the team declaration up to date after Rodney's PR #66 (his Sprint 1 answer, his "How I checked it" sections and the last reflections) and remove the TODO box.
+### How I checked it
+I read the diff, checked the Sprint 1 sentence against Rodney's first two log entries, and compared the counts.
+Removing the TODO 
+### What I kept or changed
+Declaration: it now says Sprint 1 was checked less closely (tests read roughly and run once the code was in; constitution and AGENTS.md skimmed), as Rodney's own log records, instead of implying every test was run red first. Updated Rodney's row, the entry counts (134), the trailer table and the checklist at main 2719f46; the list of 11 self-merged PRs is unchanged.
