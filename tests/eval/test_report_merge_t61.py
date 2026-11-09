@@ -87,6 +87,22 @@ def test_read_sheet_round_trips_a_grading_sheet(tmp_path):
     assert rows == _base_rows()
 
 
+def test_read_sheet_accepts_a_byte_order_mark(tmp_path):
+    """Excel's "CSV UTF-8" adds a BOM; the first header must still read as row_id
+    (bug found in review of #53: merge failed with "row ids do not match")."""
+    plain = _write(tmp_path / "sheet.csv", _base_rows())
+    excel = tmp_path / "sheet-excel.csv"
+    excel.write_bytes(b"\xef\xbb\xbf" + plain.read_bytes())
+    rows = rp.read_sheet(excel)
+    assert list(rows[0])[0] == "row_id"
+    assert rows == _base_rows()
+    nic = tmp_path / "sheet-nicole.csv"
+    nic.write_bytes(b"\xef\xbb\xbf" + _write(tmp_path / "n.csv",
+                                             _filled(NICOLE, "nicole")).read_bytes())
+    merged = rp.merge(_base_rows(), rp.read_sheet(nic), _filled(KELSEY, "kelsey"))
+    assert [r["row_id"] for r in merged] == ["R01", "R02", "R03", "R04"]
+
+
 # -- each grader's columns only from their own file -----------------------------------
 
 
