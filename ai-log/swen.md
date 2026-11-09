@@ -120,3 +120,14 @@ Ran `pytest -m model` on GPU: 10 passed. The dev (14B) profile was used, because
 Checked the default profile by reading codecompass/online/config.py (`default_profile = "dev"`).
 ### What I kept or changed
 The example names an invented file (`example/client.py`) and commit, and the prompt says they are invented. The test checks that the example parses into the entries it shows and that the file does not exist in this repository. Off by default, so the prompt is unchanged until the flag is set. Evaluation must be re-run before any result that uses the flag is reported (Article VII.5). The key is `format_example`, not `citation_example`: the approved test T9.6 (Article VI.2) rejects any config field whose name contains "citation", and the flag does not switch off the checker. I did not add the flag to `codecompass.toml`: `tests/eval/test_eval_config_t52.py` requires the eval config to match the project config, so the default lives only in code.
+
+## 2026-11-09 · Correct GPU cluster timings and build provenance
+- **Tool (model):** Claude Code (claude-haiku-5-5)
+- **Files:** GPU-CLUSTER.md, README.md, ai-log/swen.md
+- **Outcome:** Changed
+### What I asked for
+Review feedback on the GPU cluster guide before merge: replace the "2 to 6 s per answer" estimate with the eval-v1 medians (5.1 s RAG only, 8.2 s with tools), describe the evidence gate as a score threshold rather than "blocked", and state that the official runs used the from-source b11960 build.
+### How I checked it
+Verified that I was able to run Code Compass following the instructions in GPU-CLUSTER.md
+### What I kept or changed
+Changed the timing in the README cluster row and the guide, and added that answers take longer when tools run several rounds. Reworded the evidence-gate sentence to "often stopped by the evidence gate (a retrieval score threshold)". Added the build provenance (commit 8642541) to the build step. Did not rewrite commit 66966d6 to add an attribution line; left that for the team to decide.

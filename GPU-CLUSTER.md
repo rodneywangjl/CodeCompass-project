@@ -74,7 +74,7 @@ Do this once, inside a 3090 GPU shell, except step 1, which runs on your laptop.
    git clone https://github.com/pallets/flask ~/repos/flask
    ```
 
-4. **Build llama-server.** The prebuilt binaries need glibc 2.38 and the cluster has 2.34, so build the pinned release b11960 from source. Build on the 3090 node so it targets that GPU. This takes 10 to 30 minutes:
+4. **Build llama-server.** The prebuilt binaries need glibc 2.38 and the cluster has 2.34, so build the pinned release b11960 from source. Build on the 3090 node so it targets that GPU. The official evaluation runs used this from-source build (commit `8642541`). This takes 10 to 30 minutes:
 
    ```bash
    module load CUDA/12.6.0
@@ -160,14 +160,14 @@ After the setup, a session is four steps.
 
 ## Asking questions and reading answers
 
-Name a specific file or function in every question. Vague questions are blocked by the evidence gate before the model runs, and you get *could not find enough evidence*. For example:
+Name a specific file or function in every question. Vague questions are often stopped by the evidence gate (a retrieval score threshold) before the model runs, and you get *could not find enough evidence*. For example:
 
 ```
 What does Flask.test_request_context in src/flask/app.py do?
 Use git_log on src/flask/app.py and tell me the most recent commit that changed it.
 ```
 
-While it works, the model's unchecked draft appears dimmed under a **DRAFT — NOT CHECKED** header. The checked answer then replaces it. On the 3090, an answer takes about 2 to 6 seconds once the index and models have loaded.
+While it works, the model's unchecked draft appears dimmed under a **DRAFT — NOT CHECKED** header. The checked answer then replaces it. On the 3090, an answer took a median of 5.1 seconds with RAG only and 8.2 seconds with tools enabled, once the index and models had loaded. Answers take longer when the tools run several rounds.
 
 - **Commands:** `/tools` lists the tools the last answer used, `/theme none` turns colour off, and `/exit` or Ctrl-D quits.
 - **Flags in answers:** `[UNVERIFIED]`, `(not cited)` or a warning banner mean the citation check failed for part of the answer.
