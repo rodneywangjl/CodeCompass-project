@@ -25,6 +25,7 @@ This repository implements both pipelines. The **offline indexing pipeline** (Sp
 - [How indexing works](#how-indexing-works)
 - [Project structure](#project-structure)
 - [Testing](#testing)
+- [Evaluation](#evaluation)
 - [Development process](#development-process)
 - [Known limitations](#known-limitations)
 - [Roadmap](#roadmap)
@@ -468,7 +469,46 @@ Specs and plans: [`docs/specs/001-offline-indexing/spec.md`](docs/specs/001-offl
 .venv/bin/python -m pytest -m model
 ```
 
-Sprint 1 verification: **134 passed** in the required suite, **5 passed** in the model suite, no skipped/xfail tests.
+Latest run (9 Nov 2026, `main` at `0518a82`, WSL): **1502 passed** in the required suite, 10 model tests deselected, none skipped or xfail ([`docs/final/test-results.md`](docs/final/test-results.md)). Sprint 1 verification: 134 passed in the required suite, 5 passed in the model suite.
+
+---
+
+## Evaluation
+
+The evaluation compares three configurations on the same questions (constitution Article VII): **(a)** no retrieval, **(b)** RAG only and **(c)** RAG with the verifier tools. The method is in [`docs/specs/003-evaluation/`](docs/specs/003-evaluation/), and the full figures, each with its n, are in [`eval/results/report-eval-v1/report.md`](eval/results/report-eval-v1/report.md).
+
+**Setup.** CodeCompass at tag `eval-v1` (`c6fa1b7`) on Flask at `85c5d93`. Qwen2.5-Coder-14B-Instruct (Q4_K_M, `dev` profile, 32k context, temperature 0.1, seed 42) through llama.cpp b11960 on one RTX 3090. Settings are in [`eval/codecompass.eval.toml`](eval/codecompass.eval.toml). Every results file records the commits, the config hash, the model ids and the hardware.
+
+**Questions.** 88 frozen questions: 40 written by the team (8 in each of five categories, including 8 unanswerable controls) and 48 taken from SWE-QA. Every answerable question has a reference answer and ground-truth lines, checked by hand. A subset of 20, picked by a fixed rule before any run, was graded by two people independently with the configuration hidden. No answer was graded by an AI.
+
+### Results
+
+| | (b) RAG only | (c) RAG + tools |
+|---|---|---|
+| Hallucination rate, graded subset (n = 20) | 55% | 20% |
+| Strict rate, format slips counted (n = 20) | 75% | 50% |
+| Mean answer quality, 0 to 2 (n = 20) | 0.80 | 0.95 |
+| Citation accuracy, all questions (n = 88) | 35% | 15% |
+| Median time per answer (n = 88) | 5.1 s | 8.2 s |
+
+- **The tools reduce hallucination:** Verification Gain +0.35 (+0.25 strict). Part of the gain comes from the tools declining more often, not from better answers.
+- **Hybrid retrieval beats either retriever alone.** With a ground-truth file in the top 5 chunks: vector 85%, BM25 89%, RRF 94% (n = 80 answerable questions). The re-ranker's effect was mixed.
+- **Citation accuracy is low mostly because of format slips:** the model lists `Sources` but leaves out the `[N]` markers in the text, so correct sources are flagged. Invented citations were rare (H1: 0 in (b), 2 in (c)).
+- **Without retrieval** the model refused 74 of 88 questions, and the checker caught all 14 citations it produced. The contamination check was therefore inconclusive.
+- **Graders' agreement before settling:** score 75% (κ 0.55), hallucination judgement 68% (κ 0.24).
+
+Example answers for each outcome (verified, format slip, unverified citation, abstention) are in [`docs/final/sample-runs.md`](docs/final/sample-runs.md).
+
+**Exploratory runs** (not graded, not part of the comparison, no default changed). Adding one example answer to the prompt (`format_example = true`) halved the format slips (56 → 28 of 88) and raised citation accuracy from 15% to 45%, but H1 rose from 2 to 4; this run was on `main` (`01bbc6e`), because the flag was added after the freeze. Indexing documentation (28%) and 1024-token chunks (18%) helped less. Details: [`eval/results/experiments/README.md`](eval/results/experiments/README.md).
+
+### Limitations
+
+- Small samples: 20 graded questions per configuration and one run each. No significance tests.
+- Judging whether a claim is supported is hard even for people (κ 0.24 before settling).
+- "Verified" means the cited file or commit was in the model's context, not that the claim is true.
+- One model (14B), one GPU and one repository. The 32B production model and the held-out FastAPI set were not run.
+- The tools can only explain *why* if the commit history says why (Article X.5).
+- The evidence gate refuses questions that name no file or function before the model runs.
 
 ---
 
@@ -490,7 +530,7 @@ Hard rules: never edit, weaken, skip, or xfail an approved test to pass; stay in
 - The verifier is only as useful as the repository's commit history; uninformative messages are reported as-is, never invented.
 - Only the branch/HEAD passed in is indexed; there is no branch selection.
 - Submodules are skipped and reported. Symlinks are flagged, never followed.
-- No numeric performance target yet; run reports and query audit logs record timings so one can be set from measurements.
+- No performance target has been set. Measured on one RTX 3090 with the 14B model: median 5.1 s per answer with RAG only and 8.2 s with tools (n = 88; see [Evaluation](#evaluation)). Run reports and query audit logs record timings per stage.
 - Answers describe the code committed at HEAD. Uncommitted changes in the working tree are not indexed.
 - A 14B model on a 16 GB laptop takes about a minute per generator call (`MODEL-SETUP.md` §5).
 - The first question in a repository with no index builds the index first. With the real embedder on CPU that took about 6 minutes for this repository (3 minutes of it indexing, 1 minute re-ranking, 1.5 minutes generating). On a terminal the warm-up does this while you type; the GPU settings above shrink the embedding and re-ranking parts. Run `python -m codecompass.offline.cli index <repo>` ahead of time to pay it separately.
@@ -505,7 +545,8 @@ Hard rules: never edit, weaken, skip, or xfail an approved test to pass; stay in
 - [x] Sprint 1: offline indexing pipeline
 - [x] Sprint 2: online pipeline: hybrid retriever (RRF-50/50→50), cross-encoder re-ranker (top 8), generator (Qwen2.5-Coder-Instruct via llama-server), verifier tool loop (`git blame`/`git log`, configurable rounds, default 3), deterministic citation checker, evaluation modes
 - [ ] Pin the `prod` (32B) GGUF and check it on the target machine (Article VIII.2, VIII.5)
-- [ ] Evaluation question set with reference answers/citations; three-way comparison (no-retrieval vs RAG vs RAG+verification); required before any retrieval/prompt/model tuning
+- [x] Evaluation question set with reference answers/citations; three-way comparison (no-retrieval vs RAG vs RAG+verification): done at `eval-v1`, see [Evaluation](#evaluation)
+- [ ] Generalisation run on the held-out FastAPI question set
 - [ ] Performance target from measured run-report timings
 
 ---
@@ -518,3 +559,13 @@ Hard rules: never edit, weaken, skip, or xfail an approved test to pass; stay in
 - `docs/specs/001-offline-indexing/tasks.md` — ordered task list with per-task tests
 - `docs/specs/002-online-retrieval/` — spec, plan and tasks for the online pipeline
 - `docs/summary/SPRINT1-SUMMARY.md` — what was built, verification results, and design deviations
+- `docs/specs/003-evaluation/` — evaluation spec, plan, tasks and the complexity tagging rule
+- `docs/specs/004-tui/` — spec, plan and tasks for the minimal terminal UI (`codecompass`)
+- `docs/specs/005-gpu-inference/` — spec, plan and tasks for running the 7B generator and the re-ranker on one 8 GB GPU
+- `eval/questions/README.md` — how the 88 evaluation questions are built, tagged and checked
+- `eval/results/report-eval-v1/` — the eval-v1 report (`report.md`) and failure candidates; exploratory runs in `eval/results/experiments/README.md`
+- `MODEL-SETUP.md` — record of the development model setup (`llama-server`, pinned GGUF files, profiles)
+- `GPU-CLUSTER.md` — running CodeCompass with the `dev` 14B profile on the SCIS GPU cluster
+- `AGENTS.md` — rules for AI coding agents working in this repo
+- `ai-log/` — each member's AI use log
+- `docs/final/` — final submission documents: AI use declaration, member reflections, sample runs and test results
