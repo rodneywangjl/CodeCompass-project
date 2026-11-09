@@ -141,6 +141,20 @@ def test_strict_h1_also_counts_format_slips():
     assert r["hallucination_strict"]["rag_tools"]["overall"]["hallucinated"] == 1
 
 
+def test_strict_rate_does_not_count_a_slip_the_graders_settled_as_an_abstention():
+    """An abstention is never hallucinated (§5.2, AC-7.2); the graders' settled reason decides
+    abstention (AC-7.4). Bug found on the official run: four rag_tools rows that both graders
+    settled as pure abstentions were automatic format slips and counted in the strict rate."""
+    rows, key = _fixture()
+    rows[5].update(format_slip="yes", final_h3="no", final_score="0",
+                   final_reason="abstained")                 # R06: slip, settled as abstained
+    rows[4]["format_slip"] = "yes"                           # R05: slip, answered (H1 yes)
+    r = rp.figures(rows, key, _results())
+    strict = r["hallucination_strict"]["rag_tools"]["overall"]
+    assert strict == {"n": 3, "hallucinated": 1, "rate": 1 / 3}   # R05 only, not R06
+    assert r["hallucination"]["rag_tools"]["overall"]["hallucinated"] == 1
+
+
 def test_verification_gain_is_rag_minus_rag_tools():
     vg = _report()["verification_gain"]
     assert vg["overall"] == pytest.approx(2 / 3 - 1 / 3)

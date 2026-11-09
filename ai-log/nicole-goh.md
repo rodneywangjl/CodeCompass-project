@@ -290,3 +290,29 @@ After normalising the line endings and merging main (incl. #52), I ran the full 
 BOM fix: saw the new test fail on '\ufeffrow_id' in Claude's message, then 22 passed; full suite 1501 passed
 ### What I kept or changed
 Before anyone saw the results (decided around 01:00 in a draft, before the runs; committed at 10:10, after the runs had finished, as Kelsey pointed out in her review) I fixed three rules in plan §4.4: the contamination flag at a difference of 0.5 or more, agreement as % for every field plus Cohen's kappa for the score and H2, and unanswerable questions counted in the overall hallucination rate and as their own group. Each grader's columns are taken only from their own copy, and the final values are filled only where we agree, so disagreements are settled by us and not averaged. The key is read only by `figures`, after grading. Claude also ran the whole chain end to end on the fixture repo (runner, grading sheet, merge, figures) to check the real file shapes fit together. After Kelsey's review of #53: `read_sheet` now accepts a byte-order mark (Excel's "CSV UTF-8" made merge fail with a misleading "row ids do not match"), fixed with a failing test first; and before grading we agreed and recorded in spec §5.1 to score against what the question asks, with the how/why counting as part of what is asked.
+
+## 2026-11-09 · Grading support (guide, rule questions, format check); grades by hand
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** reference/grading-for-graders/GRADING-GUIDE.md (local), reference/grading-for-graders/sheet-nicole.csv (local, graded by me), docs/specs/003-evaluation/spec.md (§5.1 scoring rule)
+- **Outcome:** Kept
+### What I asked for
+Help to grade my 56 rows without the AI deciding any grade: a step-by-step guide restating the spec §5.1/§5.2 rules, the allowed values per column and the reason labels, answers to rule questions (e.g. what H2 means for an uncited answer, what both H2 and H3 being n/a means), and a format-only check of my sheet.
+### How I checked it
+1. Opened each row's RXX.md file and identified exactly what the question asks.
+2. Compared the system answer's factual claims against the full context provided to the model, not just the reference answer or outside knowledge.
+3. Marked H2 for unsupported claims, and H3 for a substantive answer to an unanswerable question.
+4. Then scored the answer against the question (e.g., a missing "why" can make an otherwise correct answer partial).
+5. If the score was 0, chose the reason label that best explains it: abstained, fabricated-citation, unsupported, or wrong-but-grounded.
+### What I kept or changed
+I graded all 56 rows myself, independently of Kelsey (FR-7, AC-8.5). When I asked Claude to help grade, it declined to decide any value and offered only the guide, rule explanations and a format check; I kept it that way. The format check (same rules as `report merge`) found 56/56 rows graded and no format problems; it did not look at my judgements. Before grading, Kelsey and I agreed to score against what the question asks, with how/why counting as asked, and recorded it in spec §5.1.
+
+## 2026-11-09 · Report bug fix: strict rate counted settled abstentions
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** codecompass/eval/report.py, tests/eval/test_report_figures_t62.py, docs/specs/003-evaluation/plan.md, docs/specs/003-evaluation/tasks.md
+- **Outcome:** Changed
+### What I asked for
+To check Kelsey's readings of the official report against report.json, the settled sheet and the key before they go on the slides, and to fix any figure that was wrong.
+### How I checked it
+I saw the new test fail in Claude's message (strict counted 2 instead of 1: the abstained slip was counted), then ran it myself: 20 passed. ran the full suite myself in WSL: 1502 passed, 0 failed. checked in Claude's count on the real settled sheet that strict is now rag 15/20 and rag_tools 10/20, with the normal rate unchanged (11/20, 4/20).
+### What I kept or changed
+All of Kelsey's readings held except the strict rate. Four rag_tools rows that we both settled as pure abstentions (R17, R22, R36, R43) were also automatic format slips, and `figures` counted every slip in the strict rate, although an abstention is never hallucinated (§5.2, AC-7.2, AC-7.4). The strict rate for rag_tools was 70% (14/20) instead of 50% (10/20), which made the strict Verification Gain look like +0.05 instead of +0.25. Fixed with a failing test first; the normal hallucination rate was not affected. We also noted for the slides that 5 of the 9 zeros in rag_tools are abstentions, so the tools reduce hallucination partly by declining more often.
