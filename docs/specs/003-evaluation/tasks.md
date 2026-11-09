@@ -68,7 +68,7 @@ Order: T5.1 first (T4.2 needs it), then T5.2–T5.4 in any order, then T5.5. Tag
 - Tests first (small made-up sheet, key and results files):
   - an empty final cell is refused;
   - the hallucination rate counts H1, H2 or H3 once per answer, keeps abstentions in the denominator and leaves skipped errors out;
-  - strict H1 also counts slips;
+  - strict H1 also counts slips, except a slip the graders settled as `abstained` (an abstention is never hallucinated; bug fix, 2026-11-09, found on the official run);
   - Verification Gain = (b) − (c);
   - quality mean and counts;
   - paired better / same / worse, split by tag;

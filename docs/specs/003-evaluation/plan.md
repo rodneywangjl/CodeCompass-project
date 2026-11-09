@@ -196,7 +196,7 @@ Reads the graded sheets, the key, and the results files. Writes versioned figure
 | Figure | Definition | From | AC |
 |---|---|---|---|
 | **Hallucination rate** (b), (c) | answers with H1 (pre-filled) **or** final H2 **or** final H3 ÷ graded answers; abstentions in the denominator, errors out (skipped rows) | merged sheet + key | AC-9.1 |
-| Same, strict | H1 replaced by strict H1 (the sheet's H1 or format-slip label) | merged sheet + key | AC-7.3 |
+| Same, strict | H1 replaced by strict H1 (the sheet's H1 or format-slip label); a slip the graders settled as `abstained` is not counted, since an abstention is never hallucinated (AC-7.2, AC-7.4) | merged sheet + key | AC-7.3 |
 | **Verification Gain** | rate(b) − rate(c); positive = tools help | the two rates | AC-9.2 |
 | **Quality** | mean final score and the 0/1/2 counts, (b) and (c) | merged sheet | AC-9.3 |
 | **Paired comparison** | per question: (c) better / same / worse than (b) on score, and hallucinated in (b) but not (c) and vice versa; split `simple` / `code-tracing` | merged sheet | AC-9.4 |
