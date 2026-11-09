@@ -1,0 +1,5 @@
+[embedder]
+device = "cuda"
+
+[chunking]
+target_tokens = 1024

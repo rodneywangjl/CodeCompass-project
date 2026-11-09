@@ -1,0 +1,56 @@
+{
+  "no_retrieval": {
+    "mode": "no_retrieval",
+    "n": 88,
+    "errors": 0,
+    "abstentions": 74,
+    "format_slips": 0,
+    "uncited": 0,
+    "h1": 14,
+    "h1_strict": 14,
+    "citation_accuracy": {
+      "entries": 14,
+      "verified": 0,
+      "accuracy": 0.0,
+      "answers": 88,
+      "f": 0,
+      "f_share": 0.0
+    }
+  },
+  "rag": {
+    "mode": "rag",
+    "n": 88,
+    "errors": 0,
+    "abstentions": 4,
+    "format_slips": 43,
+    "uncited": 0,
+    "h1": 0,
+    "h1_strict": 43,
+    "citation_accuracy": {
+      "entries": 230,
+      "verified": 81,
+      "accuracy": 0.3521739130434783,
+      "answers": 88,
+      "f": 41,
+      "f_share": 0.4659090909090909
+    }
+  },
+  "rag_tools": {
+    "mode": "rag_tools",
+    "n": 88,
+    "errors": 0,
+    "abstentions": 9,
+    "format_slips": 56,
+    "uncited": 3,
+    "h1": 2,
+    "h1_strict": 58,
+    "citation_accuracy": {
+      "entries": 266,
+      "verified": 39,
+      "accuracy": 0.14661654135338345,
+      "answers": 88,
+      "f": 18,
+      "f_share": 0.20454545454545456
+    }
+  }
+}

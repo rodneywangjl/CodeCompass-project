@@ -1,0 +1,2124 @@
+{
+  "hallucination": {
+    "rag": {
+      "overall": {
+        "n": 20,
+        "hallucinated": 11,
+        "rate": 0.55
+      },
+      "by": {
+        "category": {
+          "architectural": {
+            "n": 4,
+            "hallucinated": 3,
+            "rate": 0.75
+          },
+          "design-rationale": {
+            "n": 4,
+            "hallucinated": 3,
+            "rate": 0.75
+          },
+          "localisation": {
+            "n": 4,
+            "hallucinated": 2,
+            "rate": 0.5
+          },
+          "runtime-behaviour": {
+            "n": 4,
+            "hallucinated": 2,
+            "rate": 0.5
+          },
+          "unanswerable": {
+            "n": 4,
+            "hallucinated": 1,
+            "rate": 0.25
+          }
+        },
+        "complexity": {
+          "code-tracing": {
+            "n": 8,
+            "hallucinated": 5,
+            "rate": 0.625
+          },
+          "simple": {
+            "n": 12,
+            "hallucinated": 6,
+            "rate": 0.5
+          }
+        },
+        "set": {
+          "core": {
+            "n": 12,
+            "hallucinated": 4,
+            "rate": 0.3333333333333333
+          },
+          "swe-qa": {
+            "n": 8,
+            "hallucinated": 7,
+            "rate": 0.875
+          }
+        }
+      }
+    },
+    "rag_tools": {
+      "overall": {
+        "n": 20,
+        "hallucinated": 4,
+        "rate": 0.2
+      },
+      "by": {
+        "category": {
+          "architectural": {
+            "n": 4,
+            "hallucinated": 2,
+            "rate": 0.5
+          },
+          "design-rationale": {
+            "n": 4,
+            "hallucinated": 0,
+            "rate": 0.0
+          },
+          "localisation": {
+            "n": 4,
+            "hallucinated": 1,
+            "rate": 0.25
+          },
+          "runtime-behaviour": {
+            "n": 4,
+            "hallucinated": 1,
+            "rate": 0.25
+          },
+          "unanswerable": {
+            "n": 4,
+            "hallucinated": 0,
+            "rate": 0.0
+          }
+        },
+        "complexity": {
+          "code-tracing": {
+            "n": 8,
+            "hallucinated": 4,
+            "rate": 0.5
+          },
+          "simple": {
+            "n": 12,
+            "hallucinated": 0,
+            "rate": 0.0
+          }
+        },
+        "set": {
+          "core": {
+            "n": 12,
+            "hallucinated": 2,
+            "rate": 0.16666666666666666
+          },
+          "swe-qa": {
+            "n": 8,
+            "hallucinated": 2,
+            "rate": 0.25
+          }
+        }
+      }
+    }
+  },
+  "hallucination_strict": {
+    "rag": {
+      "overall": {
+        "n": 20,
+        "hallucinated": 15,
+        "rate": 0.75
+      },
+      "by": {
+        "category": {
+          "architectural": {
+            "n": 4,
+            "hallucinated": 3,
+            "rate": 0.75
+          },
+          "design-rationale": {
+            "n": 4,
+            "hallucinated": 3,
+            "rate": 0.75
+          },
+          "localisation": {
+            "n": 4,
+            "hallucinated": 2,
+            "rate": 0.5
+          },
+          "runtime-behaviour": {
+            "n": 4,
+            "hallucinated": 4,
+            "rate": 1.0
+          },
+          "unanswerable": {
+            "n": 4,
+            "hallucinated": 3,
+            "rate": 0.75
+          }
+        },
+        "complexity": {
+          "code-tracing": {
+            "n": 8,
+            "hallucinated": 6,
+            "rate": 0.75
+          },
+          "simple": {
+            "n": 12,
+            "hallucinated": 9,
+            "rate": 0.75
+          }
+        },
+        "set": {
+          "core": {
+            "n": 12,
+            "hallucinated": 7,
+            "rate": 0.5833333333333334
+          },
+          "swe-qa": {
+            "n": 8,
+            "hallucinated": 8,
+            "rate": 1.0
+          }
+        }
+      }
+    },
+    "rag_tools": {
+      "overall": {
+        "n": 20,
+        "hallucinated": 10,
+        "rate": 0.5
+      },
+      "by": {
+        "category": {
+          "architectural": {
+            "n": 4,
+            "hallucinated": 3,
+            "rate": 0.75
+          },
+          "design-rationale": {
+            "n": 4,
+            "hallucinated": 0,
+            "rate": 0.0
+          },
+          "localisation": {
+            "n": 4,
+            "hallucinated": 1,
+            "rate": 0.25
+          },
+          "runtime-behaviour": {
+            "n": 4,
+            "hallucinated": 4,
+            "rate": 1.0
+          },
+          "unanswerable": {
+            "n": 4,
+            "hallucinated": 2,
+            "rate": 0.5
+          }
+        },
+        "complexity": {
+          "code-tracing": {
+            "n": 8,
+            "hallucinated": 5,
+            "rate": 0.625
+          },
+          "simple": {
+            "n": 12,
+            "hallucinated": 5,
+            "rate": 0.4166666666666667
+          }
+        },
+        "set": {
+          "core": {
+            "n": 12,
+            "hallucinated": 6,
+            "rate": 0.5
+          },
+          "swe-qa": {
+            "n": 8,
+            "hallucinated": 4,
+            "rate": 0.5
+          }
+        }
+      }
+    }
+  },
+  "verification_gain": {
+    "overall": 0.35000000000000003,
+    "by": {
+      "category": {
+        "architectural": 0.25,
+        "design-rationale": 0.75,
+        "localisation": 0.25,
+        "runtime-behaviour": 0.25,
+        "unanswerable": 0.25
+      },
+      "complexity": {
+        "code-tracing": 0.125,
+        "simple": 0.5
+      },
+      "set": {
+        "core": 0.16666666666666666,
+        "swe-qa": 0.625
+      }
+    }
+  },
+  "quality": {
+    "rag": {
+      "overall": {
+        "n": 20,
+        "mean": 0.8,
+        "counts": {
+          "0": 11,
+          "1": 2,
+          "2": 7
+        }
+      },
+      "by": {
+        "category": {
+          "architectural": {
+            "n": 4,
+            "mean": 0.25,
+            "counts": {
+              "0": 3,
+              "1": 1,
+              "2": 0
+            }
+          },
+          "design-rationale": {
+            "n": 4,
+            "mean": 0.5,
+            "counts": {
+              "0": 3,
+              "1": 0,
+              "2": 1
+            }
+          },
+          "localisation": {
+            "n": 4,
+            "mean": 1.0,
+            "counts": {
+              "0": 2,
+              "1": 0,
+              "2": 2
+            }
+          },
+          "runtime-behaviour": {
+            "n": 4,
+            "mean": 0.75,
+            "counts": {
+              "0": 2,
+              "1": 1,
+              "2": 1
+            }
+          },
+          "unanswerable": {
+            "n": 4,
+            "mean": 1.5,
+            "counts": {
+              "0": 1,
+              "1": 0,
+              "2": 3
+            }
+          }
+        },
+        "complexity": {
+          "code-tracing": {
+            "n": 8,
+            "mean": 0.625,
+            "counts": {
+              "0": 5,
+              "1": 1,
+              "2": 2
+            }
+          },
+          "simple": {
+            "n": 12,
+            "mean": 0.9166666666666666,
+            "counts": {
+              "0": 6,
+              "1": 1,
+              "2": 5
+            }
+          }
+        },
+        "set": {
+          "core": {
+            "n": 12,
+            "mean": 1.25,
+            "counts": {
+              "0": 4,
+              "1": 1,
+              "2": 7
+            }
+          },
+          "swe-qa": {
+            "n": 8,
+            "mean": 0.125,
+            "counts": {
+              "0": 7,
+              "1": 1,
+              "2": 0
+            }
+          }
+        }
+      }
+    },
+    "rag_tools": {
+      "overall": {
+        "n": 20,
+        "mean": 0.95,
+        "counts": {
+          "0": 9,
+          "1": 3,
+          "2": 8
+        }
+      },
+      "by": {
+        "category": {
+          "architectural": {
+            "n": 4,
+            "mean": 0.75,
+            "counts": {
+              "0": 2,
+              "1": 1,
+              "2": 1
+            }
+          },
+          "design-rationale": {
+            "n": 4,
+            "mean": 0.0,
+            "counts": {
+              "0": 4,
+              "1": 0,
+              "2": 0
+            }
+          },
+          "localisation": {
+            "n": 4,
+            "mean": 0.75,
+            "counts": {
+              "0": 2,
+              "1": 1,
+              "2": 1
+            }
+          },
+          "runtime-behaviour": {
+            "n": 4,
+            "mean": 1.25,
+            "counts": {
+              "0": 1,
+              "1": 1,
+              "2": 2
+            }
+          },
+          "unanswerable": {
+            "n": 4,
+            "mean": 2.0,
+            "counts": {
+              "0": 0,
+              "1": 0,
+              "2": 4
+            }
+          }
+        },
+        "complexity": {
+          "code-tracing": {
+            "n": 8,
+            "mean": 0.25,
+            "counts": {
+              "0": 6,
+              "1": 2,
+              "2": 0
+            }
+          },
+          "simple": {
+            "n": 12,
+            "mean": 1.4166666666666667,
+            "counts": {
+              "0": 3,
+              "1": 1,
+              "2": 8
+            }
+          }
+        },
+        "set": {
+          "core": {
+            "n": 12,
+            "mean": 1.1666666666666667,
+            "counts": {
+              "0": 4,
+              "1": 2,
+              "2": 6
+            }
+          },
+          "swe-qa": {
+            "n": 8,
+            "mean": 0.625,
+            "counts": {
+              "0": 5,
+              "1": 1,
+              "2": 2
+            }
+          }
+        }
+      }
+    }
+  },
+  "paired": {
+    "overall": {
+      "n": 20,
+      "better": 5,
+      "same": 12,
+      "worse": 3,
+      "fixed": 9,
+      "new": 2
+    },
+    "by_complexity": {
+      "code-tracing": {
+        "n": 8,
+        "better": 2,
+        "same": 3,
+        "worse": 3,
+        "fixed": 3,
+        "new": 2
+      },
+      "simple": {
+        "n": 12,
+        "better": 3,
+        "same": 9,
+        "worse": 0,
+        "fixed": 6,
+        "new": 0
+      }
+    }
+  },
+  "contamination": {
+    "core": {
+      "n": 8,
+      "mean": 0.0
+    },
+    "swe-qa": {
+      "n": 8,
+      "mean": 0.0
+    },
+    "difference": 0.0,
+    "flagged": false,
+    "threshold": 0.5
+  },
+  "automatic": {
+    "no_retrieval": {
+      "mode": "no_retrieval",
+      "n": 88,
+      "errors": 0,
+      "abstentions": 74,
+      "format_slips": 0,
+      "uncited": 0,
+      "h1": 14,
+      "h1_strict": 14,
+      "citation_accuracy": {
+        "entries": 14,
+        "verified": 0,
+        "accuracy": 0.0,
+        "answers": 88,
+        "f": 0,
+        "f_share": 0.0
+      }
+    },
+    "rag": {
+      "mode": "rag",
+      "n": 88,
+      "errors": 0,
+      "abstentions": 4,
+      "format_slips": 43,
+      "uncited": 0,
+      "h1": 0,
+      "h1_strict": 43,
+      "citation_accuracy": {
+        "entries": 230,
+        "verified": 81,
+        "accuracy": 0.3521739130434783,
+        "answers": 88,
+        "f": 41,
+        "f_share": 0.4659090909090909
+      }
+    },
+    "rag_tools": {
+      "mode": "rag_tools",
+      "n": 88,
+      "errors": 0,
+      "abstentions": 9,
+      "format_slips": 56,
+      "uncited": 3,
+      "h1": 2,
+      "h1_strict": 58,
+      "citation_accuracy": {
+        "entries": 266,
+        "verified": 39,
+        "accuracy": 0.14661654135338345,
+        "answers": 88,
+        "f": 18,
+        "f_share": 0.20454545454545456
+      }
+    }
+  },
+  "latency": {
+    "no_retrieval": {
+      "n": 88,
+      "median_total": 0.6363893612287939,
+      "max_total": 0.9572254726663232,
+      "median_stage": {
+        "citation_check": 4.208134487271309e-05,
+        "ensure_current": 0.009305094368755817,
+        "generation": 0.6257113288156688,
+        "reranking": 0.0,
+        "retrieval": 0.0,
+        "tool_execution": 0.0
+      }
+    },
+    "rag": {
+      "n": 88,
+      "median_total": 5.074765018653125,
+      "max_total": 21.353111990727484,
+      "median_stage": {
+        "citation_check": 0.00014516152441501617,
+        "ensure_current": 0.009422915987670422,
+        "generation": 4.483398450072855,
+        "reranking": 0.4188401969149709,
+        "retrieval": 0.031040852423757315,
+        "tool_execution": 0.0
+      }
+    },
+    "rag_tools": {
+      "n": 88,
+      "median_total": 8.224688739515841,
+      "max_total": 21.715458624064922,
+      "median_stage": {
+        "citation_check": 0.00015386752784252167,
+        "ensure_current": 0.009508075192570686,
+        "generation": 7.380093437153846,
+        "reranking": 0.4188662054948509,
+        "retrieval": 0.030240632593631744,
+        "tool_execution": 0.35233196849003434
+      }
+    }
+  },
+  "hit_rates": {
+    "excluded": [
+      "core-unanswerable-01",
+      "core-unanswerable-02",
+      "core-unanswerable-03",
+      "core-unanswerable-04",
+      "core-unanswerable-05",
+      "core-unanswerable-06",
+      "core-unanswerable-07",
+      "core-unanswerable-08"
+    ],
+    "setups": {
+      "vector": {
+        "1": {
+          "overall": {
+            "n": 80,
+            "file_hits": 46,
+            "file_rate": 0.575,
+            "line_n": 67,
+            "line_hits": 22,
+            "line_rate": 0.3283582089552239
+          },
+          "set": {
+            "core": {
+              "n": 32,
+              "file_hits": 15,
+              "file_rate": 0.46875,
+              "line_n": 32,
+              "line_hits": 12,
+              "line_rate": 0.375
+            },
+            "swe-qa": {
+              "n": 48,
+              "file_hits": 31,
+              "file_rate": 0.6458333333333334,
+              "line_n": 35,
+              "line_hits": 10,
+              "line_rate": 0.2857142857142857
+            }
+          },
+          "category": {
+            "architectural": {
+              "n": 20,
+              "file_hits": 13,
+              "file_rate": 0.65,
+              "line_n": 18,
+              "line_hits": 4,
+              "line_rate": 0.2222222222222222
+            },
+            "design-rationale": {
+              "n": 20,
+              "file_hits": 12,
+              "file_rate": 0.6,
+              "line_n": 17,
+              "line_hits": 5,
+              "line_rate": 0.29411764705882354
+            },
+            "localisation": {
+              "n": 20,
+              "file_hits": 11,
+              "file_rate": 0.55,
+              "line_n": 17,
+              "line_hits": 6,
+              "line_rate": 0.35294117647058826
+            },
+            "runtime-behaviour": {
+              "n": 20,
+              "file_hits": 10,
+              "file_rate": 0.5,
+              "line_n": 15,
+              "line_hits": 7,
+              "line_rate": 0.4666666666666667
+            },
+            "unanswerable": {
+              "n": 0,
+              "file_hits": 0,
+              "file_rate": null,
+              "line_n": 0,
+              "line_hits": 0,
+              "line_rate": null
+            }
+          },
+          "complexity": {
+            "code-tracing": {
+              "n": 41,
+              "file_hits": 22,
+              "file_rate": 0.5365853658536586,
+              "line_n": 35,
+              "line_hits": 11,
+              "line_rate": 0.3142857142857143
+            },
+            "simple": {
+              "n": 39,
+              "file_hits": 24,
+              "file_rate": 0.6153846153846154,
+              "line_n": 32,
+              "line_hits": 11,
+              "line_rate": 0.34375
+            }
+          }
+        },
+        "5": {
+          "overall": {
+            "n": 80,
+            "file_hits": 68,
+            "file_rate": 0.85,
+            "line_n": 67,
+            "line_hits": 39,
+            "line_rate": 0.582089552238806
+          },
+          "set": {
+            "core": {
+              "n": 32,
+              "file_hits": 25,
+              "file_rate": 0.78125,
+              "line_n": 32,
+              "line_hits": 20,
+              "line_rate": 0.625
+            },
+            "swe-qa": {
+              "n": 48,
+              "file_hits": 43,
+              "file_rate": 0.8958333333333334,
+              "line_n": 35,
+              "line_hits": 19,
+              "line_rate": 0.5428571428571428
+            }
+          },
+          "category": {
+            "architectural": {
+              "n": 20,
+              "file_hits": 17,
+              "file_rate": 0.85,
+              "line_n": 18,
+              "line_hits": 10,
+              "line_rate": 0.5555555555555556
+            },
+            "design-rationale": {
+              "n": 20,
+              "file_hits": 17,
+              "file_rate": 0.85,
+              "line_n": 17,
+              "line_hits": 10,
+              "line_rate": 0.5882352941176471
+            },
+            "localisation": {
+              "n": 20,
+              "file_hits": 16,
+              "file_rate": 0.8,
+              "line_n": 17,
+              "line_hits": 8,
+              "line_rate": 0.47058823529411764
+            },
+            "runtime-behaviour": {
+              "n": 20,
+              "file_hits": 18,
+              "file_rate": 0.9,
+              "line_n": 15,
+              "line_hits": 11,
+              "line_rate": 0.7333333333333333
+            },
+            "unanswerable": {
+              "n": 0,
+              "file_hits": 0,
+              "file_rate": null,
+              "line_n": 0,
+              "line_hits": 0,
+              "line_rate": null
+            }
+          },
+          "complexity": {
+            "code-tracing": {
+              "n": 41,
+              "file_hits": 33,
+              "file_rate": 0.8048780487804879,
+              "line_n": 35,
+              "line_hits": 19,
+              "line_rate": 0.5428571428571428
+            },
+            "simple": {
+              "n": 39,
+              "file_hits": 35,
+              "file_rate": 0.8974358974358975,
+              "line_n": 32,
+              "line_hits": 20,
+              "line_rate": 0.625
+            }
+          }
+        },
+        "10": {
+          "overall": {
+            "n": 80,
+            "file_hits": 74,
+            "file_rate": 0.925,
+            "line_n": 67,
+            "line_hits": 45,
+            "line_rate": 0.6716417910447762
+          },
+          "set": {
+            "core": {
+              "n": 32,
+              "file_hits": 28,
+              "file_rate": 0.875,
+              "line_n": 32,
+              "line_hits": 24,
+              "line_rate": 0.75
+            },
+            "swe-qa": {
+              "n": 48,
+              "file_hits": 46,
+              "file_rate": 0.9583333333333334,
+              "line_n": 35,
+              "line_hits": 21,
+              "line_rate": 0.6
+            }
+          },
+          "category": {
+            "architectural": {
+              "n": 20,
+              "file_hits": 18,
+              "file_rate": 0.9,
+              "line_n": 18,
+              "line_hits": 11,
+              "line_rate": 0.6111111111111112
+            },
+            "design-rationale": {
+              "n": 20,
+              "file_hits": 18,
+              "file_rate": 0.9,
+              "line_n": 17,
+              "line_hits": 11,
+              "line_rate": 0.6470588235294118
+            },
+            "localisation": {
+              "n": 20,
+              "file_hits": 20,
+              "file_rate": 1.0,
+              "line_n": 17,
+              "line_hits": 12,
+              "line_rate": 0.7058823529411765
+            },
+            "runtime-behaviour": {
+              "n": 20,
+              "file_hits": 18,
+              "file_rate": 0.9,
+              "line_n": 15,
+              "line_hits": 11,
+              "line_rate": 0.7333333333333333
+            },
+            "unanswerable": {
+              "n": 0,
+              "file_hits": 0,
+              "file_rate": null,
+              "line_n": 0,
+              "line_hits": 0,
+              "line_rate": null
+            }
+          },
+          "complexity": {
+            "code-tracing": {
+              "n": 41,
+              "file_hits": 36,
+              "file_rate": 0.8780487804878049,
+              "line_n": 35,
+              "line_hits": 22,
+              "line_rate": 0.6285714285714286
+            },
+            "simple": {
+              "n": 39,
+              "file_hits": 38,
+              "file_rate": 0.9743589743589743,
+              "line_n": 32,
+              "line_hits": 23,
+              "line_rate": 0.71875
+            }
+          }
+        }
+      },
+      "bm25": {
+        "1": {
+          "overall": {
+            "n": 80,
+            "file_hits": 47,
+            "file_rate": 0.5875,
+            "line_n": 67,
+            "line_hits": 23,
+            "line_rate": 0.34328358208955223
+          },
+          "set": {
+            "core": {
+              "n": 32,
+              "file_hits": 17,
+              "file_rate": 0.53125,
+              "line_n": 32,
+              "line_hits": 13,
+              "line_rate": 0.40625
+            },
+            "swe-qa": {
+              "n": 48,
+              "file_hits": 30,
+              "file_rate": 0.625,
+              "line_n": 35,
+              "line_hits": 10,
+              "line_rate": 0.2857142857142857
+            }
+          },
+          "category": {
+            "architectural": {
+              "n": 20,
+              "file_hits": 9,
+              "file_rate": 0.45,
+              "line_n": 18,
+              "line_hits": 5,
+              "line_rate": 0.2777777777777778
+            },
+            "design-rationale": {
+              "n": 20,
+              "file_hits": 11,
+              "file_rate": 0.55,
+              "line_n": 17,
+              "line_hits": 5,
+              "line_rate": 0.29411764705882354
+            },
+            "localisation": {
+              "n": 20,
+              "file_hits": 15,
+              "file_rate": 0.75,
+              "line_n": 17,
+              "line_hits": 7,
+              "line_rate": 0.4117647058823529
+            },
+            "runtime-behaviour": {
+              "n": 20,
+              "file_hits": 12,
+              "file_rate": 0.6,
+              "line_n": 15,
+              "line_hits": 6,
+              "line_rate": 0.4
+            },
+            "unanswerable": {
+              "n": 0,
+              "file_hits": 0,
+              "file_rate": null,
+              "line_n": 0,
+              "line_hits": 0,
+              "line_rate": null
+            }
+          },
+          "complexity": {
+            "code-tracing": {
+              "n": 41,
+              "file_hits": 26,
+              "file_rate": 0.6341463414634146,
+              "line_n": 35,
+              "line_hits": 11,
+              "line_rate": 0.3142857142857143
+            },
+            "simple": {
+              "n": 39,
+              "file_hits": 21,
+              "file_rate": 0.5384615384615384,
+              "line_n": 32,
+              "line_hits": 12,
+              "line_rate": 0.375
+            }
+          }
+        },
+        "5": {
+          "overall": {
+            "n": 80,
+            "file_hits": 71,
+            "file_rate": 0.8875,
+            "line_n": 67,
+            "line_hits": 38,
+            "line_rate": 0.5671641791044776
+          },
+          "set": {
+            "core": {
+              "n": 32,
+              "file_hits": 27,
+              "file_rate": 0.84375,
+              "line_n": 32,
+              "line_hits": 21,
+              "line_rate": 0.65625
+            },
+            "swe-qa": {
+              "n": 48,
+              "file_hits": 44,
+              "file_rate": 0.9166666666666666,
+              "line_n": 35,
+              "line_hits": 17,
+              "line_rate": 0.4857142857142857
+            }
+          },
+          "category": {
+            "architectural": {
+              "n": 20,
+              "file_hits": 16,
+              "file_rate": 0.8,
+              "line_n": 18,
+              "line_hits": 7,
+              "line_rate": 0.3888888888888889
+            },
+            "design-rationale": {
+              "n": 20,
+              "file_hits": 16,
+              "file_rate": 0.8,
+              "line_n": 17,
+              "line_hits": 11,
+              "line_rate": 0.6470588235294118
+            },
+            "localisation": {
+              "n": 20,
+              "file_hits": 19,
+              "file_rate": 0.95,
+              "line_n": 17,
+              "line_hits": 9,
+              "line_rate": 0.5294117647058824
+            },
+            "runtime-behaviour": {
+              "n": 20,
+              "file_hits": 20,
+              "file_rate": 1.0,
+              "line_n": 15,
+              "line_hits": 11,
+              "line_rate": 0.7333333333333333
+            },
+            "unanswerable": {
+              "n": 0,
+              "file_hits": 0,
+              "file_rate": null,
+              "line_n": 0,
+              "line_hits": 0,
+              "line_rate": null
+            }
+          },
+          "complexity": {
+            "code-tracing": {
+              "n": 41,
+              "file_hits": 36,
+              "file_rate": 0.8780487804878049,
+              "line_n": 35,
+              "line_hits": 17,
+              "line_rate": 0.4857142857142857
+            },
+            "simple": {
+              "n": 39,
+              "file_hits": 35,
+              "file_rate": 0.8974358974358975,
+              "line_n": 32,
+              "line_hits": 21,
+              "line_rate": 0.65625
+            }
+          }
+        },
+        "10": {
+          "overall": {
+            "n": 80,
+            "file_hits": 75,
+            "file_rate": 0.9375,
+            "line_n": 67,
+            "line_hits": 43,
+            "line_rate": 0.6417910447761194
+          },
+          "set": {
+            "core": {
+              "n": 32,
+              "file_hits": 28,
+              "file_rate": 0.875,
+              "line_n": 32,
+              "line_hits": 22,
+              "line_rate": 0.6875
+            },
+            "swe-qa": {
+              "n": 48,
+              "file_hits": 47,
+              "file_rate": 0.9791666666666666,
+              "line_n": 35,
+              "line_hits": 21,
+              "line_rate": 0.6
+            }
+          },
+          "category": {
+            "architectural": {
+              "n": 20,
+              "file_hits": 19,
+              "file_rate": 0.95,
+              "line_n": 18,
+              "line_hits": 8,
+              "line_rate": 0.4444444444444444
+            },
+            "design-rationale": {
+              "n": 20,
+              "file_hits": 17,
+              "file_rate": 0.85,
+              "line_n": 17,
+              "line_hits": 11,
+              "line_rate": 0.6470588235294118
+            },
+            "localisation": {
+              "n": 20,
+              "file_hits": 19,
+              "file_rate": 0.95,
+              "line_n": 17,
+              "line_hits": 11,
+              "line_rate": 0.6470588235294118
+            },
+            "runtime-behaviour": {
+              "n": 20,
+              "file_hits": 20,
+              "file_rate": 1.0,
+              "line_n": 15,
+              "line_hits": 13,
+              "line_rate": 0.8666666666666667
+            },
+            "unanswerable": {
+              "n": 0,
+              "file_hits": 0,
+              "file_rate": null,
+              "line_n": 0,
+              "line_hits": 0,
+              "line_rate": null
+            }
+          },
+          "complexity": {
+            "code-tracing": {
+              "n": 41,
+              "file_hits": 38,
+              "file_rate": 0.926829268292683,
+              "line_n": 35,
+              "line_hits": 20,
+              "line_rate": 0.5714285714285714
+            },
+            "simple": {
+              "n": 39,
+              "file_hits": 37,
+              "file_rate": 0.9487179487179487,
+              "line_n": 32,
+              "line_hits": 23,
+              "line_rate": 0.71875
+            }
+          }
+        }
+      },
+      "rrf": {
+        "1": {
+          "overall": {
+            "n": 80,
+            "file_hits": 57,
+            "file_rate": 0.7125,
+            "line_n": 67,
+            "line_hits": 27,
+            "line_rate": 0.40298507462686567
+          },
+          "set": {
+            "core": {
+              "n": 32,
+              "file_hits": 21,
+              "file_rate": 0.65625,
+              "line_n": 32,
+              "line_hits": 15,
+              "line_rate": 0.46875
+            },
+            "swe-qa": {
+              "n": 48,
+              "file_hits": 36,
+              "file_rate": 0.75,
+              "line_n": 35,
+              "line_hits": 12,
+              "line_rate": 0.34285714285714286
+            }
+          },
+          "category": {
+            "architectural": {
+              "n": 20,
+              "file_hits": 15,
+              "file_rate": 0.75,
+              "line_n": 18,
+              "line_hits": 5,
+              "line_rate": 0.2777777777777778
+            },
+            "design-rationale": {
+              "n": 20,
+              "file_hits": 12,
+              "file_rate": 0.6,
+              "line_n": 17,
+              "line_hits": 6,
+              "line_rate": 0.35294117647058826
+            },
+            "localisation": {
+              "n": 20,
+              "file_hits": 15,
+              "file_rate": 0.75,
+              "line_n": 17,
+              "line_hits": 7,
+              "line_rate": 0.4117647058823529
+            },
+            "runtime-behaviour": {
+              "n": 20,
+              "file_hits": 15,
+              "file_rate": 0.75,
+              "line_n": 15,
+              "line_hits": 9,
+              "line_rate": 0.6
+            },
+            "unanswerable": {
+              "n": 0,
+              "file_hits": 0,
+              "file_rate": null,
+              "line_n": 0,
+              "line_hits": 0,
+              "line_rate": null
+            }
+          },
+          "complexity": {
+            "code-tracing": {
+              "n": 41,
+              "file_hits": 29,
+              "file_rate": 0.7073170731707317,
+              "line_n": 35,
+              "line_hits": 13,
+              "line_rate": 0.37142857142857144
+            },
+            "simple": {
+              "n": 39,
+              "file_hits": 28,
+              "file_rate": 0.717948717948718,
+              "line_n": 32,
+              "line_hits": 14,
+              "line_rate": 0.4375
+            }
+          }
+        },
+        "5": {
+          "overall": {
+            "n": 80,
+            "file_hits": 75,
+            "file_rate": 0.9375,
+            "line_n": 67,
+            "line_hits": 47,
+            "line_rate": 0.7014925373134329
+          },
+          "set": {
+            "core": {
+              "n": 32,
+              "file_hits": 28,
+              "file_rate": 0.875,
+              "line_n": 32,
+              "line_hits": 24,
+              "line_rate": 0.75
+            },
+            "swe-qa": {
+              "n": 48,
+              "file_hits": 47,
+              "file_rate": 0.9791666666666666,
+              "line_n": 35,
+              "line_hits": 23,
+              "line_rate": 0.6571428571428571
+            }
+          },
+          "category": {
+            "architectural": {
+              "n": 20,
+              "file_hits": 20,
+              "file_rate": 1.0,
+              "line_n": 18,
+              "line_hits": 12,
+              "line_rate": 0.6666666666666666
+            },
+            "design-rationale": {
+              "n": 20,
+              "file_hits": 18,
+              "file_rate": 0.9,
+              "line_n": 17,
+              "line_hits": 11,
+              "line_rate": 0.6470588235294118
+            },
+            "localisation": {
+              "n": 20,
+              "file_hits": 18,
+              "file_rate": 0.9,
+              "line_n": 17,
+              "line_hits": 11,
+              "line_rate": 0.6470588235294118
+            },
+            "runtime-behaviour": {
+              "n": 20,
+              "file_hits": 19,
+              "file_rate": 0.95,
+              "line_n": 15,
+              "line_hits": 13,
+              "line_rate": 0.8666666666666667
+            },
+            "unanswerable": {
+              "n": 0,
+              "file_hits": 0,
+              "file_rate": null,
+              "line_n": 0,
+              "line_hits": 0,
+              "line_rate": null
+            }
+          },
+          "complexity": {
+            "code-tracing": {
+              "n": 41,
+              "file_hits": 37,
+              "file_rate": 0.9024390243902439,
+              "line_n": 35,
+              "line_hits": 24,
+              "line_rate": 0.6857142857142857
+            },
+            "simple": {
+              "n": 39,
+              "file_hits": 38,
+              "file_rate": 0.9743589743589743,
+              "line_n": 32,
+              "line_hits": 23,
+              "line_rate": 0.71875
+            }
+          }
+        },
+        "10": {
+          "overall": {
+            "n": 80,
+            "file_hits": 80,
+            "file_rate": 1.0,
+            "line_n": 67,
+            "line_hits": 53,
+            "line_rate": 0.7910447761194029
+          },
+          "set": {
+            "core": {
+              "n": 32,
+              "file_hits": 32,
+              "file_rate": 1.0,
+              "line_n": 32,
+              "line_hits": 28,
+              "line_rate": 0.875
+            },
+            "swe-qa": {
+              "n": 48,
+              "file_hits": 48,
+              "file_rate": 1.0,
+              "line_n": 35,
+              "line_hits": 25,
+              "line_rate": 0.7142857142857143
+            }
+          },
+          "category": {
+            "architectural": {
+              "n": 20,
+              "file_hits": 20,
+              "file_rate": 1.0,
+              "line_n": 18,
+              "line_hits": 13,
+              "line_rate": 0.7222222222222222
+            },
+            "design-rationale": {
+              "n": 20,
+              "file_hits": 20,
+              "file_rate": 1.0,
+              "line_n": 17,
+              "line_hits": 14,
+              "line_rate": 0.8235294117647058
+            },
+            "localisation": {
+              "n": 20,
+              "file_hits": 20,
+              "file_rate": 1.0,
+              "line_n": 17,
+              "line_hits": 13,
+              "line_rate": 0.7647058823529411
+            },
+            "runtime-behaviour": {
+              "n": 20,
+              "file_hits": 20,
+              "file_rate": 1.0,
+              "line_n": 15,
+              "line_hits": 13,
+              "line_rate": 0.8666666666666667
+            },
+            "unanswerable": {
+              "n": 0,
+              "file_hits": 0,
+              "file_rate": null,
+              "line_n": 0,
+              "line_hits": 0,
+              "line_rate": null
+            }
+          },
+          "complexity": {
+            "code-tracing": {
+              "n": 41,
+              "file_hits": 41,
+              "file_rate": 1.0,
+              "line_n": 35,
+              "line_hits": 26,
+              "line_rate": 0.7428571428571429
+            },
+            "simple": {
+              "n": 39,
+              "file_hits": 39,
+              "file_rate": 1.0,
+              "line_n": 32,
+              "line_hits": 27,
+              "line_rate": 0.84375
+            }
+          }
+        }
+      },
+      "rrf+rerank": {
+        "1": {
+          "overall": {
+            "n": 80,
+            "file_hits": 54,
+            "file_rate": 0.675,
+            "line_n": 67,
+            "line_hits": 28,
+            "line_rate": 0.417910447761194
+          },
+          "set": {
+            "core": {
+              "n": 32,
+              "file_hits": 17,
+              "file_rate": 0.53125,
+              "line_n": 32,
+              "line_hits": 12,
+              "line_rate": 0.375
+            },
+            "swe-qa": {
+              "n": 48,
+              "file_hits": 37,
+              "file_rate": 0.7708333333333334,
+              "line_n": 35,
+              "line_hits": 16,
+              "line_rate": 0.45714285714285713
+            }
+          },
+          "category": {
+            "architectural": {
+              "n": 20,
+              "file_hits": 12,
+              "file_rate": 0.6,
+              "line_n": 18,
+              "line_hits": 7,
+              "line_rate": 0.3888888888888889
+            },
+            "design-rationale": {
+              "n": 20,
+              "file_hits": 12,
+              "file_rate": 0.6,
+              "line_n": 17,
+              "line_hits": 7,
+              "line_rate": 0.4117647058823529
+            },
+            "localisation": {
+              "n": 20,
+              "file_hits": 14,
+              "file_rate": 0.7,
+              "line_n": 17,
+              "line_hits": 4,
+              "line_rate": 0.23529411764705882
+            },
+            "runtime-behaviour": {
+              "n": 20,
+              "file_hits": 16,
+              "file_rate": 0.8,
+              "line_n": 15,
+              "line_hits": 10,
+              "line_rate": 0.6666666666666666
+            },
+            "unanswerable": {
+              "n": 0,
+              "file_hits": 0,
+              "file_rate": null,
+              "line_n": 0,
+              "line_hits": 0,
+              "line_rate": null
+            }
+          },
+          "complexity": {
+            "code-tracing": {
+              "n": 41,
+              "file_hits": 29,
+              "file_rate": 0.7073170731707317,
+              "line_n": 35,
+              "line_hits": 13,
+              "line_rate": 0.37142857142857144
+            },
+            "simple": {
+              "n": 39,
+              "file_hits": 25,
+              "file_rate": 0.6410256410256411,
+              "line_n": 32,
+              "line_hits": 15,
+              "line_rate": 0.46875
+            }
+          }
+        },
+        "5": {
+          "overall": {
+            "n": 80,
+            "file_hits": 74,
+            "file_rate": 0.925,
+            "line_n": 67,
+            "line_hits": 51,
+            "line_rate": 0.7611940298507462
+          },
+          "set": {
+            "core": {
+              "n": 32,
+              "file_hits": 31,
+              "file_rate": 0.96875,
+              "line_n": 32,
+              "line_hits": 27,
+              "line_rate": 0.84375
+            },
+            "swe-qa": {
+              "n": 48,
+              "file_hits": 43,
+              "file_rate": 0.8958333333333334,
+              "line_n": 35,
+              "line_hits": 24,
+              "line_rate": 0.6857142857142857
+            }
+          },
+          "category": {
+            "architectural": {
+              "n": 20,
+              "file_hits": 18,
+              "file_rate": 0.9,
+              "line_n": 18,
+              "line_hits": 12,
+              "line_rate": 0.6666666666666666
+            },
+            "design-rationale": {
+              "n": 20,
+              "file_hits": 18,
+              "file_rate": 0.9,
+              "line_n": 17,
+              "line_hits": 13,
+              "line_rate": 0.7647058823529411
+            },
+            "localisation": {
+              "n": 20,
+              "file_hits": 20,
+              "file_rate": 1.0,
+              "line_n": 17,
+              "line_hits": 13,
+              "line_rate": 0.7647058823529411
+            },
+            "runtime-behaviour": {
+              "n": 20,
+              "file_hits": 18,
+              "file_rate": 0.9,
+              "line_n": 15,
+              "line_hits": 13,
+              "line_rate": 0.8666666666666667
+            },
+            "unanswerable": {
+              "n": 0,
+              "file_hits": 0,
+              "file_rate": null,
+              "line_n": 0,
+              "line_hits": 0,
+              "line_rate": null
+            }
+          },
+          "complexity": {
+            "code-tracing": {
+              "n": 41,
+              "file_hits": 37,
+              "file_rate": 0.9024390243902439,
+              "line_n": 35,
+              "line_hits": 26,
+              "line_rate": 0.7428571428571429
+            },
+            "simple": {
+              "n": 39,
+              "file_hits": 37,
+              "file_rate": 0.9487179487179487,
+              "line_n": 32,
+              "line_hits": 25,
+              "line_rate": 0.78125
+            }
+          }
+        }
+      },
+      "sent": {
+        "all": {
+          "overall": {
+            "n": 80,
+            "file_hits": 76,
+            "file_rate": 0.95,
+            "line_n": 67,
+            "line_hits": 53,
+            "line_rate": 0.7910447761194029
+          },
+          "set": {
+            "core": {
+              "n": 32,
+              "file_hits": 31,
+              "file_rate": 0.96875,
+              "line_n": 32,
+              "line_hits": 29,
+              "line_rate": 0.90625
+            },
+            "swe-qa": {
+              "n": 48,
+              "file_hits": 45,
+              "file_rate": 0.9375,
+              "line_n": 35,
+              "line_hits": 24,
+              "line_rate": 0.6857142857142857
+            }
+          },
+          "category": {
+            "architectural": {
+              "n": 20,
+              "file_hits": 19,
+              "file_rate": 0.95,
+              "line_n": 18,
+              "line_hits": 13,
+              "line_rate": 0.7222222222222222
+            },
+            "design-rationale": {
+              "n": 20,
+              "file_hits": 19,
+              "file_rate": 0.95,
+              "line_n": 17,
+              "line_hits": 14,
+              "line_rate": 0.8235294117647058
+            },
+            "localisation": {
+              "n": 20,
+              "file_hits": 19,
+              "file_rate": 0.95,
+              "line_n": 17,
+              "line_hits": 13,
+              "line_rate": 0.7647058823529411
+            },
+            "runtime-behaviour": {
+              "n": 20,
+              "file_hits": 19,
+              "file_rate": 0.95,
+              "line_n": 15,
+              "line_hits": 13,
+              "line_rate": 0.8666666666666667
+            },
+            "unanswerable": {
+              "n": 0,
+              "file_hits": 0,
+              "file_rate": null,
+              "line_n": 0,
+              "line_hits": 0,
+              "line_rate": null
+            }
+          },
+          "complexity": {
+            "code-tracing": {
+              "n": 41,
+              "file_hits": 38,
+              "file_rate": 0.926829268292683,
+              "line_n": 35,
+              "line_hits": 26,
+              "line_rate": 0.7428571428571429
+            },
+            "simple": {
+              "n": 39,
+              "file_hits": 38,
+              "file_rate": 0.9743589743589743,
+              "line_n": 32,
+              "line_hits": 27,
+              "line_rate": 0.84375
+            }
+          }
+        }
+      }
+    }
+  },
+  "failure_candidates": [
+    {
+      "row_id": "R02",
+      "question_id": "core-architectural-02",
+      "mode": "rag",
+      "why": [
+        "H2"
+      ],
+      "log_file": "/common/home/users/h/huevan.la.2024/.local/share/codecompass/queries/20261109T010521265717Z-f27c7714.json"
+    },
+    {
+      "row_id": "R05",
+      "question_id": "core-localisation-04",
+      "mode": "rag_tools",
+      "why": [
+        "H2"
+      ],
+      "log_file": "/common/home/users/h/huevan.la.2024/.local/share/codecompass/queries/20261109T011217010736Z-c8253437.json"
+    },
+    {
+      "row_id": "R09",
+      "question_id": "swe-qa-flask-01",
+      "mode": "rag",
+      "why": [
+        "H2"
+      ],
+      "log_file": "/common/home/users/h/huevan.la.2024/.local/share/codecompass/queries/20261109T010706530707Z-e7179d84.json"
+    },
+    {
+      "row_id": "R11",
+      "question_id": "swe-qa-flask-45",
+      "mode": "rag",
+      "why": [
+        "H2"
+      ],
+      "log_file": "/common/home/users/h/huevan.la.2024/.local/share/codecompass/queries/20261109T011119610405Z-ff9bdc94.json"
+    },
+    {
+      "row_id": "R12",
+      "question_id": "swe-qa-flask-27",
+      "mode": "rag",
+      "why": [
+        "H2"
+      ],
+      "log_file": "/common/home/users/h/huevan.la.2024/.local/share/codecompass/queries/20261109T010950429246Z-f7f1e8ba.json"
+    },
+    {
+      "row_id": "R14",
+      "question_id": "swe-qa-flask-17",
+      "mode": "rag",
+      "why": [
+        "H2"
+      ],
+      "log_file": "/common/home/users/h/huevan.la.2024/.local/share/codecompass/queries/20261109T010846495667Z-27568d75.json"
+    },
+    {
+      "row_id": "R23",
+      "question_id": "swe-qa-flask-35",
+      "mode": "rag",
+      "why": [
+        "H2"
+      ],
+      "log_file": "/common/home/users/h/huevan.la.2024/.local/share/codecompass/queries/20261109T011035617778Z-bd78c293.json"
+    },
+    {
+      "row_id": "R31",
+      "question_id": "swe-qa-flask-40",
+      "mode": "rag",
+      "why": [
+        "H2"
+      ],
+      "log_file": "/common/home/users/h/huevan.la.2024/.local/share/codecompass/queries/20261109T011056716837Z-f323fbd7.json"
+    },
+    {
+      "row_id": "R32",
+      "question_id": "core-unanswerable-08",
+      "mode": "rag",
+      "why": [
+        "H2"
+      ],
+      "log_file": "/common/home/users/h/huevan.la.2024/.local/share/codecompass/queries/20261109T010640555955Z-853c695a.json"
+    },
+    {
+      "row_id": "R33",
+      "question_id": "core-architectural-02",
+      "mode": "rag_tools",
+      "why": [
+        "H2"
+      ],
+      "log_file": "/common/home/users/h/huevan.la.2024/.local/share/codecompass/queries/20261109T011446306458Z-cecbc923.json"
+    },
+    {
+      "row_id": "R35",
+      "question_id": "swe-qa-flask-06",
+      "mode": "rag_tools",
+      "why": [
+        "H1",
+        "H2"
+      ],
+      "log_file": "/common/home/users/h/huevan.la.2024/.local/share/codecompass/queries/20261109T011816350074Z-ea96b624.json"
+    },
+    {
+      "row_id": "R37",
+      "question_id": "swe-qa-flask-23",
+      "mode": "rag_tools",
+      "why": [
+        "H2"
+      ],
+      "log_file": "/common/home/users/h/huevan.la.2024/.local/share/codecompass/queries/20261109T012040922778Z-a63e0d1c.json"
+    },
+    {
+      "row_id": "R38",
+      "question_id": "core-runtime-behaviour-07",
+      "mode": "rag",
+      "why": [
+        "H2"
+      ],
+      "log_file": "/common/home/users/h/huevan.la.2024/.local/share/codecompass/queries/20261109T010439796650Z-c0797c52.json"
+    },
+    {
+      "row_id": "R46",
+      "question_id": "swe-qa-flask-06",
+      "mode": "rag",
+      "why": [
+        "H2"
+      ],
+      "log_file": "/common/home/users/h/huevan.la.2024/.local/share/codecompass/queries/20261109T010726586128Z-e3e4086b.json"
+    },
+    {
+      "row_id": "R50",
+      "question_id": "core-design-rationale-05",
+      "mode": "rag",
+      "why": [
+        "H2"
+      ],
+      "log_file": "/common/home/users/h/huevan.la.2024/.local/share/codecompass/queries/20261109T010647866124Z-f8828105.json"
+    }
+  ],
+  "skipped": [],
+  "meta": {
+    "no_retrieval": {
+      "codecompass": {
+        "commit": "c6fa1b71e679d968f61a32d4282ac09d53188449",
+        "tag": "eval-v1",
+        "dirty": false
+      },
+      "repo": {
+        "path": "/common/home/users/h/huevan.la.2024/repos/flask",
+        "head_commit": "85c5d93cbd049c4bd0679c36fd1ddcae8c37b642"
+      },
+      "index": {
+        "dir": "/common/home/users/h/huevan.la.2024/.local/share/codecompass",
+        "state": "current",
+        "indexed_commit": "85c5d93cbd049c4bd0679c36fd1ddcae8c37b642",
+        "embedder_model": "jinaai/jina-embeddings-v2-base-code",
+        "embedder_revision": "516f4baf13dec4ddddda8631e019b5737c8bc250"
+      },
+      "config": {
+        "path": "eval/codecompass.eval.toml",
+        "sha256": "e3c2e26b3c9c37ae963bdea6c7124f47fc28309e785578e56b04fc44cfe8573a",
+        "retrieval": {
+          "vector_k": 50,
+          "keyword_k": 50,
+          "rrf_constant": 60,
+          "rerank_k": 50,
+          "final_k": 8,
+          "min_top_score": 0.02,
+          "closest_files": 3,
+          "docs_fallback": false,
+          "doc_languages": [
+            "md",
+            "rst"
+          ],
+          "docs_margin": 0.2
+        },
+        "chunking": {
+          "target_tokens": 512,
+          "hard_max_tokens": 8192,
+          "batch_files": 50
+        }
+      },
+      "embedder": {
+        "model": "jinaai/jina-embeddings-v2-base-code",
+        "revision": "516f4baf13dec4ddddda8631e019b5737c8bc250",
+        "device": "cuda"
+      },
+      "reranker": {
+        "model": "BAAI/bge-reranker-v2-m3",
+        "revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+        "device": "cuda",
+        "dtype": "float16"
+      },
+      "generator": {
+        "profile": "dev",
+        "model_id": "Qwen2.5-Coder-14B-Instruct",
+        "gguf_file": "qwen2.5-coder-14b-instruct-q4_k_m.gguf",
+        "gguf_checksum_pinned": "c1e659736d89ac1065fb495330fb824d94001974a4bfa78e7270e43476a8d940",
+        "context_window": 32768,
+        "temperature": 0.1,
+        "seed": 42,
+        "timeout_seconds": 300,
+        "max_verifier_rounds": 3
+      },
+      "server": {
+        "url": "http://127.0.0.1:8080",
+        "build_info": "b1-8642541",
+        "model_path": "/common/home/users/h/huevan.la.2024/.cache/codecompass/models/qwen2.5-coder-14b-instruct-q4_k_m.gguf",
+        "n_ctx": 32768
+      },
+      "host": {
+        "hostname": "aloha",
+        "gpu": "NVIDIA GeForce RTX 3090",
+        "python": "3.12.8",
+        "started_at": "2026-11-09T01:02:19+00:00"
+      },
+      "mode": "no_retrieval",
+      "docs_fallback": false,
+      "label": "reported",
+      "question_files": [
+        {
+          "path": "eval/questions/flask-core-kelsey.jsonl",
+          "sha256": "76cf0dcfaf7d44d1949af56f6511e01a8535021d0f719924c2eb0d3380c6a77a"
+        },
+        {
+          "path": "eval/questions/flask-core-nicole.jsonl",
+          "sha256": "3449335bd0dc03bfb57518e308baa44957362779f334c0c63acc2c0e8c57fe36"
+        },
+        {
+          "path": "eval/questions/flask-swe-qa.jsonl",
+          "sha256": "9c62594655fac7f44c71b39de341bef1cd947ddad1b7a47276e48a99cf188d1d"
+        }
+      ],
+      "subset": {
+        "path": "eval/questions/grading-subset.json",
+        "sha256": "5908800cd5d39761653ccb079fed9271a708d9795fc75479489ed9862ab4fc28"
+      },
+      "started_at": "2026-11-09T01:02:17+00:00",
+      "ended_at": "2026-11-09T01:03:14+00:00"
+    },
+    "rag": {
+      "codecompass": {
+        "commit": "c6fa1b71e679d968f61a32d4282ac09d53188449",
+        "tag": "eval-v1",
+        "dirty": false
+      },
+      "repo": {
+        "path": "/common/home/users/h/huevan.la.2024/repos/flask",
+        "head_commit": "85c5d93cbd049c4bd0679c36fd1ddcae8c37b642"
+      },
+      "index": {
+        "dir": "/common/home/users/h/huevan.la.2024/.local/share/codecompass",
+        "state": "current",
+        "indexed_commit": "85c5d93cbd049c4bd0679c36fd1ddcae8c37b642",
+        "embedder_model": "jinaai/jina-embeddings-v2-base-code",
+        "embedder_revision": "516f4baf13dec4ddddda8631e019b5737c8bc250"
+      },
+      "config": {
+        "path": "eval/codecompass.eval.toml",
+        "sha256": "e3c2e26b3c9c37ae963bdea6c7124f47fc28309e785578e56b04fc44cfe8573a",
+        "retrieval": {
+          "vector_k": 50,
+          "keyword_k": 50,
+          "rrf_constant": 60,
+          "rerank_k": 50,
+          "final_k": 8,
+          "min_top_score": 0.02,
+          "closest_files": 3,
+          "docs_fallback": false,
+          "doc_languages": [
+            "md",
+            "rst"
+          ],
+          "docs_margin": 0.2
+        },
+        "chunking": {
+          "target_tokens": 512,
+          "hard_max_tokens": 8192,
+          "batch_files": 50
+        }
+      },
+      "embedder": {
+        "model": "jinaai/jina-embeddings-v2-base-code",
+        "revision": "516f4baf13dec4ddddda8631e019b5737c8bc250",
+        "device": "cuda"
+      },
+      "reranker": {
+        "model": "BAAI/bge-reranker-v2-m3",
+        "revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+        "device": "cuda",
+        "dtype": "float16"
+      },
+      "generator": {
+        "profile": "dev",
+        "model_id": "Qwen2.5-Coder-14B-Instruct",
+        "gguf_file": "qwen2.5-coder-14b-instruct-q4_k_m.gguf",
+        "gguf_checksum_pinned": "c1e659736d89ac1065fb495330fb824d94001974a4bfa78e7270e43476a8d940",
+        "context_window": 32768,
+        "temperature": 0.1,
+        "seed": 42,
+        "timeout_seconds": 300,
+        "max_verifier_rounds": 3
+      },
+      "server": {
+        "url": "http://127.0.0.1:8080",
+        "build_info": "b1-8642541",
+        "model_path": "/common/home/users/h/huevan.la.2024/.cache/codecompass/models/qwen2.5-coder-14b-instruct-q4_k_m.gguf",
+        "n_ctx": 32768
+      },
+      "host": {
+        "hostname": "aloha",
+        "gpu": "NVIDIA GeForce RTX 3090",
+        "python": "3.12.8",
+        "started_at": "2026-11-09T01:03:15+00:00"
+      },
+      "mode": "rag",
+      "docs_fallback": false,
+      "label": "reported",
+      "question_files": [
+        {
+          "path": "eval/questions/flask-core-kelsey.jsonl",
+          "sha256": "76cf0dcfaf7d44d1949af56f6511e01a8535021d0f719924c2eb0d3380c6a77a"
+        },
+        {
+          "path": "eval/questions/flask-core-nicole.jsonl",
+          "sha256": "3449335bd0dc03bfb57518e308baa44957362779f334c0c63acc2c0e8c57fe36"
+        },
+        {
+          "path": "eval/questions/flask-swe-qa.jsonl",
+          "sha256": "9c62594655fac7f44c71b39de341bef1cd947ddad1b7a47276e48a99cf188d1d"
+        }
+      ],
+      "subset": {
+        "path": "eval/questions/grading-subset.json",
+        "sha256": "5908800cd5d39761653ccb079fed9271a708d9795fc75479489ed9862ab4fc28"
+      },
+      "started_at": "2026-11-09T01:03:14+00:00",
+      "ended_at": "2026-11-09T01:11:37+00:00"
+    },
+    "rag_tools": {
+      "codecompass": {
+        "commit": "c6fa1b71e679d968f61a32d4282ac09d53188449",
+        "tag": "eval-v1",
+        "dirty": false
+      },
+      "repo": {
+        "path": "/common/home/users/h/huevan.la.2024/repos/flask",
+        "head_commit": "85c5d93cbd049c4bd0679c36fd1ddcae8c37b642"
+      },
+      "index": {
+        "dir": "/common/home/users/h/huevan.la.2024/.local/share/codecompass",
+        "state": "current",
+        "indexed_commit": "85c5d93cbd049c4bd0679c36fd1ddcae8c37b642",
+        "embedder_model": "jinaai/jina-embeddings-v2-base-code",
+        "embedder_revision": "516f4baf13dec4ddddda8631e019b5737c8bc250"
+      },
+      "config": {
+        "path": "eval/codecompass.eval.toml",
+        "sha256": "e3c2e26b3c9c37ae963bdea6c7124f47fc28309e785578e56b04fc44cfe8573a",
+        "retrieval": {
+          "vector_k": 50,
+          "keyword_k": 50,
+          "rrf_constant": 60,
+          "rerank_k": 50,
+          "final_k": 8,
+          "min_top_score": 0.02,
+          "closest_files": 3,
+          "docs_fallback": false,
+          "doc_languages": [
+            "md",
+            "rst"
+          ],
+          "docs_margin": 0.2
+        },
+        "chunking": {
+          "target_tokens": 512,
+          "hard_max_tokens": 8192,
+          "batch_files": 50
+        }
+      },
+      "embedder": {
+        "model": "jinaai/jina-embeddings-v2-base-code",
+        "revision": "516f4baf13dec4ddddda8631e019b5737c8bc250",
+        "device": "cuda"
+      },
+      "reranker": {
+        "model": "BAAI/bge-reranker-v2-m3",
+        "revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+        "device": "cuda",
+        "dtype": "float16"
+      },
+      "generator": {
+        "profile": "dev",
+        "model_id": "Qwen2.5-Coder-14B-Instruct",
+        "gguf_file": "qwen2.5-coder-14b-instruct-q4_k_m.gguf",
+        "gguf_checksum_pinned": "c1e659736d89ac1065fb495330fb824d94001974a4bfa78e7270e43476a8d940",
+        "context_window": 32768,
+        "temperature": 0.1,
+        "seed": 42,
+        "timeout_seconds": 300,
+        "max_verifier_rounds": 3
+      },
+      "server": {
+        "url": "http://127.0.0.1:8080",
+        "build_info": "b1-8642541",
+        "model_path": "/common/home/users/h/huevan.la.2024/.cache/codecompass/models/qwen2.5-coder-14b-instruct-q4_k_m.gguf",
+        "n_ctx": 32768
+      },
+      "host": {
+        "hostname": "aloha",
+        "gpu": "NVIDIA GeForce RTX 3090",
+        "python": "3.12.8",
+        "started_at": "2026-11-09T01:11:40+00:00"
+      },
+      "mode": "rag_tools",
+      "docs_fallback": false,
+      "label": "reported",
+      "question_files": [
+        {
+          "path": "eval/questions/flask-core-kelsey.jsonl",
+          "sha256": "76cf0dcfaf7d44d1949af56f6511e01a8535021d0f719924c2eb0d3380c6a77a"
+        },
+        {
+          "path": "eval/questions/flask-core-nicole.jsonl",
+          "sha256": "3449335bd0dc03bfb57518e308baa44957362779f334c0c63acc2c0e8c57fe36"
+        },
+        {
+          "path": "eval/questions/flask-swe-qa.jsonl",
+          "sha256": "9c62594655fac7f44c71b39de341bef1cd947ddad1b7a47276e48a99cf188d1d"
+        }
+      ],
+      "subset": {
+        "path": "eval/questions/grading-subset.json",
+        "sha256": "5908800cd5d39761653ccb079fed9271a708d9795fc75479489ed9862ab4fc28"
+      },
+      "started_at": "2026-11-09T01:11:39+00:00",
+      "ended_at": "2026-11-09T01:23:49+00:00"
+    }
+  }
+}

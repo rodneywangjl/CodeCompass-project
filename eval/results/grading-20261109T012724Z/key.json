@@ -1,0 +1,230 @@
+{
+  "seed": 20261109,
+  "rows": {
+    "R01": {
+      "question_id": "core-localisation-02",
+      "mode": "rag"
+    },
+    "R02": {
+      "question_id": "core-architectural-02",
+      "mode": "rag"
+    },
+    "R03": {
+      "question_id": "core-architectural-08",
+      "mode": "rag_tools"
+    },
+    "R04": {
+      "question_id": "core-localisation-04",
+      "mode": "rag"
+    },
+    "R05": {
+      "question_id": "core-localisation-04",
+      "mode": "rag_tools"
+    },
+    "R06": {
+      "question_id": "core-runtime-behaviour-01",
+      "mode": "rag_tools"
+    },
+    "R07": {
+      "question_id": "core-unanswerable-08",
+      "mode": "rag_tools"
+    },
+    "R08": {
+      "question_id": "core-localisation-04",
+      "mode": "no_retrieval"
+    },
+    "R09": {
+      "question_id": "swe-qa-flask-01",
+      "mode": "rag"
+    },
+    "R10": {
+      "question_id": "swe-qa-flask-40",
+      "mode": "rag_tools"
+    },
+    "R11": {
+      "question_id": "swe-qa-flask-45",
+      "mode": "rag"
+    },
+    "R12": {
+      "question_id": "swe-qa-flask-27",
+      "mode": "rag"
+    },
+    "R13": {
+      "question_id": "core-design-rationale-05",
+      "mode": "no_retrieval"
+    },
+    "R14": {
+      "question_id": "swe-qa-flask-17",
+      "mode": "rag"
+    },
+    "R15": {
+      "question_id": "swe-qa-flask-27",
+      "mode": "no_retrieval"
+    },
+    "R16": {
+      "question_id": "swe-qa-flask-45",
+      "mode": "no_retrieval"
+    },
+    "R17": {
+      "question_id": "core-design-rationale-05",
+      "mode": "rag_tools"
+    },
+    "R18": {
+      "question_id": "core-localisation-02",
+      "mode": "rag_tools"
+    },
+    "R19": {
+      "question_id": "swe-qa-flask-06",
+      "mode": "no_retrieval"
+    },
+    "R20": {
+      "question_id": "core-design-rationale-04",
+      "mode": "no_retrieval"
+    },
+    "R21": {
+      "question_id": "swe-qa-flask-40",
+      "mode": "no_retrieval"
+    },
+    "R22": {
+      "question_id": "swe-qa-flask-27",
+      "mode": "rag_tools"
+    },
+    "R23": {
+      "question_id": "swe-qa-flask-35",
+      "mode": "rag"
+    },
+    "R24": {
+      "question_id": "swe-qa-flask-17",
+      "mode": "rag_tools"
+    },
+    "R25": {
+      "question_id": "core-unanswerable-06",
+      "mode": "rag_tools"
+    },
+    "R26": {
+      "question_id": "core-architectural-02",
+      "mode": "no_retrieval"
+    },
+    "R27": {
+      "question_id": "core-unanswerable-03",
+      "mode": "rag_tools"
+    },
+    "R28": {
+      "question_id": "core-runtime-behaviour-01",
+      "mode": "no_retrieval"
+    },
+    "R29": {
+      "question_id": "core-unanswerable-03",
+      "mode": "rag"
+    },
+    "R30": {
+      "question_id": "core-architectural-08",
+      "mode": "rag"
+    },
+    "R31": {
+      "question_id": "swe-qa-flask-40",
+      "mode": "rag"
+    },
+    "R32": {
+      "question_id": "core-unanswerable-08",
+      "mode": "rag"
+    },
+    "R33": {
+      "question_id": "core-architectural-02",
+      "mode": "rag_tools"
+    },
+    "R34": {
+      "question_id": "core-unanswerable-06",
+      "mode": "rag"
+    },
+    "R35": {
+      "question_id": "swe-qa-flask-06",
+      "mode": "rag_tools"
+    },
+    "R36": {
+      "question_id": "core-design-rationale-04",
+      "mode": "rag_tools"
+    },
+    "R37": {
+      "question_id": "swe-qa-flask-23",
+      "mode": "rag_tools"
+    },
+    "R38": {
+      "question_id": "core-runtime-behaviour-07",
+      "mode": "rag"
+    },
+    "R39": {
+      "question_id": "core-design-rationale-04",
+      "mode": "rag"
+    },
+    "R40": {
+      "question_id": "swe-qa-flask-17",
+      "mode": "no_retrieval"
+    },
+    "R41": {
+      "question_id": "swe-qa-flask-01",
+      "mode": "rag_tools"
+    },
+    "R42": {
+      "question_id": "core-unanswerable-01",
+      "mode": "rag_tools"
+    },
+    "R43": {
+      "question_id": "swe-qa-flask-35",
+      "mode": "rag_tools"
+    },
+    "R44": {
+      "question_id": "swe-qa-flask-35",
+      "mode": "no_retrieval"
+    },
+    "R45": {
+      "question_id": "core-architectural-08",
+      "mode": "no_retrieval"
+    },
+    "R46": {
+      "question_id": "swe-qa-flask-06",
+      "mode": "rag"
+    },
+    "R47": {
+      "question_id": "core-localisation-02",
+      "mode": "no_retrieval"
+    },
+    "R48": {
+      "question_id": "swe-qa-flask-45",
+      "mode": "rag_tools"
+    },
+    "R49": {
+      "question_id": "core-unanswerable-01",
+      "mode": "rag"
+    },
+    "R50": {
+      "question_id": "core-design-rationale-05",
+      "mode": "rag"
+    },
+    "R51": {
+      "question_id": "swe-qa-flask-01",
+      "mode": "no_retrieval"
+    },
+    "R52": {
+      "question_id": "core-runtime-behaviour-07",
+      "mode": "rag_tools"
+    },
+    "R53": {
+      "question_id": "core-runtime-behaviour-01",
+      "mode": "rag"
+    },
+    "R54": {
+      "question_id": "swe-qa-flask-23",
+      "mode": "rag"
+    },
+    "R55": {
+      "question_id": "core-runtime-behaviour-07",
+      "mode": "no_retrieval"
+    },
+    "R56": {
+      "question_id": "swe-qa-flask-23",
+      "mode": "no_retrieval"
+    }
+  },
+  "skipped": []
+}

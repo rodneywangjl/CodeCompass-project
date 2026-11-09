@@ -1,0 +1,5 @@
+[embedder]
+device = "cuda"
+
+[files]
+source_extensions = [".py", ".js", ".jsx", ".ts", ".tsx", ".java", ".c", ".h", ".cpp", ".hpp", ".go", ".rs", ".rb", ".php", ".swift", ".kt", ".cs", ".scala", ".sh", ".md", ".rst"]
