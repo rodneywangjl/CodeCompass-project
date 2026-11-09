@@ -37,7 +37,9 @@ PREFILLED = [c for c in SHEET_COLUMNS if c not in GRADER_COLUMNS]
 
 def read_sheet(path) -> list[dict]:
     """A grading sheet (or a grader's copy, or a merged sheet) as a list of rows."""
-    with Path(path).open(encoding="utf-8", newline="") as fh:
+    # utf-8-sig: Excel's "CSV UTF-8" starts the file with a byte-order mark, which would
+    # otherwise become part of the first header ("﻿row_id")
+    with Path(path).open(encoding="utf-8-sig", newline="") as fh:
         return list(csv.DictReader(fh))
 
 
@@ -172,7 +174,7 @@ def _write_csv(path: Path, rows: list[dict], columns: list[str]) -> None:
 MODES = ("no_retrieval", "rag", "rag_tools")
 COMPARED = ("rag", "rag_tools")  # (b) and (c): hallucination and Verification Gain
 GROUPS = ("category", "complexity", "set")
-CONTAMINATION_FLAG = 0.5  # plan §4.4: fixed on 2026-11-09, before any results existed
+CONTAMINATION_FLAG = 0.5  # plan §4.4: fixed on 2026-11-09, before anyone saw the results
 
 
 def figures(merged: list[dict], key: dict, results: list[dict], retrieval: dict | None = None
