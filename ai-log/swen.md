@@ -92,7 +92,8 @@ Amended Spec 004 T2.2 and the plan, which said the request is unchanged without 
 ### What I asked for
 Re-test whether a repeated tool call (same tool and arguments in one question) still wastes a round after T19.1. If it does, stop it from running again, tell the model to use the earlier result, log the repeat, and decide whether a repeat counts against `max_verifier_rounds`.
 ### How I checked it
-TODO (Swen)
+Ran `pytest -m "not model"` on the cluster and verified that all have passed
+Ran `pytest -m model` on GPU: 10 passed
 ### What I kept or changed
 The probe showed the cache stopped re-execution but the repeat still used a round, and the model got the full result again. Decided a repeat counts against the limit (Article V.1: the loop must stay bounded). The round-limit test T8.3 fed the same call every round, so it had to change to distinct calls; the assertions are unchanged, and it needs reviewer sign-off (Article IX.3). Evaluation must be re-run before results are reported (Article VII.5).
 
