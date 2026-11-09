@@ -47,3 +47,36 @@ Order: T5.1 first (T4.2 needs it), then T5.2–T5.4 in any order, then T5.5. Tag
 **T5.6 Automatic labels and grading sheet**
 - Tests first: an answer citing nothing that is not an abstention is `uncited`, not H1; an errored row has no labels; `summary` counts each label and leaves errors out; `load_results` reads `.json` and `.json.gz`; errored answers are skipped and listed; results in the wrong slot or under different conditions are refused; the command writes the sheet and `summary.json`, or prints `error:`; `NO_EVIDENCE` and `NO_INDEX` are abstentions, and an answer with sources is not; a G answer whose unverified markers are all unreferenced is a slip, both with no markers at all and with some missing; a G answer with an entry matching nothing, or a `[N]` with no entry, is H1 even if other entries are unreferenced; a slip is not H1 but is strict H1; an abstention is never H1; citation accuracy is micro-averaged; the sheet has one row per subset question in (b) and in (c) and one per answerable subset question in (a) (56 for the real subset; no unanswerable question in (a)), is shuffled the same way for the same seed, hides the configuration, leaves every grader column empty except H2 and H3 pre-filled `n/a` on (a) rows; every row has a Markdown file with the full recorded context except the system prompt, which would reveal the configuration; the key file maps every row back.
 - ACs: AC-7.1–7.4, AC-8.1, AC-8.3, AC-8.5, AC-10.1. | Touches: `codecompass/eval/grading.py`, `tests/eval/test_grading_t56.py`. | Depends on: T5.5.
+
+## S6: Report figures
+
+**T6.1 Merge and agreement**
+- Tests first:
+  - each grader's columns come only from their own file;
+  - a changed row id or pre-filled cell is refused;
+  - an empty grader cell is refused with its row id;
+  - an invalid value, a 0 with no reason, and H2 yes with a non-zero score are refused;
+  - agreement is the share of matching rows, with n;
+  - Cohen's kappa for the score and for H2 matches a hand-worked example (and is `None` when it is undefined, e.g. both graders give one value throughout);
+  - disagreeing rows are listed;
+  - final cells are pre-filled only where both agree;
+  - the command writes `sheet-merged.csv` and `agreement.json`.
+- ACs: AC-8.4. | Touches: `codecompass/eval/report.py`, `tests/eval/test_report_merge_t61.py`. | Depends on: T5.6.
+
+**T6.2 Figures**
+- Tests first (small made-up sheet, key and results files):
+  - an empty final cell is refused;
+  - the hallucination rate counts H1, H2 or H3 once per answer, keeps abstentions in the denominator and leaves skipped errors out;
+  - strict H1 also counts slips;
+  - Verification Gain = (b) − (c);
+  - quality mean and counts;
+  - paired better / same / worse, split by tag;
+  - groupings by category, tag and set;
+  - the contamination difference, and the flag at exactly 0.5 (flagged) and just below it (not flagged);
+  - unanswerable questions count in the overall rate and appear as their own group;
+  - latency median and max;
+  - hit rates copied from the retrieval file;
+  - every figure has an n;
+  - `report.md` contains each table;
+  - failure candidates are the H1, H2 or H3 rows.
+- ACs: AC-4.x, AC-7.1, AC-9.1–9.6, AC-10.2, AC-10.3, AC-11.1. | Touches: `codecompass/eval/report.py`, `tests/eval/test_report_figures_t62.py`. | Depends on: T6.1.
