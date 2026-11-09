@@ -3,35 +3,40 @@
 | | |
 |---|---|
 | **Name** | Rodney Wang |
-| **Date written** | _YYYY-MM-DD_ |
+| **Date written** | _2026-11-10_ |
 | **AI use log** | [`ai-log/rodney-wang.md`](../../../ai-log/rodney-wang.md) |
 
-> **For the member:** write this yourself, in your own words (AI Use Disclosure Policy §5.2). Do not have an AI tool write it. Replace each `_..._` prompt, add or remove bullets as you need, and delete this note when you finish.
 
 ---
 
 ## 1. What did you learn about how to use these tools effectively?
 
-_What worked for you: how you set up tasks, gave context, checked output, and when you used the tool or did not._
-
-- 
+- The most useful habit was writing the tests first and checking that they failed before any code was written. This caught several bugs in the AI's first drafts that I would otherwise have missed.
+- The AI did better work when I gave it the project rules and the spec up front, and told it to flag open questions instead of answering them itself. When it reviewed one of our specs, it left three decisions for the team rather than guessing.
+- Passing tests were not enough. I also had to check the results by actually running the system and watching how it behaved. Several problems only showed up that way.
 
 ## 2. Where were the tools strong, and where were they weak?
 
 **Strong**
 
-- _Tasks where the output was useful with little correction._
+- Small, clearly defined pieces of code needed very little correction.
+- It was good at finding the cause of a problem when it could measure what was happening. When indexing a repository froze for over half an hour, it worked step by step from the symptoms to the real cause, that was a bug that produced one chunk of text far larger than intended.
 
 **Weak**
 
-- _Tasks where the output was wrong, misleading or needed heavy rework, with an example if you can._
+- It guessed numbers instead of working them out. Some of its default settings were simply wrong until I asked it to check them against real measurements.
+- Some of the tests it wrote were wrong, or passed without actually testing anything.
+- Its first drafts often looked correct but failed when run for real, for example running out of memory or breaking on a different operating system.
 
 ## 3. What went wrong, and what would you do differently?
 
 **What went wrong**
 
-- _A specific mistake or problem, what caused it, and how it was caught._
+- Partway through the project I told it to assume I had approved its tests and stop asking me. I later did a final review in the end though, but since there were so much changes, it might not be the best.
+- Sometimes i got the same model to write the tests and code, as I got lazy.
 
 **What I would do differently**
 
-- 
+- Read and approve the tests myself before any code is written, and look out for tests that pass without really checking anything.
+- Get different AI models to write code and test
+- Ask for evidence before accepting any number the AI suggests, and test on every operating system from the start instead of adding them late.
