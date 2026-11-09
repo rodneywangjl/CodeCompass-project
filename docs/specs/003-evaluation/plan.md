@@ -171,6 +171,58 @@ The chosen ids are written to `eval/questions/grading-subset.json` and **committ
 - **One results file per mode, rewritten after each question:** resumable, and AC-5.3 can compare `meta` across files before any figures are combined.
 - **Tag after T5.5:** grading (T5.6) only reads results files, so the official runs can start while it is built.
 
-## 4. Later sections
+## 4. Report figures (AC-4.x, AC-7.1, AC-8.4, AC-9.1–9.6, AC-10.2–10.3, AC-11.1)
 
-Report figures (AC-9): to be planned next.
+Reads the graded sheets, the key, and the results files. Writes versioned figures under `eval/results/`. Standard library only. Nothing under `codecompass/online` or `codecompass/offline` changes. No significance tests (AC-9.5); **every figure carries its n**.
+
+### 4.1 Merge the two graders' sheets: `codecompass/eval/report.py merge`
+
+`python -m codecompass.eval.report merge --sheet DIR/sheet.csv --nicole sheet-nicole.csv --kelsey sheet-kelsey.csv --out DIR/sheet-merged.csv`
+
+- Takes each grader's columns **only from that grader's own copy** (`nicole_*` from `sheet-nicole.csv`, `kelsey_*` from `sheet-kelsey.csv`), so neither can overwrite the other. Refuses if the row ids or pre-filled columns differ from `sheet.csv` (someone edited the wrong columns or the wrong file).
+- Refuses if any grader cell is still empty (a row not graded), listing the row ids. `n/a` cells must still be `n/a`.
+- Checks values: H2/H3 `yes`/`no`; score `0`/`1`/`2`; a reason for every 0, from `unsupported`, `fabricated-citation`, `abstained`, `wrong-but-grounded`; H2 or H3 `yes` must have score 0 (§5.2).
+- **Agreement (AC-8.4):** for score, H2, H3 and the 0-reason, the share of rows where the two graders agree (with n), and Cohen's kappa for the score and for H2. It also lists the disagreeing row ids.
+- Writes `sheet-merged.csv`: all columns, plus `agree` (`yes`/`no`) and `final_h2`, `final_h3`, `final_score`, `final_reason`, `note`. Final cells are **pre-filled where both agree** and left empty where they disagree. The two graders then fill those together and write in `note` why.
+- Writes `agreement.json`.
+
+### 4.2 Figures: `codecompass/eval/report.py figures`
+
+`python -m codecompass.eval.report figures --merged DIR/sheet-merged.csv --key DIR/key.json --results A.json B.json C.json [--retrieval RETRIEVAL.json] --out eval/results/report-<UTC time>/`
+
+- Refuses if any `final_*` cell is empty (disagreements not yet settled) or the rows do not match the key.
+- Joins the rows with `key.json` to get each row's configuration. **This is the only place the key is read.**
+
+| Figure | Definition | From | AC |
+|---|---|---|---|
+| **Hallucination rate** (b), (c) | answers with H1 (pre-filled) **or** final H2 **or** final H3 ÷ graded answers; abstentions in the denominator, errors out (skipped rows) | merged sheet + key | AC-9.1 |
+| Same, strict | H1 replaced by strict H1 (the sheet's H1 or format-slip label) | merged sheet + key | AC-7.3 |
+| **Verification Gain** | rate(b) − rate(c); positive = tools help | the two rates | AC-9.2 |
+| **Quality** | mean final score and the 0/1/2 counts, (b) and (c) | merged sheet | AC-9.3 |
+| **Paired comparison** | per question: (c) better / same / worse than (b) on score, and hallucinated in (b) but not (c) and vice versa; split `simple` / `code-tracing` | merged sheet | AC-9.4 |
+| Groupings | every figure above overall and by category, tag and set | | AC-9.1, AC-9.3, FR-8 |
+| **Contamination** | (a) mean final score, core vs SWE-QA (8 + 8), and the difference; flagged when SWE-QA is higher by ≥ 0.5 (the report interprets it, AC-10.2) | merged sheet | AC-10.2 |
+| Citation accuracy (a), (b), (c) | from `summary()` over all 88; also F share, slips, uncited, H1, strict H1, abstentions, errors | results files | AC-7.1, AC-10.3 |
+| **Latency** | per configuration: median and max of total time per question, median per stage | results files (`timings`) | AC-11.1 |
+| Hit rate@k | copied from the retrieval results file's `summary` (file and line rates, with n) | retrieval file | AC-4.x |
+| Failure-example candidates | rows with final H2 or H3 yes, or H1, with question id, configuration and audit-log path; the 3–5 examples are **chosen by hand** | merged sheet + results | AC-9.6 |
+
+- The contamination flag threshold (≥ 0.5) was fixed on 2026-11-09 before anyone saw any results (§4.4).
+- Output:
+  - `report.json`: every figure, with n, plus the run details (`meta`) of the three results files and the agreement figures;
+  - `report.md`: the same as tables, ready to copy into the slides and the report;
+  - `failure-candidates.md`.
+
+### 4.3 Design decisions
+- **Two steps, with settling in between:** agreement is measured on the raw grades; the figures use only the settled `final_*` values, so the disagreements are resolved by people, not by averaging.
+- **The key is read only by `figures`**, after grading, so the configuration stays hidden while grading.
+- **No significance tests** (AC-9.5): n is small (20 per configuration); every figure states its n.
+- **The figures are computed, not typed:** the slides and the report copy from `report.md`, so the numbers can be traced back to the files.
+
+### 4.4 Decisions (Nicole, 2026-11-09, before anyone saw the results)
+
+Decided around 01:00 on 9 Nov in a draft, before the official runs (09:03–09:23); committed at 10:10, after the runs had finished but before anyone had looked at any results.
+
+1. **Contamination flag:** flagged when the (a) mean score on SWE-QA is **≥ 0.5 above** core (fixed now, before the numbers, so it cannot be tuned). The report also shows the difference, both score distributions and n (8 + 8), with the caveat that the two sets differ in style and difficulty, so a gap suggests memorisation but does not prove it.
+2. **Agreement:** % agreement for every field (score, H2, H3, 0-reason), **plus Cohen's kappa for the score and for H2**, each with n. Kappa is shown next to the %, never alone (it is unstable at n = 56).
+3. **Unanswerable questions in (b)/(c):** included in the overall hallucination rate **and** reported as their own group (category `unanswerable`).

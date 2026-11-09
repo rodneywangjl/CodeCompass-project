@@ -174,6 +174,11 @@ Priorities: **P1** = required for the final submission, **P2** = should ship, **
 - The sheet's row order uses **seed 20261109**, fixed before the sheet is made, so the shuffle cannot be re-rolled.
 - Each grader fills only their own columns in their own copy of the sheet, and the key is not opened until both have finished.
 
+**Scoring against the question (agreed 2026-11-09, before grading started):**
+- Score against **what the question asks**: **2** if the answer fully and correctly answers what is asked and is supported by the evidence, even if it leaves out extra background that the reference answer adds; **1** if it misses, or gets wrong, part of what is asked. Reference answers, especially SWE-QA's, often add background the question does not ask for, and its absence is not penalised.
+- For **how** and **why** questions, the parts of the reference that explain the how or the why **are** what is asked, not background. An answer that gives the *what* but not the *why* scores **1** (the example above).
+- Reasons for a 0 use exactly these labels: `unsupported`, `fabricated-citation`, `abstained`, `wrong-but-grounded`.
+
 ### 5.2 Hallucinated answer (hallucination rate and Verification Gain)
 An answer is **hallucinated** if **any** of these is true:
 
