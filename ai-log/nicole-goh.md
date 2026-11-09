@@ -316,3 +316,14 @@ To check Kelsey's readings of the official report against report.json, the settl
 I saw the new test fail in Claude's message (strict counted 2 instead of 1: the abstained slip was counted), then ran it myself: 20 passed. ran the full suite myself in WSL: 1502 passed, 0 failed. checked in Claude's count on the real settled sheet that strict is now rag 15/20 and rag_tools 10/20, with the normal rate unchanged (11/20, 4/20).
 ### What I kept or changed
 All of Kelsey's readings held except the strict rate. Four rag_tools rows that we both settled as pure abstentions (R17, R22, R36, R43) were also automatic format slips, and `figures` counted every slip in the strict rate, although an abstention is never hallucinated (§5.2, AC-7.2, AC-7.4). The strict rate for rag_tools was 70% (14/20) instead of 50% (10/20), which made the strict Verification Gain look like +0.05 instead of +0.25. Fixed with a failing test first; the normal hallucination rate was not affected. We also noted for the slides that 5 of the 9 zeros in rag_tools are abstentions, so the tools reduce hallucination partly by declining more often.
+
+## 2026-11-09 · Final AI use declaration, reflections, slide edits and PR reviews
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** docs/final/ai-use-declaration.md, docs/final/ai-reflections/*_reflection.md
+- **Outcome:** Changed
+### What I asked for
+Rebuild the team declaration from the current logs, reflection templates for each member, Swen's reflection formatted from her text, and help phrasing my own reflection from my points. Also reviews of PRs #57–#59 and edits to the final slides.
+### How I checked it
+I checked by reviewing what Claude wrote before accepting it. I rejected two of its suggested examples for my reflection (the line-endings mistake and naming my terminals) because they were my own errors, not problems with the AI. I also compared the two declaration drafts and chose to keep docs/final/ai-use-declaration.md as the only one.
+### What I kept or changed
+Changed the declaration's "every PR was reviewed" after GitHub showed 11 merged without a recorded review. I chose the examples in my reflection and replaced the ones that were not about AI use.
