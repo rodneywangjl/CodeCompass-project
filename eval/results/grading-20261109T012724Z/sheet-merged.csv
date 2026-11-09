@@ -1,0 +1,57 @@
+row_id,question_id,category,complexity,set,abstention,format_slip,uncited,h1,file,nicole_h2,nicole_h3,nicole_score,nicole_reason,kelsey_h2,kelsey_h3,kelsey_score,kelsey_reason,agree,final_h2,final_h3,final_score,final_reason,note
+R01,core-localisation-02,localisation,simple,core,no,no,no,no,R01.md,no,n/a,2,,no,n/a,2,,yes,no,n/a,2,,
+R02,core-architectural-02,architectural,code-tracing,core,no,yes,no,no,R02.md,no,n/a,1,,yes,n/a,0,unsupported,no,yes,n/a,0,unsupported,Rule 1: app-context preservation claim is misattributed; context describes request-context preservation.
+R03,core-architectural-08,architectural,simple,core,no,no,no,no,R03.md,no,n/a,1,,no,n/a,1,,yes,no,n/a,1,,
+R04,core-localisation-04,localisation,code-tracing,core,no,no,no,no,R04.md,no,n/a,2,,no,n/a,1,,no,no,n/a,2,,Both storage and execution path are identified; reverse order and signals are extra.
+R05,core-localisation-04,localisation,code-tracing,core,no,yes,no,no,R05.md,yes,n/a,0,unsupported,yes,n/a,0,abstained,no,yes,n/a,0,unsupported,Agreed: an unsupported claim makes this more than a pure abstention.
+R06,core-runtime-behaviour-01,runtime-behaviour,simple,core,no,yes,no,no,R06.md,no,n/a,2,,no,n/a,2,,yes,no,n/a,2,,
+R07,core-unanswerable-08,unanswerable,simple,core,yes,no,no,no,R07.md,no,no,2,,no,no,2,,yes,no,no,2,,
+R08,core-localisation-04,localisation,code-tracing,core,yes,n/a,no,n/a,R08.md,n/a,n/a,0,abstained,n/a,n/a,0,abstained,yes,n/a,n/a,0,abstained,
+R09,swe-qa-flask-01,architectural,simple,swe-qa,no,no,no,no,R09.md,no,n/a,2,,yes,n/a,0,unsupported,no,yes,n/a,0,unsupported,Rule 1: the dumps implementation is absent so its ensure_ascii behavior is unsupported.
+R10,swe-qa-flask-40,localisation,code-tracing,swe-qa,no,no,no,no,R10.md,no,n/a,1,,no,n/a,1,,yes,no,n/a,1,,
+R11,swe-qa-flask-45,localisation,simple,swe-qa,no,yes,no,no,R11.md,yes,n/a,0,unsupported,yes,n/a,0,unsupported,yes,yes,n/a,0,unsupported,
+R12,swe-qa-flask-27,design-rationale,simple,swe-qa,no,yes,no,no,R12.md,yes,n/a,0,unsupported,yes,n/a,0,unsupported,yes,yes,n/a,0,unsupported,
+R13,core-design-rationale-05,design-rationale,simple,core,yes,n/a,no,n/a,R13.md,n/a,n/a,0,abstained,n/a,n/a,0,abstained,yes,n/a,n/a,0,abstained,
+R14,swe-qa-flask-17,runtime-behaviour,simple,swe-qa,no,yes,no,no,R14.md,no,n/a,2,,yes,n/a,0,unsupported,no,yes,n/a,0,unsupported,Rule 1: the claim that JSON only supports text is not in the context.
+R15,swe-qa-flask-27,design-rationale,simple,swe-qa,yes,n/a,no,n/a,R15.md,n/a,n/a,0,abstained,n/a,n/a,0,abstained,yes,n/a,n/a,0,abstained,
+R16,swe-qa-flask-45,localisation,simple,swe-qa,yes,n/a,no,n/a,R16.md,n/a,n/a,0,abstained,n/a,n/a,0,abstained,yes,n/a,n/a,0,abstained,
+R17,core-design-rationale-05,design-rationale,simple,core,no,yes,no,no,R17.md,no,n/a,0,abstained,no,n/a,0,wrong-but-grounded,no,no,n/a,0,abstained,Agreed: it declines an answerable why question; the relevant commit was not retrieved.
+R18,core-localisation-02,localisation,simple,core,no,no,no,no,R18.md,no,n/a,2,,no,n/a,2,,yes,no,n/a,2,,
+R19,swe-qa-flask-06,architectural,code-tracing,swe-qa,yes,n/a,no,n/a,R19.md,n/a,n/a,0,abstained,n/a,n/a,0,abstained,yes,n/a,n/a,0,abstained,
+R20,core-design-rationale-04,design-rationale,code-tracing,core,yes,n/a,no,n/a,R20.md,n/a,n/a,0,abstained,n/a,n/a,0,abstained,yes,n/a,n/a,0,abstained,
+R21,swe-qa-flask-40,localisation,code-tracing,swe-qa,yes,n/a,no,n/a,R21.md,n/a,n/a,0,abstained,n/a,n/a,0,abstained,yes,n/a,n/a,0,abstained,
+R22,swe-qa-flask-27,design-rationale,simple,swe-qa,no,yes,no,no,R22.md,no,n/a,0,abstained,no,n/a,0,abstained,yes,no,n/a,0,abstained,
+R23,swe-qa-flask-35,design-rationale,code-tracing,swe-qa,no,yes,no,no,R23.md,yes,n/a,0,unsupported,yes,n/a,0,unsupported,yes,yes,n/a,0,unsupported,
+R24,swe-qa-flask-17,runtime-behaviour,simple,swe-qa,no,yes,no,no,R24.md,no,n/a,2,,no,n/a,1,,no,no,n/a,2,,Supported encoding and decoding explain the requested reversible round trip.
+R25,core-unanswerable-06,unanswerable,simple,core,no,yes,no,no,R25.md,no,no,2,,no,no,2,,yes,no,no,2,,
+R26,core-architectural-02,architectural,code-tracing,core,yes,n/a,no,n/a,R26.md,n/a,n/a,0,abstained,n/a,n/a,0,abstained,yes,n/a,n/a,0,abstained,
+R27,core-unanswerable-03,unanswerable,simple,core,yes,no,no,no,R27.md,no,no,2,,no,no,2,,yes,no,no,2,,
+R28,core-runtime-behaviour-01,runtime-behaviour,simple,core,yes,n/a,no,n/a,R28.md,n/a,n/a,0,abstained,n/a,n/a,0,abstained,yes,n/a,n/a,0,abstained,
+R29,core-unanswerable-03,unanswerable,simple,core,no,yes,no,no,R29.md,no,no,2,,no,no,2,,yes,no,no,2,,
+R30,core-architectural-08,architectural,simple,core,no,no,no,no,R30.md,no,n/a,1,,no,n/a,1,,yes,no,n/a,1,,
+R31,swe-qa-flask-40,localisation,code-tracing,swe-qa,no,no,no,no,R31.md,no,n/a,1,,yes,n/a,0,unsupported,no,yes,n/a,0,unsupported,Rule 1: the config-setting branch is absent from context.
+R32,core-unanswerable-08,unanswerable,simple,core,no,yes,no,no,R32.md,yes,no,0,unsupported,no,no,2,,no,yes,no,0,unsupported,Rule 1: the ad-funding inference is unsupported; no sponsor answer was made.
+R33,core-architectural-02,architectural,code-tracing,core,no,yes,no,no,R33.md,no,n/a,1,,yes,n/a,0,unsupported,no,yes,n/a,0,unsupported,Rule 1: request-context preservation is misattributed to the app context.
+R34,core-unanswerable-06,unanswerable,simple,core,no,yes,no,no,R34.md,yes,yes,0,unsupported,no,no,2,,no,no,no,2,,Correctly rejects the nonexistent property and points to get_json.
+R35,swe-qa-flask-06,architectural,code-tracing,swe-qa,no,no,no,yes,R35.md,no,n/a,1,,yes,n/a,0,fabricated-citation,no,yes,n/a,0,unsupported,"Rule 3 + Rule 1: both citations are unverified (H1), and the claims behind them (registration) are not in the context -> H2 yes, 0. Unsupported rather than fabricated-citation: what makes it wrong is the content (it addresses processors, not filters), not only the bad citations."
+R36,core-design-rationale-04,design-rationale,code-tracing,core,no,yes,no,no,R36.md,no,n/a,0,abstained,no,n/a,0,abstained,yes,no,n/a,0,abstained,
+R37,swe-qa-flask-23,runtime-behaviour,code-tracing,swe-qa,no,yes,no,no,R37.md,yes,n/a,0,unsupported,yes,n/a,0,unsupported,yes,yes,n/a,0,unsupported,
+R38,core-runtime-behaviour-07,runtime-behaviour,code-tracing,core,no,yes,no,no,R38.md,yes,n/a,0,unsupported,no,n/a,1,,no,yes,n/a,0,unsupported,Rule 1: the HTTPException subclass claim is not in the context.
+R39,core-design-rationale-04,design-rationale,code-tracing,core,no,no,no,no,R39.md,no,n/a,2,,no,n/a,2,,yes,no,n/a,2,,
+R40,swe-qa-flask-17,runtime-behaviour,simple,swe-qa,yes,n/a,no,n/a,R40.md,n/a,n/a,0,abstained,n/a,n/a,0,abstained,yes,n/a,n/a,0,abstained,
+R41,swe-qa-flask-01,architectural,simple,swe-qa,no,yes,no,no,R41.md,no,n/a,2,,no,n/a,2,,yes,no,n/a,2,,
+R42,core-unanswerable-01,unanswerable,simple,core,no,yes,no,no,R42.md,no,no,2,,no,no,2,,yes,no,no,2,,
+R43,swe-qa-flask-35,design-rationale,code-tracing,swe-qa,no,yes,no,no,R43.md,no,n/a,0,abstained,no,n/a,0,abstained,yes,no,n/a,0,abstained,
+R44,swe-qa-flask-35,design-rationale,code-tracing,swe-qa,yes,n/a,no,n/a,R44.md,n/a,n/a,0,abstained,n/a,n/a,0,abstained,yes,n/a,n/a,0,abstained,
+R45,core-architectural-08,architectural,simple,core,yes,n/a,no,n/a,R45.md,n/a,n/a,0,abstained,n/a,n/a,0,abstained,yes,n/a,n/a,0,abstained,
+R46,swe-qa-flask-06,architectural,code-tracing,swe-qa,no,yes,no,no,R46.md,no,n/a,1,,yes,n/a,0,unsupported,no,yes,n/a,0,unsupported,Rule 1: registration and rendering claims are not established; answer discusses processors not filters.
+R47,core-localisation-02,localisation,simple,core,no,n/a,no,n/a,R47.md,n/a,n/a,0,abstained,n/a,n/a,0,abstained,yes,n/a,n/a,0,abstained,
+R48,swe-qa-flask-45,localisation,simple,swe-qa,yes,no,no,no,R48.md,yes,n/a,0,abstained,no,n/a,0,abstained,no,no,n/a,0,abstained,Rule 2: pure abstention on an answerable question means H2 no.
+R49,core-unanswerable-01,unanswerable,simple,core,yes,no,no,no,R49.md,no,no,2,,no,no,2,,yes,no,no,2,,
+R50,core-design-rationale-05,design-rationale,simple,core,no,yes,no,no,R50.md,yes,n/a,0,unsupported,yes,n/a,0,unsupported,yes,yes,n/a,0,unsupported,
+R51,swe-qa-flask-01,architectural,simple,swe-qa,yes,n/a,no,n/a,R51.md,n/a,n/a,0,abstained,n/a,n/a,0,abstained,yes,n/a,n/a,0,abstained,
+R52,core-runtime-behaviour-07,runtime-behaviour,code-tracing,core,no,yes,no,no,R52.md,yes,n/a,0,unsupported,no,n/a,1,,no,no,n/a,1,,Claims are supported but the requested exception-dispatch path is omitted.
+R53,core-runtime-behaviour-01,runtime-behaviour,simple,core,no,yes,no,no,R53.md,no,n/a,2,,no,n/a,2,,yes,no,n/a,2,,
+R54,swe-qa-flask-23,runtime-behaviour,code-tracing,swe-qa,no,yes,no,no,R54.md,yes,n/a,0,unsupported,no,n/a,1,,no,no,n/a,1,,Runtime separation is supported; the TypedDict mechanism and tuple status detail are missing.
+R55,core-runtime-behaviour-07,runtime-behaviour,code-tracing,core,no,n/a,no,n/a,R55.md,n/a,n/a,0,abstained,n/a,n/a,0,abstained,yes,n/a,n/a,0,abstained,
+R56,swe-qa-flask-23,runtime-behaviour,code-tracing,swe-qa,yes,n/a,no,n/a,R56.md,n/a,n/a,0,abstained,n/a,n/a,0,abstained,yes,n/a,n/a,0,abstained,
