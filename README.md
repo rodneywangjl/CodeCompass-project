@@ -326,6 +326,8 @@ codecompass                     # or: codecompass /path/to/repo
 
 #### Running fast on a GPU
 
+> **On the SCIS GPU cluster?** Follow [`GPU-CLUSTER.md`](GPU-CLUSTER.md): getting a 3090 node with Slurm, building `llama-server`, running the `dev` (14B) profile, and fixes for the errors we hit.
+
 The project runs on Linux, Windows and macOS, with the GPU API chosen per machine and CPU-only always possible (constitution Article VIII.2). What has actually been **tested** is narrower:
 
 | Platform | `llama-server` build (release b11960) | Embedder / re-ranker device | Status |
@@ -335,6 +337,7 @@ The project runs on Linux, Windows and macOS, with the GPU API chosen per machin
 | macOS (Apple Silicon or Intel) | `llama-b11960-bin-macos-arm64.tar.gz` / `-x64.tar.gz` (Metal), or `brew install llama.cpp` | `mps` | Not tested on a real machine; see "macOS" below |
 | AMD / Intel GPU | the `vulkan` builds (Linux and Windows) | `cpu` (the pinned PyTorch has no ROCm or XPU build) | Not tested |
 | CPU only, any OS | any build, or `win-cpu-x64` | `cpu` | Works everywhere, slow: re-ranking one shortlist took 52 s here |
+| SCIS GPU cluster (RTX 3090, Slurm) | b11960 built from source with CUDA 12.6 (the cluster's glibc is too old for the prebuilt binaries) | `cuda` | Used with the `dev` 14B profile, 2 to 6 s per answer; step-by-step guide in [`GPU-CLUSTER.md`](GPU-CLUSTER.md) |
 
 The test suite that CI runs (`pytest -m "not model"`) runs on Ubuntu, Windows and macOS, so platform bugs in the Python code show up in pull requests. CI does not run a model, so it proves nothing about GPU speed or memory. **If you run this on Windows or macOS, please record what you measured** (the commands under "Platform check" below) and open a pull request with the results.
 
