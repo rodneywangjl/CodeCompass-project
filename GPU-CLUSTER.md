@@ -7,7 +7,7 @@ How to run CodeCompass with the `dev` profile (Qwen2.5-Coder-14B) on one RTX 309
 CodeCompass runs on one GPU node as two programs: `llama-server` (the model) in the background and the `codecompass` command in front. The one-time setup takes up to an hour; after that, a session starts in about five minutes.
 
 - **Account:** use your own SCIS cluster account and never share it. Each of us does the one-time setup in our own home folder.
-- **Network:** connect to the GlobalProtect VPN (only one VPN at a time). Use the address `10.193.104.102`. The name `origami.smu.edu.sg` points to an on-campus address that times out over the VPN.
+- **Network:** connect to the GlobalProtect VPN (only one VPN at a time). In the commands below, replace `<cluster-address>` with the cluster's VPN address from the SCIS cluster instructions. The cluster's hostname may resolve to an on-campus address that times out over the VPN, so use the VPN address instead.
 - **Limits:** our accounts are on the `student` partition with QoS `studentqos`: 4 CPUs, 32 GB of RAM and 1 GPU per job, 1 day per job, and 2 running jobs at once. A `mynotebook` session counts as one of those jobs. Run `myinfo` to check yours.
 - **Storage:** nothing on the cluster is backed up, and scratch files older than 30 days are deleted.
 - **Secrets:** never put passwords or tokens in any file on the cluster.
@@ -19,7 +19,7 @@ Always ask for an RTX 3090. Other cards in the `student` partition either lack t
 1. Log in from Terminal (macOS) or PowerShell (Windows):
 
    ```bash
-   ssh <your-username>@10.193.104.102
+   ssh <your-username>@<cluster-address>
    ```
 
 2. Clear any Slurm settings left over from an earlier job. Without this, `srun` can fail with *Memory required by task is not available*:
@@ -49,10 +49,10 @@ Do this once, inside a 3090 GPU shell, except step 1, which runs on your laptop.
      --exclude '.venv' --exclude '__pycache__' --exclude '.git' --exclude 'runs' \
      --exclude 'idx' --exclude '.pytest_cache' --exclude '.DS_Store' \
      "/path/to/CodeCompass-project/" \
-     <your-username>@10.193.104.102:~/CodeCompass-project/
+     <your-username>@<cluster-address>:~/CodeCompass-project/
    ```
 
-   Keep the `/` at the end of the first path. On Windows without `rsync`, zip the folder (leaving out the same folders) and send it with `scp CodeCompass-project.zip <your-username>@10.193.104.102:~`, then `unzip` it on the cluster.
+   Keep the `/` at the end of the first path. On Windows without `rsync`, zip the folder (leaving out the same folders) and send it with `scp CodeCompass-project.zip <your-username>@<cluster-address>:~`, then `unzip` it on the cluster.
 
 2. **Create a Python environment.** The system Python is 3.9, which is too old, so load 3.12:
 
@@ -213,7 +213,7 @@ Every error below came up while setting this up on 7 November 2026.
 
 | What you see | Cause | Fix |
 |---|---|---|
-| `ssh` or `rsync` times out connecting to `10.0.104.102` | `origami.smu.edu.sg` resolves to an on-campus address | Use `10.193.104.102` |
+| `ssh` or `rsync` times out while connecting | The cluster's hostname resolves to an on-campus address | Connect to the VPN address instead of the hostname |
 | `srun: error: Unable to create step ... Memory required by task is not available` | Leftover `SLURM_JOB_ID` in your login shell | `unset $(env \| grep -o '^SLURM_[A-Z_]*')`, or log in again |
 | `nvidia-smi` shows a GTX 1080 Ti or RTX 2080 | No GPU type was requested | `exit` and rerun `srun` with `--constraint=3090` |
 | Server prints `Exit 1`; log says `GLIBCXX_3.4.32 not found` | System C++ library is too old | `source ~/cc-env.sh`, then start the server again |
