@@ -76,11 +76,27 @@ FINAL_MESSAGE = ("Tool limit reached: no more tools are available. Answer now, u
 VAGUE_QUESTION_RULE = ("If the question names no file or function and the code context does not "
                        "answer it, say so and ask the developer to name a file or function.")
 
+# Optional example, on only with [prompt] format_example = true (T19.6, Article VI.4).
+# It names an invented file and commit, so it cannot be cited as evidence from a repository.
+# The Sources lines use the format citation/parser.py reads (AC-1.1).
+CITATION_EXAMPLE_ANSWER = (
+    "The retry runs three times before the request fails [1], so a short upstream "
+    "error does not fail it [2].\n\n"
+    "Sources\n"
+    "[1] example/client.py, lines 10-24 (indexed at 1a2b3c4)\n"
+    '[2] Commit 5d6e7f8, "retry on upstream timeout", Sam Lee, 2025-01-10'
+)
+CITATION_EXAMPLE_BLOCK = (
+    "Example of a correct answer (the file and commit are invented; copy the format, "
+    f"not the names):\n{CITATION_EXAMPLE_ANSWER}"
+)
 
-def system_prompt(*, tools_enabled: bool, vague_question_hint: bool = False) -> str:
+
+def system_prompt(*, tools_enabled: bool, vague_question_hint: bool = False,
+                  format_example: bool = False) -> str:
     """The D14 prompt: with tools, the tool decision is rule 1; without, the
     pre-T20.1 prompt, unchanged (D17, Article VII.3). With the default flags it is
-    byte-for-byte today's prompt (T19.5)."""
+    byte-for-byte today's prompt (T19.5, T19.6)."""
     if not tools_enabled:
         rules, intro = _RULES, _INTRO
     else:
@@ -89,7 +105,10 @@ def system_prompt(*, tools_enabled: bool, vague_question_hint: bool = False) -> 
     if vague_question_hint:
         rules = [*rules, VAGUE_QUESTION_RULE]
     numbered = "\n".join(f"{i}. {rule}" for i, rule in enumerate(rules, 1))
-    return f"{intro}\n\nRules:\n{numbered}"
+    prompt = f"{intro}\n\nRules:\n{numbered}"
+    if format_example:
+        prompt = f"{prompt}\n\n{CITATION_EXAMPLE_BLOCK}"
+    return prompt
 
 
 def user_message(question: str, chunks: list, *, tools_enabled: bool = False,
@@ -243,16 +262,19 @@ def _generate(generator, messages: list[dict], on_draft) -> str:
 
 def run_agent(generator, question: str, chunks: list, *, run_tool, max_rounds: int,
               tools_enabled: bool = True, docs: bool = False, on_draft=None,
-              on_tool=None, vague_question_hint: bool = False) -> AgentRun:
+              on_tool=None, vague_question_hint: bool = False,
+              format_example: bool = False) -> AgentRun:
     """Answer, running at most *max_rounds* tool calls, one per round (Plan D15).
 
     *on_draft*, if given, receives the model's text as it is written (Spec 004 US2).
     *on_tool*, if given, is called with a deep copy of the audit record of each tool call
     that ran, in order (Spec 004 US6); it only observes.
+    *format_example* is the [prompt] flag (T19.6); off, the prompt is unchanged.
     *vague_question_hint* is the [prompt] flag (T19.5); off, the prompt is unchanged.
     """
     messages = [{"role": "system", "content": system_prompt(
-                    tools_enabled=tools_enabled, vague_question_hint=vague_question_hint)},
+                    tools_enabled=tools_enabled, vague_question_hint=vague_question_hint,
+                    format_example=format_example)},
                 {"role": "user", "content": user_message(question, chunks,
                                                          tools_enabled=tools_enabled,
                                                          docs=docs)}]
