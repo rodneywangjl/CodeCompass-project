@@ -327,3 +327,14 @@ Rebuild the team declaration from the current logs, reflection templates for eac
 I checked by reviewing what Claude wrote before accepting it. I rejected two of its suggested examples for my reflection (the line-endings mistake and naming my terminals) because they were my own errors, not problems with the AI. I also compared the two declaration drafts and chose to keep docs/final/ai-use-declaration.md as the only one.
 ### What I kept or changed
 Changed the declaration's "every PR was reviewed" after GitHub showed 11 merged without a recorded review. I chose the examples in my reflection and replaced the ones that were not about AI use.
+
+## 2026-11-09 · Sample runs, test results and README evaluation section
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** docs/final/sample-runs.md, docs/final/test-results.md, README.md, ai-log/nicole-goh.md
+- **Outcome:** Kept
+### What I asked for
+Supporting documents for the final submission: sample run logs, a test-results summary and an evaluation section for the README. Also a review of Swen's PR #62.
+### How I checked it
+I compared two of the sample answers with the results file and the four grades with sheet-merged.csv, and checked the test-results file against my own WSL run. I previewed the README, clicked the new links and checked the headline figures against report.md. I read the git diff to confirm only the Evaluation section, the three out-of-date lines and the Reference list changed.
+### What I kept or changed
+Kept the five sample answers, copied verbatim from the eval-v1 rag_tools results file by a script, one per outcome (F, format slip, H1, evidence-gate abstention, unanswerable control at the round limit), with the final grades from sheet-merged.csv. Example 4 is an answerable question, so it is described as a missed answer, not a success. Added the evaluation section to the README between Testing and Development process, with a table-of-contents entry; its figures were checked against report.md, report.json, agreement.json and the experiments README, and it states that H1 rose from 2 to 4 in experiment C. Also updated three of Rodney's README lines that were out of date (the test count under Testing, the evaluation item in Roadmap plus an unticked FastAPI generalisation item, and the performance line in Known limitations), for him to check in review. Added the missing documents (Specs 003 to 005, the question and results READMEs, MODEL-SETUP, GPU-CLUSTER, AGENTS, ai-log and docs/final) to the README's Reference section. The test-results file records my own run of the required suite in WSL on main at 0518a82 (1502 passed).
