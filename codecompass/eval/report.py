@@ -189,8 +189,11 @@ def figures(merged: list[dict], key: dict, results: list[dict], retrieval: dict 
     by_mode = {m: [r for r in rows if r["mode"] == m] for m in MODES}
 
     def hallucinated(strict):
+        # strict also counts format slips, except a slip the graders settled as an abstention:
+        # an abstention is never hallucinated (§5.2, AC-7.2, AC-7.4)
         return lambda r: (r["h1"] == "yes" or r["final_h2"] == "yes" or r["final_h3"] == "yes"
-                          or (strict and r["format_slip"] == "yes"))
+                          or (strict and r["format_slip"] == "yes"
+                              and r["final_reason"] != "abstained"))
 
     hall = {m: _grouped(by_mode[m], _rate(hallucinated(False))) for m in COMPARED}
     strict = {m: _grouped(by_mode[m], _rate(hallucinated(True))) for m in COMPARED}
