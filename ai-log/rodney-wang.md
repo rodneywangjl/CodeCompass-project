@@ -653,3 +653,17 @@ Went through it in a real terminal: the tool count, `/tools`, both themes, `/the
 - For the Claude Code-style look (boxed prompt, spinner, live tool lines, styled markdown), I let Claude do T4.2 to T4.5 without stopping for approval, since this was low-risk display work that doesn't touch retrieval or citation checking. It still wrote tests first and fixed its own code instead of an approved test when one failed.
 - A real-terminal check found two small spinner glitches, which were fixed with a new test. Everything went through PR #27, which Nicole reviewed and Gavin merged.
 
+
+## 2026-11-10 · quickstart.py and README: from a new machine to a first question
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** quickstart.py, README.md, ai-log/rodney-wang.md
+- **Outcome:** Changed
+### What I asked for
+Check whether quickstart.py and the README get a user from nothing to running `codecompass` on a repo, fix quickstart.py so it builds a real (queryable) index and the personal config, make it reliable on a machine that has never had CodeCompass, and update the README.
+### How I checked it
+I got claude to check it. I skim through the readme and looks about right. Due to time constraint, i hope it works. The previous quickstart.py was definitely incomplete anyways.
+### What I kept or changed
+- quickstart.py used the stub embedder by default, which `codecompass` refuses to query (Article II.4). It now defaults to the real embedder and also runs `pip install -e .`, so the `codecompass` command exists.
+- It now creates the personal config (`~/.config/codecompass/codecompass.toml`, or `%APPDATA%` on Windows) with the pinned profiles and a `--profile` default, because the built-in profiles have no GGUF file or checksum. The file is checked with codecompass's own loader before it is saved and is never overwritten.
+- A fresh-machine run (empty HOME, new clone) found that Python 3.15 cannot install the pinned torch. quickstart.py now stops with a clear message on an unsupported Python or a `.venv` made by one.
+- README: replaced Installation/Quickstart with a numbered new-machine guide (quickstart, llama-server, GGUF download, start, ask), a profile table, troubleshooting, both pipelines in Architecture, and the full online layout in Project structure.
