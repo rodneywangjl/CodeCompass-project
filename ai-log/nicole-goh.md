@@ -347,6 +347,16 @@ Kept the five sample answers, copied verbatim from the eval-v1 rag_tools results
 Bring the team declaration up to date after Rodney's PR #66 (his Sprint 1 answer, his "How I checked it" sections and the last reflections) and remove the TODO box.
 ### How I checked it
 I read the diff, checked the Sprint 1 sentence against Rodney's first two log entries, and compared the counts.
-Removing the TODO 
 ### What I kept or changed
 Declaration: it now says Sprint 1 was checked less closely (tests read roughly and run once the code was in; constitution and AGENTS.md skimmed), as Rodney's own log records, instead of implying every test was run red first. Updated Rodney's row, the entry counts (134), the trailer table and the checklist at main 2719f46; the list of 11 self-merged PRs is unchanged.
+
+## 2026-11-10 · Architecture diagram in the README
+- **Tool (model):** Claude Code (claude-opus-5-5)
+- **Files:** docs/architecture/architecture.mmd, docs/architecture/architecture.svg, README.md, docs/final/ai-use-declaration.md, ai-log/nicole-goh.md
+- **Outcome:** Changed
+### What I asked for
+A review of where my Mermaid architecture diagram should live, a check of the diagram against the code, and a README change that shows it under Architecture.
+### How I checked it
+I read the diff, and check the affected files preview to ensure the everything is aligned and accurate.
+### What I kept or changed
+Moved the diagram from the repository root to docs/architecture/architecture.mmd and showed it under the README's Architecture section as an SVG image that I rendered myself from the Mermaid source (so it also shows outside GitHub), with the Mermaid source in a collapsed block below, replacing the old offline-only text diagram; the source file is linked there and in the Reference list. Claude checked the diagram against the code (50 + 50 retrieved, RRF 60, 50 re-ranked, 8 sent, min_top_score, 3 closest files, 3 tool rounds, final answer-only call) and found one gap: the evidence-gate refusal also goes through the citation checker, so I added that arrow. Changed "will call ensure_current" to "calls", since the online pipeline already does. Updated the declaration's entry count for this entry.

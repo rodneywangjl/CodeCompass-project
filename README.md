@@ -35,15 +35,65 @@ This repository implements both pipelines. The **offline indexing pipeline** (Sp
 
 ## Architecture
 
-```
-Git repository
-  → Repo scanner (tree-sitter + GitPython, changed files only)
-    → Code-aware embedder (jina-embeddings-v2-base-code, local)
-      → Vector store (Chroma/HNSW)
-    → Keyword index (BM25, tantivy)
+The diagram shows both pipelines: offline indexing (top) and the online query pipeline with its bounded agent loop and citation checker (bottom).
+
+![CodeCompass architecture: offline indexing pipeline and online query pipeline](docs/architecture/architecture.svg)
+
+The source is [`docs/architecture/architecture.mmd`](docs/architecture/architecture.mmd). After editing it, update the Mermaid block below and re-export `architecture.svg` (for example with the Mermaid Live Editor or `mmdc`).
+
+<details>
+<summary>Mermaid source</summary>
+
+```mermaid
+flowchart TD
+    A[Git repository] --> B1
+
+    D[Developer question] --> EC{{"ensure_current()<br/>HEAD == last indexed commit?"}}
+    EC -- "no: incremental re-index" --> B
+    EC -- "yes, or re-index failed<br/>(flag answer as stale)" --> E1
+
+    subgraph B["Offline: indexing pipeline (runs before each question, only on changed files)"]
+        B1["Repo scanner<br/>GitPython diff since last indexed commit<br/>ignore list excludes secrets, lockfiles, binaries"]
+        B2["Structure-aware chunker<br/>tree-sitter: whole functions/classes, ~512 tokens<br/>line-window fallback for unparseable files"]
+        B3["Code embedder<br/>jina-embeddings-v2-base-code (pinned revision)"]
+        B4["Vector store<br/>Chroma, HNSW"]
+        B5["Keyword index<br/>tantivy BM25"]
+        B1 --> B2 --> B3 --> B4
+        B2 --> B5
+    end
+
+    B4 -. "read-only handles<br/>(embedder version checked)" .-> E1
+    B5 -. "read-only handles" .-> E1
+
+    subgraph E["Online: query pipeline (runs per question, bounded agent loop)"]
+        E1["Hybrid retriever<br/>vector top 50 + BM25 top 50<br/>merged with RRF (k = 60)"]
+        E2["Re-ranker<br/>bge-reranker-v2-m3 on 50-chunk shortlist → top 8"]
+        G{"Best re-rank score<br/>≥ min_top_score?"}
+        R["No model call:<br/>say evidence is insufficient,<br/>list 3 closest files"]
+        E3["Agent / Generator<br/>Qwen2.5-Coder-Instruct via llama.cpp llama-server<br/>14B (dev, eval) / 32B (prod)<br/>decides: answer or request one tool"]
+        E5{"Tool requested and<br/>round < max_verifier_rounds (3)?"}
+        E4["Read-only tools (cached, logged)<br/>git blame · git log · open_file<br/>search_again (re-runs retriever + re-ranker)"]
+        E6["Final answer-only call<br/>(no tool runs)"]
+        E7["Citation checker<br/>deterministic code, no LLM<br/>matches every Sources entry against context"]
+
+        E1 --> E2 --> G
+        G -- "no" --> R
+        R -- "cites nothing" --> E7
+        G -- "yes" --> E3 --> E5
+        E5 -- "yes" --> E4
+        E4 -- "result appended as citable evidence" --> E3
+        E5 -- "no: answered" --> E7
+        E5 -- "no: limit reached, still asks" --> E6 --> E7
+    end
+
+    E7 --> F["F: Cited answer<br/>all citations verified"]
+    E7 --> FG["G: Flagged answer<br/>banner + mark on each unverified source"]
+    E7 --> U["No citations:<br/>marked uncited, 'please verify' note"]
 ```
 
-One pipeline, one code path: **a full build is an incremental run from an empty index**. Before answering each question, the online pipeline will call the single public `ensure_current` entry point, which compares repo HEAD against the last indexed commit and runs an incremental re-index only if they differ.
+</details>
+
+One pipeline, one code path: **a full build is an incremental run from an empty index**. Before answering each question, the online pipeline calls the single public `ensure_current` entry point, which compares repo HEAD against the last indexed commit and runs an incremental re-index only if they differ.
 
 Module boundaries are strict: only `codecompass.offline`'s `ensure_current` (write-capable), `status`, `open_index`, and `check_consistency` (read-only) are visible to the online pipeline.
 
@@ -553,6 +603,7 @@ Hard rules: never edit, weaken, skip, or xfail an approved test to pass; stay in
 
 ## Reference
 
+- `docs/architecture/architecture.mmd` — Mermaid source of the architecture diagram shown under [Architecture](#architecture)
 - `docs/constitution.md` — non-negotiable principles (grounding, two pipelines, index correctness, hybrid retrieval, bounded agent loop, citation integrity, evaluation-first, models/environment, TDD, responsible AI, scope)
 - `docs/specs/001-offline-indexing/spec.md` — what the pipeline must do (user stories, acceptance criteria)
 - `docs/specs/001-offline-indexing/plan.md` — how it is built (interfaces, design decisions D1–D10, optimisations O1–O9)
