@@ -1,0 +1,44 @@
+flowchart TD
+    A[Git repository] --> B1
+
+    D[Developer question] --> EC{{"ensure_current()<br/>HEAD == last indexed commit?"}}
+    EC -- "no: incremental re-index" --> B
+    EC -- "yes, or re-index failed<br/>(flag answer as stale)" --> E1
+
+    subgraph B["Offline: indexing pipeline (runs before each question, only on changed files)"]
+        B1["Repo scanner<br/>GitPython diff since last indexed commit<br/>ignore list excludes secrets, lockfiles, binaries"]
+        B2["Structure-aware chunker<br/>tree-sitter: whole functions/classes, ~512 tokens<br/>line-window fallback for unparseable files"]
+        B3["Code embedder<br/>jina-embeddings-v2-base-code (pinned revision)"]
+        B4["Vector store<br/>Chroma, HNSW"]
+        B5["Keyword index<br/>tantivy BM25"]
+        B1 --> B2 --> B3 --> B4
+        B2 --> B5
+    end
+
+    B4 -. "read-only handles<br/>(embedder version checked)" .-> E1
+    B5 -. "read-only handles" .-> E1
+
+    subgraph E["Online: query pipeline (runs per question, bounded agent loop)"]
+        E1["Hybrid retriever<br/>vector top 50 + BM25 top 50<br/>merged with RRF (k = 60)"]
+        E2["Re-ranker<br/>bge-reranker-v2-m3 on 50-chunk shortlist → top 8"]
+        G{"Best re-rank score<br/>≥ min_top_score?"}
+        R["No model call:<br/>say evidence is insufficient,<br/>list 3 closest files"]
+        E3["Agent / Generator<br/>Qwen2.5-Coder-Instruct via llama.cpp llama-server<br/>14B (dev, eval) / 32B (prod)<br/>decides: answer or request one tool"]
+        E5{"Tool requested and<br/>round < max_verifier_rounds (3)?"}
+        E4["Read-only tools (cached, logged)<br/>git blame · git log · open_file<br/>search_again (re-runs retriever + re-ranker)"]
+        E6["Final answer-only call<br/>(no tool runs)"]
+        E7["Citation checker<br/>deterministic code, no LLM<br/>matches every Sources entry against context"]
+
+        E1 --> E2 --> G
+        G -- "no" --> R
+        R -- "cites nothing" --> E7
+        G -- "yes" --> E3 --> E5
+        E5 -- "yes" --> E4
+        E4 -- "result appended as citable evidence" --> E3
+        E5 -- "no: answered" --> E7
+        E5 -- "no: limit reached, still asks" --> E6 --> E7
+    end
+
+    E7 --> F["F: Cited answer<br/>all citations verified"]
+    E7 --> FG["G: Flagged answer<br/>banner + mark on each unverified source"]
+    E7 --> U["No citations:<br/>marked uncited, 'please verify' note"]
