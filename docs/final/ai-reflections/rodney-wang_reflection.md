@@ -24,7 +24,7 @@
 
 **Weak**
 
-- It guessed numbers instead of working them out. Some of its default settings were simply wrong until I asked it to check them against real measurements.
+- It guessed settings like memory limits and batch sizes instead of measuring them. Its first GPU settings ran out of memory on my 8 GB card, and its batch size made indexing a large repo hang for 36 minutes. Both were only fixed after I had it measure memory use on my machine.
 - Some of the tests it wrote were wrong, or passed without actually testing anything.
 - Its first drafts often looked correct but failed when run for real, for example running out of memory or breaking on a different operating system.
 
@@ -32,8 +32,8 @@
 
 **What went wrong**
 
-- Partway through the project I told it to assume I had approved its tests and stop asking me. I later did a final review in the end though, but since there were so much changes, it might not be the best.
-- Sometimes i got the same model to write the tests and code, as I got lazy.
+- Partway through the project I told it to assume I had approved its tests and stop asking me. I later did a final review in the end though, but since there were so much changes, it might not be the best. I did this for the TUI mainly, which is small risk and github version control would have contained it. Next time, I should pay more attention to details.
+- Sometimes i got the same model to write the tests and code, as I got lazy. I would instead get another model to do the tests.
 
 **What I would do differently**
 
